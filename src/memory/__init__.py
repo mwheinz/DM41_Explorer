@@ -19,6 +19,9 @@ for readability. The current components are:
                     format_data_line/parse_data_line (DATA line format)
   trigraphs.py     encode_trigraphs/decode_trigraphs/focal_to_unicode (docs/trigraphs.md --
                     the HP41/DM41L FOCAL character set's non-ASCII symbols)
+  device_profile.py
+                   DeviceProfile and the DM41L/DM41X profiles -- the per-model
+                    memory map (extended-memory regions) a Memory carries
   constants.py     address-range and sentinel-register constants
   regions.py       MemoryRegion (the base class -- a live view of one
                     named span, whose boundaries are recomputed on every
@@ -105,6 +108,7 @@ from .registers import (
     parse_data_line,
 )
 from .trigraphs import encode_trigraphs, decode_trigraphs, focal_to_unicode
+from .device_profile import DeviceProfile, DM41L, DM41X, PROFILES
 from .constants import (
     STATUS_REGISTERS_RANGE,
     VOID_RANGE,
@@ -164,6 +168,10 @@ __all__ = [
     "eom_register",
     "STATUS_REGISTER_LABELS",
     "XM_REGIONS",
+    "DeviceProfile",
+    "DM41L",
+    "DM41X",
+    "PROFILES",
     "MIN_SANE_R00",
     "MemoryRegion",
     "RegionSpan",

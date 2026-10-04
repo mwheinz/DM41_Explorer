@@ -4,6 +4,7 @@ memory package.
 '''
 
 from .registers import Register
+from .device_profile import DM41L
 
 STATUS_REGISTERS_RANGE = (0x00, 0x0F)
 VOID_RANGE = (0x10, 0x3F)
@@ -43,6 +44,7 @@ def eom_register() -> Register:
     '''A new end-of-XM-directory sentinel register (all 0xFF).'''
     return Register.from_hex(EOM_REGISTER_HEX)
 
+
 # Labels for the 16 status registers, in address order.
 STATUS_REGISTER_LABELS = [
     "T", "Z", "Y", "X",
@@ -51,12 +53,8 @@ STATUS_REGISTER_LABELS = [
     "b", "c", "d / Flags", "e",
 ]
 
-# The extended-memory regions the calculator can address. Regions 0 and 1 are
-# always present in the DM41L emulator, with Region 0 emulating an Extended
-# Functions module and Region 1 emulating an Extended Memory module. Note that
-# the this XM region actually extends to address 0x200, but that register is
-# never used on a DM41L and is always zero. I believe register 0x200 would be
-# a pointer to a third XM region if the DM41L supported one. (My memory is that
-# the HP41 series could support an Extended Functions module and up to 2
-# Extended Memory modules.)
-XM_REGIONS = [(0x40, 0xBF), (0x201, 0x2EF)]
+# The DM41L's extended-memory regions, kept as a plain list for existing
+# callers and tests. The authoritative, per-model definitions (including the
+# DM41X's third region) live in device_profile.py; code that needs "the
+# regions of THIS memory" must use `memory.profile.xm_regions`, not this.
+XM_REGIONS = list(DM41L.xm_regions)

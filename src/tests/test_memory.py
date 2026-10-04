@@ -563,6 +563,7 @@ def test_status_registers_invalid_address(status_memory):
 
 from pathlib import Path
 from memory import ExtendedMemory, DM41MemoryError, XM_REGIONS, zero_register
+from fixture_loading import load_fixture
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -1263,7 +1264,7 @@ def test_cold_start_signature_is_0x169_in_every_sample():
     for this (it's not user-actionable), so read it via the same nibble
     math R00()/DotEnd() use."""
     for path in DATA_DIR.glob("*.dm41"):
-        memory = Memory.from_file(path)
+        memory = load_fixture(path)
         nibbles = memory.status_registers._reg_c_nibbles()
         cold_start = memory.status_registers._nibbles_to_int(nibbles[5:8])
         assert cold_start == 0x169, path.name
@@ -1326,7 +1327,7 @@ def test_key_assignments_end_is_start_when_no_assignments():
     for path in DATA_DIR.glob("*.dm41"):
         if path.name in excluded:
             continue
-        memory = Memory.from_file(path)
+        memory = load_fixture(path)
         assert memory.key_assignments.end_exclusive == 0xC0, path.name
 
 
@@ -1650,7 +1651,7 @@ def test_list_global_chain_terminates_on_every_sample_dump():
     raise or hang on any real fixture, regardless of whether it has
     programs."""
     for path in DATA_DIR.glob("*.dm41"):
-        memory = Memory.from_file(path)
+        memory = load_fixture(path)
         chain = memory.programs.list_global_chain()
         assert isinstance(chain, list)
         for p in chain:
@@ -1764,7 +1765,7 @@ def test_list_programs_terminates_on_every_sample_dump():
     or hang on any real fixture, regardless of whether it has programs,
     and every program's length should be positive."""
     for path in DATA_DIR.glob("*.dm41"):
-        memory = Memory.from_file(path)
+        memory = load_fixture(path)
         programs = memory.programs.list_programs()
         assert isinstance(programs, list)
         for p in programs:

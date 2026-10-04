@@ -29,6 +29,7 @@ from pathlib import Path
 import pytest
 
 from memory import Memory, DM41MemoryError, Register
+from fixture_loading import load_fixture
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -51,7 +52,7 @@ def test_pack_never_loses_or_reorders_programs(path):
     # Excludes REPAIR_FIXTURES -- see test_pack_repairs_a_broken_backward_chain
     # below for lander.dm41/targ.dm41, where pack() is supposed to change
     # what list_programs() reports (that's the fix).
-    memory = Memory.from_file(path)
+    memory = load_fixture(path)
     before = [(p.names_label, p.length) for p in memory.programs.list_programs()]
     before_bytes = [memory.programs.get_program_bytes(p) for p in memory.programs.list_programs()]
 
@@ -71,7 +72,7 @@ def test_pack_never_reports_a_negative_reclaim(path):
     # e.g. on twolabels.dm41 -- a single program terminated only by the
     # permanent .END., already in its most-compact form). pack() must
     # never make memory less free than it started.
-    memory = Memory.from_file(path)
+    memory = load_fixture(path)
     freed = memory.pack()
     assert freed >= 0, f"{path.name}: pack() reported a NEGATIVE reclaim ({freed})"
 
@@ -81,18 +82,18 @@ def test_pack_is_idempotent(path):
     # Packing an already-packed buffer a second time should never find
     # anything left to reclaim -- true for the REPAIR_FIXTURES too, once
     # their first pack() has rebuilt a real backward chain for them.
-    memory = Memory.from_file(path)
+    memory = load_fixture(path)
     memory.pack()
     assert memory.pack() == 0
 
 
 @pytest.mark.parametrize("path", ALL_FIXTURES, ids=lambda p: p.name)
 def test_pack_round_trips_through_to_string_and_from_string(path):
-    memory = Memory.from_file(path)
+    memory = load_fixture(path)
     memory.pack()
     expected = [(p.names_label, p.length) for p in memory.programs.list_programs()]
 
-    reloaded = Memory.from_string(memory.to_string())
+    reloaded = Memory.from_string(memory.to_string(), profile=memory.profile)
     assert [(p.names_label, p.length) for p in reloaded.programs.list_programs()] == expected
 
 

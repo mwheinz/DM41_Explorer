@@ -50,26 +50,66 @@ For the DM41L emulator, this means there are a total of 362 extended memory
 registers available to the user. Addresses above 0x300 are not available in the
 DM41L emulator.
 
+The DM41X has the full complement of two Extended Memory modules: 603 usable
+registers across its three regions (127 + 238 + 238), which by the same
+arithmetic is 600 as reported by EMDIR with an empty directory. (Not yet
+checked against EMDIR on a real DM41X.)
+
 ## 1. Special XM Registers
 
-* **0x040:** 000WW0PPNNNTTT or 00000000000000 (if no XM files have been created)
-* **0x200:** Always zero? Purpose unknown.
-* **0x201:** 000WW0PP000TTT or 00000000000000 (if no XM files have been created)
+Each XM region starts with a reserved pointer register. The DM41L has two
+regions; the DM41X has three (confirmed against
+`tests/data/dm41x_manyfiles.dm41`, a real DM41X dump with 52 files that
+span all three):
 
-- TTT is the address of the top of the current XM region. For the DM41L
-  emulator this will be either 0xbf or 0x2ef.
-- NNN is the address of the top of the next block of XM memory. For the DM41L
-  emulator this will be either 0x2ef or zero. Note that NNN reflects whether
-  the next region is actually *in use*, not merely whether it exists — if the
-  current catalog of XM files does not extend in the the higher memory region,
-  NNN will be zero.
-- WW is the index of the currently open XM file. (It is unclear if this is true
-  for register 0x201.)
-- PP may be the index of the previously open XM file. or it might be a back
-  link to the previous XM region. It is possible that the value of PP in
-  register 0x40 and the value of PP in register 0x201 have different meanings.
+| Region | Pointer register | Usable registers | Present on |
+| --- | --- | --- | --- |
+| 0 (Extended Functions) | 0x040 | 0x041-0x0bf | DM41L, DM41X |
+| 1 (Extended Memory) | 0x201 | 0x202-0x2ef | DM41L, DM41X |
+| 2 (Extended Memory) | 0x301 | 0x302-0x3ef | DM41X only |
+
+Registers 0x200 and 0x300 are "always zero?" and purpose unknown. The 16
+addresses 0x2f0-0x2ff are not part of any region.
+
+Every pointer register has the layout `000WWPPPNNNTTT` (14 hex digits, or
+`00000000000000` before any XM file has been created):
+
+* **0x040:** `000WWPPPNNNTTT`
+* **0x201:** `000WWPPPNNNTTT` (region 1)
+* **0x301:** `000WWPPPNNNTTT` (region 2, DM41X only)
+
+Observed values in `dm41x_manyfiles.dm41` (52 files):
+
+| Register | Value | WW | PPP | NNN | TTT |
+| --- | --- | --- | --- | --- | --- |
+| 0x040 | `000340342ef0bf` | 0x34 | 0x034 | 0x2ef | 0x0bf |
+| 0x201 | `000000403ef2ef` | 0x00 | 0x040 | 0x3ef | 0x2ef |
+| 0x301 | `000002010003ef` | 0x00 | 0x201 | 0x000 | 0x3ef |
+
+- TTT is the address of the top of this region: 0xbf, 0x2ef or 0x3ef.
+- NNN is the address of the top of the *next* region, chained region to
+  region: 0x040 holds 0x2ef, 0x201 holds 0x3ef, and the last region holds
+  zero. Note that NNN reflects whether the next region is actually *in use*,
+  not merely whether it exists -- if the current catalog of XM files does not
+  extend into the next region, NNN is zero. (On a DM41L, 0x201 always has
+  NNN = 0.)
+- WW is a **two**-digit field, not one: `manyfiles.dm41` has 0x1f, and
+  `dm41x_manyfiles.dm41` has 0x34. In region 0 it is the index of the
+  currently open XM file. (It is unclear if that is true for the other
+  regions; they have WW = 0 in every sample.)
+- PPP, in region 0, seems to indicate the number of files in extended memory,
+  but this may not alwas be true. In regions 1 and later it is a **back link**:
+  the *address* of the previous region's pointer register -- 0x040 in region
+  1's, 0x201 in region 2's.
 - Unused nibbles are not guaranteed to be zero, they might be used as temporary
   memory for internal operations.
+
+The directory itself is read exactly the same way on every model: start at
+TTT of region 0, walk files downward, and whenever a file's data runs past
+the bottom of a region's usable registers it continues at the top of the next
+region (possibly more than one region, for a very large file), until the
+FF-filled end-of-directory register is reached. In `dm41x_manyfiles.dm41` that
+register is 0x34f, in region 2.
 
 ## 2 XM File Structure — General Layout
 

@@ -9,7 +9,7 @@ from typing import Optional, TYPE_CHECKING
 
 from .registers import Register, DM41MemoryError, format_data_line, parse_data_line
 from .trigraphs import encode_trigraphs, decode_trigraphs
-from .constants import XM_REGIONS, zero_register, eom_register
+from .constants import zero_register, eom_register
 from .regions import MemoryRegion
 
 if TYPE_CHECKING:
@@ -253,7 +253,7 @@ class XMFile:
 class ExtendedMemory(MemoryRegion):
     """
     Extended memory (XM): file-oriented storage split across up to three
-    disjoint regions (see XM_REGIONS). Each region is a stack of files
+    disjoint regions (see device_profile.py). Each region is a stack of files
     packed from its top (highest address) downward: a file is a contiguous
     run of data registers immediately followed by a 2-register
     [header][name] pair at the top of its space, with the next file (if
@@ -304,20 +304,25 @@ class ExtendedMemory(MemoryRegion):
     key = "xm"
     label = "XM"
 
-    # The full addressable extent XM can occupy: the low region's own
-    # start through the high region's own end. The gap in the middle
-    # (0xC0-0x200, where key assignments/alarms/programs/data live) is
-    # inside this outer range but is never part of any XM region --
-    # _find_region() is what decides which real region an address belongs
-    # to. Callers wanting only one region's storage can still pass an
-    # explicit `address_range`.
-    DEFAULT_ADDRESS_RANGE = (XM_REGIONS[0][0], XM_REGIONS[-1][1])
+    # The full addressable extent XM can occupy is the model's first region's
+    # pointer register through its last region's ceiling
+    # (memory.profile.xm_address_range). The gaps in between (e.g. 0xC0-0x200,
+    # where key assignments/alarms/programs/data live) are inside this outer
+    # range but are never part of any XM region -- _find_region() is what
+    # decides which real region an address belongs to. Callers wanting only
+    # one region's storage can still pass an explicit `address_range`.
 
     def __init__(self, memory: "Memory", address_range=None):
         super().__init__(
             memory,
-            self.DEFAULT_ADDRESS_RANGE if address_range is None else address_range,
+            memory.profile.xm_address_range if address_range is None else address_range,
         )
+
+    @property
+    def _xm_regions(self):
+        """This memory's XM regions: (pointer register, ceiling) pairs, in
+        ascending address order (see device_profile.py)."""
+        return self._memory.profile.xm_regions
 
     TYPE_PROGRAM = XMFile.TYPE_PROGRAM
     TYPE_DATA = XMFile.TYPE_DATA
@@ -414,14 +419,15 @@ class ExtendedMemory(MemoryRegion):
         Walks every XM region top-down and returns the files found, in
         address order.
 
-        A file's data can span multiple regions.
+        A file's data can span multiple regions -- including more than two,
+        on a model with more than two (see device_profile.py).
         """
         files = []
+        regions = self._xm_regions
 
-        # Notes: In theory we should be able to handle 1, 2, or 3 extended
-        # memory regions but as a practical matter, the DM41L emulator always
-        # has exactly two. These two regions occupy (0x40-0x0bf) and
-        # (0x201-0x2ef).
+        # Notes: the DM41L emulator always has exactly two regions, which
+        # occupy (0x40-0x0bf) and (0x201-0x2ef); the DM41X adds a third at
+        # (0x301-0x3ef).
         #
         # Also, while the contents of the XM header registers would probably
         # be initialized at boot time on a real HP41 calculator, the DM41L
@@ -432,7 +438,7 @@ class ExtendedMemory(MemoryRegion):
         # If the last 3 nibbles of the region header
         # equal 0, there are no XM files.
         current_region = 0
-        region_header_addr = XM_REGIONS[current_region][0]
+        region_header_addr = regions[current_region][0]
         region_header = self.get_register(region_header_addr)
         if region_header == zero_register():
             return []
@@ -440,9 +446,9 @@ class ExtendedMemory(MemoryRegion):
         # Compare what the memory dump says should be the top of the first
         # XM region with what we know it should be...
         addr = (region_header[1] & 0x0F) * 256 + region_header[0]
-        if addr != XM_REGIONS[current_region][1]:
+        if addr != regions[current_region][1]:
             raise DM41MemoryError(
-                f"Invalid XM header: {addr:x} != 0x" f"{XM_REGIONS[current_region][1]}"
+                f"Invalid XM header: {addr:x} != 0x" f"{regions[current_region][1]}"
             )
 
         while self.get_register(addr) != eom_register():
@@ -461,20 +467,27 @@ class ExtendedMemory(MemoryRegion):
                     f"0x{addr:x}: {header_register.get_hex()}"
                 ) from e
 
+            # `addr` is now where this file's successor (or the EOM sentinel)
+            # would sit if the whole file fit in the current region. If that
+            # lands on or below the region's pointer register, the rest of
+            # the file continues at the top of the next region -- and, for a
+            # file big enough, the one after that.
             addr -= header["register_length"] + 1
-            if addr <= XM_REGIONS[current_region][0]:
-                # File spans regions.
-                segments = [[XM_REGIONS[current_region][0] + 1, header_addr - 1]]
+            top = header_addr - 1
+            while addr <= regions[current_region][0]:
+                segments.append([regions[current_region][0] + 1, top])
 
-                s = XM_REGIONS[current_region][0] - addr
+                s = regions[current_region][0] - addr
                 current_region += 1
-                addr = XM_REGIONS[current_region][1] - s
+                if current_region >= len(regions):
+                    raise DM41MemoryError(
+                        f"XM file {name!r} (header at 0x{header_addr:x}) runs "
+                        "past the last XM region."
+                    )
+                addr = regions[current_region][1] - s
+                top = regions[current_region][1]
 
-                segments.append([addr + 1, XM_REGIONS[current_region][1]])
-
-            else:
-                # File only has 1 segment.
-                segments = [[addr + 1, header_addr - 1]]
+            segments.append([addr + 1, top])
 
             file = XMFile(
                 memory=self._memory,
@@ -490,10 +503,10 @@ class ExtendedMemory(MemoryRegion):
         return files
 
     def _find_region(self, addr: int) -> int:
-        """The index into XM_REGIONS whose *usable* span (just above the
-        region's reserved pointer register, up through its ceiling)
-        contains addr."""
-        for i, (lo, hi) in enumerate(XM_REGIONS):
+        """The index into this memory's XM regions whose *usable* span (just
+        above the region's reserved pointer register, up through its
+        ceiling) contains addr."""
+        for i, (lo, hi) in enumerate(self._xm_regions):
             if lo < addr <= hi:
                 return i
         raise DM41MemoryError(f"Address 0x{addr:x} is not within any writable XM region")
@@ -517,9 +530,10 @@ class ExtendedMemory(MemoryRegion):
             name_addr = files[-1].data_start - 1
             return name_addr, self._find_region(name_addr), False
 
-        region0_header = self.get_register(XM_REGIONS[0][0])
+        regions = self._xm_regions
+        region0_header = self.get_register(regions[0][0])
         if region0_header == zero_register():
-            return XM_REGIONS[0][1], 0, True
+            return regions[0][1], 0, True
 
         # Region 0's pointer register is already initialized but every file
         # has apparently been deleted -- trust its TTT field, same as
@@ -533,9 +547,9 @@ class ExtendedMemory(MemoryRegion):
         """
         Works out where a new file's register_count data registers land,
         starting immediately below the header at name_addr - 1, spilling
-        into the next XM region if it doesn't fit in this one's remaining
+        into the next XM region(s) if it doesn't fit in this one's remaining
         space -- the exact inverse of the address math in list_files()
-        (see its docstring for the cross-region-continuation details), so
+        (see its comments for the cross-region-continuation details), so
         that list_files() reading the result back reconstructs the same
         segments.
 
@@ -544,71 +558,46 @@ class ExtendedMemory(MemoryRegion):
         next_name_addr is where *this* file's own successor (or an EOM
         sentinel) belongs, in ending_region.
         """
+        regions = self._xm_regions
         header_addr = name_addr - 1
         cursor = header_addr - (register_count + 1)
+        segments = []
+        top = header_addr - 1
+        ri = region_index
 
-        if cursor <= XM_REGIONS[region_index][0]:
-            # Spans into the next region, identically to the reading side.
-            # This `<=` (not `<`) is deliberate, not itself an off-by-one:
-            # `cursor` is also next_name_addr's starting point below, and
-            # it must land on a real address inside THIS region for a
-            # terminator (this file's successor's name register, or
-            # list_files()'s EOM sentinel) to go -- so a file that would
-            # leave *zero* room for one (cursor landing exactly on
-            # region_index's own reserved pointer register) has to be
-            # handled here too, even though none of its own data actually
-            # overflows. `s` (below) tells the two cases apart: s > 0
-            # means real data registers spill into the next region; s ==
-            # 0 means only the terminator does, and this file's own
-            # content still fits entirely in region_index -- see
-            # XMFile.spans_regions(), which reports False for exactly
-            # this s == 0 case rather than treating "spans" as merely
-            # "touched the next region for bookkeeping purposes".
-            segments = [[XM_REGIONS[region_index][0] + 1, header_addr - 1]]
-            s = XM_REGIONS[region_index][0] - cursor
-            next_region = region_index + 1
-            if next_region >= len(XM_REGIONS):
+        # The `<=` (not `<`) is deliberate, not itself an off-by-one:
+        # `cursor` is also next_name_addr's starting point, and it must land
+        # on a real, writable address strictly ABOVE a region's own reserved
+        # pointer register for a terminator (this file's successor's name
+        # register, or list_files()'s EOM sentinel) to go. So a file that
+        # would leave *zero* room for one (cursor landing exactly on the
+        # region's pointer register) spills too, even though none of its own
+        # data actually overflows: `s` (below) is 0 in that case, the segment
+        # added in the next region is empty, and XMFile.spans_regions reports
+        # False -- "spans" means real data in a later region, not merely that
+        # the terminator was pushed there.
+        #
+        # Getting this boundary wrong by one was a confirmed real bug: a file
+        # was allowed to use every last usable register, add_file() wrote it
+        # successfully, but no terminator was ever written, so the very next
+        # list_files() walked past it into unrelated memory and crashed.
+        # Rejecting such a file here -- before any registers are written --
+        # keeps a directory this close to full from losing its terminator.
+        while cursor <= regions[ri][0]:
+            segments.append([regions[ri][0] + 1, top])
+            s = regions[ri][0] - cursor
+            ri += 1
+            if ri >= len(regions):
                 raise DM41MemoryError(
                     "Not enough free space in extended memory for this "
                     "file -- no further XM region is available to spill "
                     "into."
                 )
-            ceiling = XM_REGIONS[next_region][1]
-            cursor = ceiling - s
-            # `cursor` (== next_name_addr, returned below) is where this
-            # file's successor -- another file's name register, or
-            # list_files()'s EOM sentinel if there is no successor -- has
-            # to go, so it must itself be a real, writable address in
-            # this region: strictly greater than the region's own
-            # reserved pointer register, i.e. NOT `<=`. Getting this
-            # boundary wrong by one (the previous version of this check
-            # was `cursor + 1 <= ...`, equivalent to `cursor <
-            # XM_REGIONS[next_region][0]`) let a file land `cursor`
-            # exactly ON the next region's pointer-register address
-            # through -- using every last usable register in both
-            # regions combined, with nothing free for a terminator.
-            # add_file() accepted it and wrote it successfully;
-            # _place_file() then correctly avoided clobbering that
-            # pointer register with a bogus EOM sentinel (its own
-            # `next_name_addr > XM_REGIONS[ending_region][0]` guard) --
-            # but never wrote ANY terminator there either, so the very
-            # next list_files() call walked straight past the (perfectly
-            # valid) pointer register it found, mistook it for another
-            # file's name register, and crashed trying to parse unrelated
-            # memory beyond the region as a header. Confirmed by direct
-            # repro. Rejecting it here instead -- before any registers
-            # are written -- keeps a directory this close to full from
-            # ever losing its terminator in the first place.
-            if cursor <= XM_REGIONS[next_region][0]:
-                raise DM41MemoryError(
-                    "Not enough free space in extended memory for this "
-                    "file."
-                )
-            segments.append([cursor + 1, ceiling])
-            return segments, cursor, next_region
+            cursor = regions[ri][1] - s
+            top = regions[ri][1]
 
-        segments = [[cursor + 1, header_addr - 1]]
-        return segments, cursor, region_index
+        segments.append([cursor + 1, top])
+        return segments, cursor, ri
 
     @staticmethod
     def _build_header(
@@ -640,13 +629,12 @@ class ExtendedMemory(MemoryRegion):
             data[6] = register_length & 0xFF
         return Register(data=bytes(data))
 
-    @staticmethod
     def _build_region_pointer(
-        region_index: int, *, next_region_active: bool, ww: int, pp: int
+        self, region_index: int, *, next_region_active: bool, ww: int, pp: int
     ) -> Register:
         """
-        Builds the 000WW0PPNNNTTT pointer register for XM_REGIONS[region_index]
-        (docs/memory.md sec. 4.1).
+        Builds the 000WW0PPNNNTTT pointer register for this memory's XM
+        region `region_index` (docs/extended_memory.md sec. 1).
 
         TTT is this region's own ceiling (well-confirmed). NNN is the next
         region's ceiling, but only when next_region_active -- **confirmed**
@@ -654,25 +642,91 @@ class ExtendedMemory(MemoryRegion):
         (tests/data/helloworld.dm41) leaves NNN at 0 even though region 1
         exists in hardware, while dumps with an actually-spanning file
         (3x-xm.dm41, 6x-xm.dm41) show NNN as region 1's ceiling. So NNN
-        reflects whether the next region is *in use*, not merely whether
-        it exists in XM_REGIONS.
+        reflects whether the next region is *in use*, not merely whether it
+        exists in the profile.
 
-        ww/pp ("currently"/"previously open file index", docs/memory.md
-        sec. 4.1) are caller-supplied -- see add_file()'s call sites for
-        what's actually confirmed for each region.
+        WW is a full two-hex-digit field (files beyond the 15th need both
+        digits -- tests/data/manyfiles.dm41 has 0x1f). `pp` is written as a
+        three-digit field (nibbles 5-7): for region 0 it is a small
+        number, but for later regions it is the ADDRESS of the previous
+        region's pointer register (0x040 in region 1's, 0x201 in region 2's
+        -- confirmed against tests/data/dm41x_manyfiles.dm41), which is
+        why it can need the third digit.
+
+        ww/pp are caller-supplied -- see _update_region_pointers() for what's
+        actually confirmed for each region.
         """
-        ttt = XM_REGIONS[region_index][1]
+        regions = self._xm_regions
+        ttt = regions[region_index][1]
         next_region = region_index + 1
         nnn = 0
-        if next_region_active and next_region < len(XM_REGIONS):
-            nnn = XM_REGIONS[next_region][1]
+        if next_region_active and next_region < len(regions):
+            nnn = regions[next_region][1]
         data = bytearray(7)
-        data[2] = (ww & 0x0F) << 4
+        data[1] = (ww >> 4) & 0x0F
+        data[2] = ((ww & 0x0F) << 4) | ((pp >> 8) & 0x0F)
         data[3] = pp & 0xFF
         data[4] = (nnn >> 4) & 0xFF
         data[5] = ((nnn & 0x0F) << 4) | ((ttt >> 8) & 0x0F)
         data[6] = ttt & 0xFF
         return Register(data=bytes(data))
+
+    def _update_region_pointers(self, ending_region: int) -> None:
+        """
+        After a file has been placed, brings the region pointer registers up
+        to date: every region from 0 through `ending_region` is now in use,
+        so each must have a pointer register, and each one before the last
+        must have its NNN field pointing at the next region's ceiling.
+
+        Missing in the past, and a confirmed real bug: a dump where region 0
+        was bootstrapped by an earlier, non-spanning file (leaving NNN at 0,
+        correctly, at that time) and only a *later* file first spans into
+        region 1 left NNN stuck at 0 forever after -- the real DM41L trusts
+        that field to know region 1 exists at all, so every file from the
+        first spanning one onward (including ones entirely within region 1)
+        was invisible to it, even though this tool's own list_files() never
+        needed that field and so never caught it. The same chain applies
+        between every pair of adjacent regions.
+
+        A pointer that already exists is only ever patched in its NNN field;
+        every other nibble (WW, PP, ...) is left as it was -- there's no
+        confirmed rule for updating those on every append (see
+        docs/extended_memory.md sec. 1).
+        """
+        regions = self._xm_regions
+        for i in range(ending_region + 1):
+            pointer_addr = regions[i][0]
+            next_active = i < ending_region
+            current = self.get_register(pointer_addr)
+
+            if current == zero_register():
+                if i == 0:
+                    # Confirmed against tests/data/helloworld.dm41 (a real
+                    # DM41L, erased then given its very first XM file):
+                    # ww=1, pp=0.
+                    ww, pp = 1, 0
+                else:
+                    # Confirmed against tests/data/3x-xm.dm41 and 6x-xm.dm41
+                    # (real captures with a genuinely-spanning file) and
+                    # tests/data/dm41x_manyfiles.dm41 (all three regions):
+                    # ww=0, and pp is the ADDRESS of the previous region's
+                    # pointer register -- a back-link, not a file count.
+                    ww, pp = 0, regions[i - 1][0]
+                self.set_register(
+                    pointer_addr,
+                    self._build_region_pointer(
+                        i, next_region_active=next_active, ww=ww, pp=pp
+                    ),
+                )
+                continue
+
+            raw = bytearray(current.get_bytes())
+            existing_nnn = (raw[4] << 4) | (raw[5] >> 4)
+            if next_active and existing_nnn == 0:
+                nnn = regions[i + 1][1]
+                raw[4] = (nnn >> 4) & 0xFF
+                raw[5] = ((nnn & 0x0F) << 4) | (raw[5] & 0x0F)
+                self.set_register(pointer_addr, Register(data=bytes(raw)))
 
     def add_file(
         self,
@@ -868,7 +922,7 @@ class ExtendedMemory(MemoryRegion):
         false "duplicate", aborting the rebuild partway through with
         several already-wiped, not-yet-rebuilt files gone for good.
         """
-        name_addr, region_index, needs_bootstrap = self._next_slot()
+        name_addr, region_index, _ = self._next_slot()
         register_length = len(data_registers)
         segments, next_name_addr, ending_region = self._allocate_segments(
             name_addr, region_index, register_length
@@ -892,60 +946,10 @@ class ExtendedMemory(MemoryRegion):
 
         # Terminate the directory with a fresh EOM sentinel, if there's
         # still room for one below what we just wrote.
-        if next_name_addr > XM_REGIONS[ending_region][0]:
+        if next_name_addr > self._xm_regions[ending_region][0]:
             self.set_register(next_name_addr, eom_register())
 
-        # The first file to actually use region 1 -- whether that's this
-        # very file, or a later one appended after region 0 was already
-        # bootstrapped -- must be reflected in region 0's OWN pointer
-        # register's NNN field, not just region 1's. Missing this is a
-        # confirmed real bug: a dump where region 0 was bootstrapped by an
-        # earlier, non-spanning file (leaving NNN at 0, correctly, at that
-        # time) and only a *later* file first spans into region 1 left
-        # NNN stuck at 0 forever after -- the real DM41L trusts that field
-        # to know region 1 exists at all, so every file from the first
-        # spanning one onward (including ones entirely within region 1)
-        # was invisible to it, even though this tool's own list_files()
-        # never needed that field and so never caught it.
-        region1_is_new = (
-            ending_region == 1 and self.get_register(XM_REGIONS[1][0]) == zero_register()
-        )
-
-        if needs_bootstrap:
-            # Confirmed against tests/data/helloworld.dm41 (a real DM41L,
-            # erased then given its very first XM file): ww=1, pp=0.
-            self.set_register(
-                XM_REGIONS[0][0],
-                self._build_region_pointer(
-                    0, next_region_active=region1_is_new, ww=1, pp=0
-                ),
-            )
-        elif region1_is_new:
-            # Region 0 was already bootstrapped by an earlier file; patch
-            # its NNN field only, preserving whatever WW/PP it already
-            # had (no confirmed rule for updating those on every append --
-            # see docs/memory.md sec. 4.1).
-            r40 = self.get_register(XM_REGIONS[0][0])
-            ww0 = (r40.get_bytes()[2] >> 4) & 0x0F
-            pp0 = r40.get_bytes()[3]
-            self.set_register(
-                XM_REGIONS[0][0],
-                self._build_region_pointer(0, next_region_active=True, ww=ww0, pp=pp0),
-            )
-
-        if region1_is_new:
-            # Confirmed against tests/data/3x-xm.dm41 and 6x-xm.dm41 (both
-            # real captures with a genuinely-spanning file): ww=0, and
-            # pp equal to XM_REGIONS[0][0] in both -- reads like a fixed
-            # back-link to region 0's own pointer register rather than a
-            # file count (both dumps have a different file count but the
-            # identical pp).
-            self.set_register(
-                XM_REGIONS[1][0],
-                self._build_region_pointer(
-                    1, next_region_active=False, ww=0, pp=XM_REGIONS[0][0]
-                ),
-            )
+        self._update_region_pointers(ending_region)
 
         return XMFile(
             memory=self._memory,
@@ -1009,7 +1013,7 @@ class ExtendedMemory(MemoryRegion):
                 continue
             rebuild.append((f.name_bytes, f.file_type, f.data_registers(), f.byte_length))
 
-        for lo, hi in XM_REGIONS:
+        for lo, hi in self._xm_regions:
             for addr in range(lo, hi + 1):
                 self.set_register(addr, Register(size=7))
 

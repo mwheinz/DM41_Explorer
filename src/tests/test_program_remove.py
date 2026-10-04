@@ -18,6 +18,7 @@ from pathlib import Path
 import pytest
 
 from memory import Memory, DM41MemoryError, Program
+from fixture_loading import load_fixture
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -199,10 +200,10 @@ def test_remove_every_program_in_every_sample_dump_one_at_a_time():
     should leave every other program's own name/length exactly as it
     was."""
     for path in sorted(DATA_DIR.glob("*.dm41")):
-        memory = Memory.from_file(path)
+        memory = load_fixture(path)
         programs = memory.programs.list_programs()
         for target in programs:
-            fresh = Memory.from_file(path)
+            fresh = load_fixture(path)
             fresh_programs = fresh.programs.list_programs()
             # Match target by position, same convention get_program_bytes()
             # itself uses.

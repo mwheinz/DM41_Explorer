@@ -16,8 +16,8 @@ from typing import Dict, Optional, Union
 from pathlib import Path
 
 from .registers import Register
+from .device_profile import DeviceProfile, DM41L
 from .constants import (
-    XM_REGIONS,
     MIN_SANE_R00,
     zero_register,
     REGISTER_SIZE_BYTES,
@@ -40,8 +40,11 @@ class Memory:
     # or more chars
     SPECIAL_PATTERN = re.compile(r"([A-Z]:\s*)([0-9a-fA-F]+)")
 
-    def __init__(self, header: str = "DM41"):
+    def __init__(self, header: str = "DM41", profile: DeviceProfile = DM41L):
         self._header = header
+        # Which DM41 model's memory map this dump uses. The dump text
+        # doesn't say, so the caller chooses -- see device_profile.py.
+        self._profile = profile
         self._core_memory: Dict[int, Register] = {}  # Keyed by register index
         self._special_registers: Dict[str, Register] = (
             {}
@@ -88,7 +91,7 @@ class Memory:
         if not isinstance(other, Memory):
             return False
 
-        if self._header != other._header:
+        if self._header != other._header or self._profile != other._profile:
             return False
         if self._special_registers != other._special_registers:
             return False
@@ -106,13 +109,14 @@ class Memory:
     # -- Loading and saving ----------------------------------------------
 
     @classmethod
-    def from_string(cls, buffer: str) -> "Memory":
+    def from_string(cls, buffer: str, profile: DeviceProfile = DM41L) -> "Memory":
         '''
         Creates a new Memory object from a string that contains a DM41
-        memory dump.
+        memory dump. `profile` says which model's memory map to use (the
+        text format is identical for every model).
         '''
 
-        memory = cls()
+        memory = cls(profile=profile)
 
         lines = buffer.strip().splitlines()
         if not lines:
@@ -193,12 +197,14 @@ class Memory:
         return memory
 
     @classmethod
-    def from_file(cls, path: Union[str, Path]) -> "Memory":
+    def from_file(
+        cls, path: Union[str, Path], profile: DeviceProfile = DM41L
+    ) -> "Memory":
         '''Load a memory dump from disk. A convenience wrapper: the pure,
         filesystem-free API is from_string(), which is what portable code
         (and the web decoder's port) uses.'''
         with open(path, "r", encoding="utf-8") as f:
-            return cls.from_string(f.read())
+            return cls.from_string(f.read(), profile=profile)
 
     def to_string(self) -> str:
         ''' Create a string representation of the memory dump. '''
@@ -286,6 +292,11 @@ class Memory:
         return self._regions[key]
 
     @property
+    def profile(self) -> DeviceProfile:
+        '''This dump's model profile (memory map).'''
+        return self._profile
+
+    @property
     def modified(self) -> bool:
         return self._modified
 
@@ -356,16 +367,18 @@ class Memory:
 
     def regions(self) -> list:
         '''
-        Every named region of the full addressable display range
-        (0x000-0x2EF), as a flat, address-ordered list of RegionSpan(key,
-        label, start, end) -- both inclusive.
+        Every named region of the full addressable display range (0x000
+        through `profile.display_end` -- 0x2EF for a DM41L, 0x3EF for a
+        DM41X), as a flat, address-ordered list of RegionSpan(key, label,
+        start, end) -- both inclusive.
 
-        The "xm" key appears twice (Extended Memory #0 and #1), since the
-        two spans aren't contiguous with each other.
+        The "xm" key appears once per XM region (two on a DM41L, three on a
+        DM41X), since those spans aren't contiguous with each other. On a
+        DM41X the 16 addresses 0x2F0-0x2FF between the second and third
+        regions belong to no span.
         '''
         xm = self.extended_memory
-        xm0_lo, xm0_hi = XM_REGIONS[0]
-        xm1_lo, xm1_hi = XM_REGIONS[1]
+        xm0_lo, xm0_hi = self._profile.xm_regions[0]
 
         spans = [
             self.status_registers.span(),
@@ -380,14 +393,18 @@ class Memory:
             spans.append(self.programs.span())
             spans.append(self.data_memory.span())
 
-        spans.append(RegionSpan(xm.key, xm.label, xm1_lo - 1, xm1_hi))
+        # Each later XM region's span starts one below its pointer register
+        # (e.g. 0x200 for the DM41L's second region) -- the register that
+        # would hold a pointer to a region the model doesn't have.
+        for lo, hi in self._profile.xm_regions[1:]:
+            spans.append(RegionSpan(xm.key, xm.label, lo - 1, hi))
         return spans
 
     def region_for(self, addr: int) -> Optional[RegionSpan]:
         '''The RegionSpan containing `addr` (from regions()), or None if
         `addr` falls outside every span this method returns (shouldn't
-        happen for any address in [0x000, 0x2EF], the full display range
-        regions() covers, but this is a lookup, not a guarantee).'''
+        happen for any address in [0x000, profile.display_end] other than
+        the DM41X's 0x2F0-0x2FF gap, but this is a lookup, not a guarantee).'''
         for span in self.regions():
             if addr in span:
                 return span
