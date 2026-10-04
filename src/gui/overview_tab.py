@@ -9,7 +9,7 @@ import customtkinter as ctk
 
 from memory import (
     Memory,
-    DM41LMemoryError,
+    DM41MemoryError,
     XM_REGIONS,
     PRIMARY_DATA_END,
     MIN_SANE_R00,
@@ -58,7 +58,7 @@ XM_FILE_OVERHEAD_REGISTERS = 2
 # EMDIR's "registers available" is XM_RAW_REGISTERS minus two more kinds
 # of overhead that aren't tied to any one file. One register is always
 # spent on the FF-filled sentinel that marks where free space starts
-# (see memory/constants.py's EOM_REGISTER and
+# (see memory/constants.py's eom_register() and
 # ExtendedMemory.list_files()) -- that's XM_EOM_SENTINEL_REGISTERS.
 # EMDIR's own count is then defined as "how many registers a file
 # created right now could use", which reserves the 2-register header+
@@ -385,7 +385,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
                 f"{xm_used}/{XM_TOTAL_REGISTERS} registers ({xm_used_pct}%)",
                 f"{xm_free}/{XM_TOTAL_REGISTERS} registers ({100 - xm_used_pct}%)",
             )
-        except DM41LMemoryError as e:
+        except DM41MemoryError as e:
             logger.warning("Could not list XM files for summary: %s", e)
             return f"could not be listed ({e})", "unknown", "unknown"
 

@@ -15,7 +15,7 @@ skip_if_permission_bits_unenforced = pytest.mark.skipif(
 def prefs_file(tmp_path, monkeypatch):
     """Points ProjectConfig.PREFS_FILE at a throwaway path
     for the test. It doesn't exist on disk until a test creates it."""
-    fake_prefs_path = tmp_path / ".voyager_prefs.json"
+    fake_prefs_path = tmp_path / ".dm41_test_prefs.json"
     monkeypatch.setattr(ProjectConfig, "PREFS_FILE", fake_prefs_path)
     return fake_prefs_path
 
@@ -116,9 +116,30 @@ def test_save_raises_exception_on_permission_error(tmp_path, monkeypatch):
     # cover -- see the equivalent, correct 0o555 usage in
     # test_commands.py's no_permission_on_parent test.)
     os.chmod(readonly_dir, 0o555)
-    fake_prefs_path = readonly_dir / ".voyager_prefs.json"
+    fake_prefs_path = readonly_dir / ".dm41_test_prefs.json"
     monkeypatch.setattr(ProjectConfig, "PREFS_FILE", fake_prefs_path)
     config = ProjectConfig()
     with pytest.raises(Exception) as excinfo:
         config.save()
     assert "Could not save preferences to" in str(excinfo.value)
+
+
+def test_prefs_filename_gives_each_app_its_own_file(tmp_path, monkeypatch):
+    """A second app passes its own prefs_filename, so it neither reads nor
+    overwrites DM41L_Explorer's preferences file."""
+    monkeypatch.setattr("config.Path.home", lambda: tmp_path)
+    x_config = ProjectConfig(prefs_filename=".dm41x_explorer.json")
+    assert x_config.PREFS_FILE == tmp_path / ".dm41x_explorer.json"
+    # The class-level default is untouched by the instance override.
+    assert ProjectConfig.PREFS_FILE.name == ".dm41l_explorer.json"
+
+    x_config.baudrate = 57600
+    x_config.save()
+    assert (tmp_path / ".dm41x_explorer.json").exists()
+    assert not (tmp_path / ".dm41l_explorer.json").exists()
+
+    # A default-constructed config (DM41L_Explorer's) doesn't see X's values.
+    monkeypatch.setattr(ProjectConfig, "PREFS_FILE", tmp_path / ".dm41l_explorer.json")
+    l_config = ProjectConfig()
+    l_config.load()
+    assert l_config.baudrate == ProjectConfig.DEFAULT_PREFS["baudrate"]

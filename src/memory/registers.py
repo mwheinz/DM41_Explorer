@@ -17,10 +17,18 @@ from decimal import Decimal, Context, ROUND_HALF_EVEN
 from .trigraphs import encode_trigraphs, decode_trigraphs
 
 
-class DM41LMemoryError(ValueError):
+class DM41MemoryError(ValueError):
     '''
     Raised when a register in the data dump contains an illegal value.
+
+    Shared by every DM41 model's memory code (DM41L, DM41X, ...). It was
+    originally named DM41LMemoryError; that name is kept below as an alias
+    so existing imports keep working.
     '''
+
+
+# Backward-compatible alias for the original name.
+DM41LMemoryError = DM41MemoryError
 
 
 class Register:

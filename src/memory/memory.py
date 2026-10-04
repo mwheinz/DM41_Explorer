@@ -1,7 +1,7 @@
 '''
-Memory: a representation of a DM41L memory dump and tools for manipulating
-it. See the memory package's __init__.py docstring for the on-disk dump format
-overview.
+Memory: a representation of a DM41-series (DM41L, DM41X, ...) memory dump
+and tools for manipulating it. See the memory package's __init__.py docstring
+for the on-disk dump format overview.
 
 Memory itself owns only what is genuinely dump-wide: parsing and
 serialization, raw register storage, the partition sanity check every region
@@ -19,7 +19,7 @@ from .registers import Register
 from .constants import (
     XM_REGIONS,
     MIN_SANE_R00,
-    ZERO_REGISTER,
+    zero_register,
     REGISTER_SIZE_BYTES,
     SPECIAL_REGISTER_SIZE_OVERRIDES,
 )
@@ -33,7 +33,8 @@ from .xm_file import ExtendedMemory
 
 
 class Memory:
-    '''A complete DM41L memory dump.'''
+    '''A complete DM41-series memory dump (a DM41L `.dm41` dump or a DM41X
+    `.d41` state file -- the text format is identical).'''
 
     # Pattern to capture a capital letter followed by any hex string of 1
     # or more chars
@@ -193,7 +194,9 @@ class Memory:
 
     @classmethod
     def from_file(cls, path: Union[str, Path]) -> "Memory":
-        '''Load a memory dump from disk.'''
+        '''Load a memory dump from disk. A convenience wrapper: the pure,
+        filesystem-free API is from_string(), which is what portable code
+        (and the web decoder's port) uses.'''
         with open(path, "r", encoding="utf-8") as f:
             return cls.from_string(f.read())
 
@@ -223,7 +226,7 @@ class Memory:
                     self.get_register(base_idx + offset) for offset in range(4)
                 ]
                 # If all 4 registers are zero, skip this row.
-                if all(register == ZERO_REGISTER for register in registers):
+                if all(register == zero_register() for register in registers):
                     continue
                 row = [f"{base_idx:02x}"]
                 row.extend(register.get_hex() for register in registers)
@@ -252,6 +255,8 @@ class Memory:
         return "\n".join(lines) + "\n"
 
     def to_file(self, path: Union[str, Path]):
+        '''Write the dump to disk (convenience wrapper over to_string())
+        and clear the modified flag.'''
         with open(path, "w", encoding="utf-8") as f:
             f.write(self.to_string())
         self._modified=False
@@ -419,7 +424,7 @@ class Memory:
         (the change in the free-space region's size) -- 0 if nothing
         needed packing.
 
-        Raises `DM41LMemoryError` if the program-memory scan cannot safely
+        Raises `DM41MemoryError` if the program-memory scan cannot safely
         determine program memory's real content -- see
         `ProgramMemory._forward_scan_programs()` for exactly when that
         happens. Nothing is changed at all if that happens: the scan runs,

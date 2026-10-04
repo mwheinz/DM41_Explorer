@@ -562,7 +562,7 @@ def test_status_registers_invalid_address(status_memory):
 # --- Extended Memory / XMFile Tests ---
 
 from pathlib import Path
-from memory import ExtendedMemory, DM41LMemoryError, XM_REGIONS, ZERO_REGISTER
+from memory import ExtendedMemory, DM41MemoryError, XM_REGIONS, zero_register
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -796,7 +796,7 @@ def test_xm_add_file_rejects_duplicate_name():
     before = {f.name: f for f in xm.list_files()}
     assert "XM1.000" in before  # sanity: this fixture really has it
 
-    with pytest.raises(DM41LMemoryError, match="already exists"):
+    with pytest.raises(DM41MemoryError, match="already exists"):
         xm.add_file("XM1.000", xm.TYPE_DATA, numbers=[1, 2, 3])
 
     # Nothing should have been written -- same files, same content.
@@ -854,7 +854,7 @@ def test_xm_edit_file_with_colliding_display_name_does_not_corrupt_dump():
     test_xm_list_files_preserves_raw_name_bytes_even_when_display_collides).
     Editing one of them -- remove-then-add, same as the GUI's Edit flow
     (xm_files_tab.py's _save_new_or_edited_file()) -- used to raise a
-    false "duplicate file name" DM41LMemoryError from *inside*
+    false "duplicate file name" DM41MemoryError from *inside*
     remove_file()'s rebuild, once it reached a second survivor whose
     display name collided with one already rebuilt. That happened after
     every register had already been wiped, so every file from the
@@ -1016,7 +1016,7 @@ def test_xm_add_file_updates_region0_nnn_when_a_later_file_first_spans():
 
 def test_xm_add_file_no_room_raises():
     xm = _load_xm("empty.dm41")
-    with pytest.raises(DM41LMemoryError):
+    with pytest.raises(DM41MemoryError):
         xm.add_file("HUGE", xm.TYPE_DATA, numbers=[float(i) for i in range(4000)])
 
 
@@ -1025,7 +1025,7 @@ def test_xm_add_file_one_register_over_total_capacity_raises_cleanly():
     register more than extended memory can safely hold used to be
     ACCEPTED by add_file() -- the write succeeded -- and corrupted the
     directory so badly that the very next list_files() call raised
-    DM41LMemoryError trying to parse unrelated memory past the region as
+    DM41MemoryError trying to parse unrelated memory past the region as
     a header.
 
     Root cause: _allocate_segments()'s spanning-into-region-1 capacity
@@ -1057,12 +1057,12 @@ def test_xm_add_file_one_register_over_total_capacity_raises_cleanly():
     assert files[0].get_numbers() == [1.0] * max_safe
 
     xm2 = _load_xm("empty.dm41")
-    with pytest.raises(DM41LMemoryError, match="Not enough free space"):
+    with pytest.raises(DM41MemoryError, match="Not enough free space"):
         xm2.add_file("ONEOVER", xm2.TYPE_DATA, numbers=[1.0] * one_over)
     # And confirm the rejection happened before any writes -- extended
     # memory must be left exactly as it started, not partially corrupted.
     assert xm2.list_files() == []
-    assert xm2.get_register(region0[0]) == ZERO_REGISTER
+    assert xm2.get_register(region0[0]) == zero_register()
 
 
 def test_xm_add_file_exact_single_region_fill_does_not_falsely_span():
@@ -1094,7 +1094,7 @@ def test_xm_add_file_exact_single_region_fill_does_not_falsely_span():
     # Region 1's own pointer register must still have been bootstrapped
     # -- the terminator genuinely lives there even though this file's
     # data doesn't.
-    assert xm.get_register(region1[0]) != ZERO_REGISTER
+    assert xm.get_register(region1[0]) != zero_register()
 
     # Must round-trip identically through list_files().
     files = xm.list_files()
@@ -1318,7 +1318,7 @@ def test_key_assignments_end_is_start_when_no_assignments():
     for the same reason."""
     excluded = {
         "keyassigns.dm41", "xrom-keyassignments.dm41",
-        "manyfiles.dm41",
+        "manyfiles.dm41", "dm41x_manyfiles.dm41",
         "alarmtest.dm41", "alarmtest2.dm41", "alarmtest3.dm41",
         "4alarmtest.dm41", "repeater.dm41", "badalarms.dm41",
         "goodalarms.dm41", "past-due.dm41", "tenthsofasecond.dm41",
@@ -1505,12 +1505,12 @@ def test_xm_remove_last_file_leaves_extended_memory_empty():
 
     assert xm.list_files() == []
     # Region 0's pointer register should be back to "never used".
-    assert xm.get_register(0x40) == ZERO_REGISTER
+    assert xm.get_register(0x40) == zero_register()
 
 
 def test_xm_remove_file_unknown_header_raises():
     xm = _load_xm("empty.dm41")
-    with pytest.raises(DM41LMemoryError):
+    with pytest.raises(DM41MemoryError):
         xm.remove_file(0x99)
 
 

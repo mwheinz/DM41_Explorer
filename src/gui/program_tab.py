@@ -71,7 +71,7 @@ import customtkinter as ctk
 
 from memory import (
     Memory,
-    DM41LMemoryError,
+    DM41MemoryError,
     encode_program_raw,
     encode_program_dat,
     encode_program_ppc,
@@ -264,7 +264,7 @@ class ProgramTab(ctk.CTkFrame):
 
         try:
             instruction_bytes = self._memory.programs.get_program_bytes(program)
-        except (ValueError, DM41LMemoryError) as e:
+        except (ValueError, DM41MemoryError) as e:
             logger.warning(
                 "Could not read program bytes for %r: %s", program.names_label, e
             )
@@ -376,7 +376,7 @@ class ProgramTab(ctk.CTkFrame):
         try:
             file_bytes = Path(path).read_bytes()
             instruction_bytes = decoder(file_bytes)
-        except (OSError, DM41LMemoryError) as e:
+        except (OSError, DM41MemoryError) as e:
             logger.warning("Could not read %s program file %s: %s", format_label, path, e)
             messagebox.showerror("Could Not Import", str(e))
             return
@@ -384,7 +384,7 @@ class ProgramTab(ctk.CTkFrame):
         try:
             imported = self._memory.programs.import_program(instruction_bytes)
             self._memory.programs.repack()
-        except (ValueError, DM41LMemoryError) as e:
+        except (ValueError, DM41MemoryError) as e:
             logger.warning("Could not import program from %s: %s", path, e)
             messagebox.showerror("Could Not Import", str(e))
             return
@@ -462,7 +462,7 @@ class ProgramTab(ctk.CTkFrame):
 
         try:
             self._memory.programs.remove_program(program)
-        except (ValueError, DM41LMemoryError) as e:
+        except (ValueError, DM41MemoryError) as e:
             logger.warning(
                 "Could not remove program %r: %s", program.names_label, e
             )

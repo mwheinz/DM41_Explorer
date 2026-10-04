@@ -319,6 +319,11 @@ def _normalize_memory_state_fields(data: bytes) -> bytes:
       - An END's packed-status nibble -- packing is a separate,
         already-implemented, user-invoked operation (plan doc sec 5),
         not something a freshly compiled program has an opinion about.
+      - A GTO/XEQ's cached jump-distance bytes (compact B1-BF's second
+        byte; the long D0-EF form's low nibble, second byte, and
+        direction bit) -- a real calculator resolves them, hp41uc never
+        does, and there's nowhere in the text for them to live. See
+        program_text.py's _GTO_COMPACT_BASE comment.
 
     Does *not* normalize a plain END vs. the permanent ".END." sentinel
     (the top nibble of an END's own third byte) -- both already decode
@@ -340,7 +345,37 @@ def _normalize_memory_state_fields(data: bytes) -> bytes:
         else:
             end_type_nibble = marker["third_byte"] & 0xF0
             out[idx + 2] = end_type_nibble  # packed-status nibble -> 0
+    _zero_cached_jump_bytes(data, out)
     return bytes(out)
+
+
+def _zero_cached_jump_bytes(data: bytes, out: bytearray) -> None:
+    '''Walks `data` instruction by instruction (the same length classes
+    opcode_scan.find_program_end() uses) and clears every GTO/XEQ's cached
+    jump distance in `out` -- see _normalize_memory_state_fields().'''
+    i, n = 0, len(data)
+    while i < n:
+        c = data[i]
+        if 0x1D <= c <= 0x1F:  # GTO"/XEQ" name reference
+            has_name = i + 1 < n and data[i + 1] > 0xF0
+            i += 2 + (data[i + 1] & 0x0F if has_name else 0)
+        elif 0xB1 <= c <= 0xBF and i + 1 < n:  # compact GTO 00-14
+            out[i + 1] = 0x00
+            i += 2
+        elif 0x90 <= c <= 0xBF or c in (0xCE, 0xCF):
+            i += 2
+        elif 0xC0 <= c <= 0xCD:  # END / global LBL
+            has_name = i + 2 < n and data[i + 2] >= 0xF0
+            i += 3 + (data[i + 2] & 0x0F if has_name else 0)
+        elif 0xD0 <= c <= 0xEF and i + 2 < n:  # long GTO/XEQ
+            out[i] = c & 0xF0
+            out[i + 1] = 0x00
+            out[i + 2] = data[i + 2] & 0x7F
+            i += 3
+        elif c >= 0xF0:  # ALPHA text
+            i += 1 + (c & 0x0F)
+        else:
+            i += 1
 
 
 def _dm41_sample_programs():
@@ -932,3 +967,104 @@ def test_decode_program_txt_synthetic_status_register_names_case_insensitive_for
     mixed = decode_program_txt('LBL "CM"\nSTO m\nEND\n')
     canonical = decode_program_txt('LBL "CM"\nSTO M\nEND\n')
     assert mixed == canonical
+
+
+# -- Resolved jump bytes in GTO/XEQ (manyfiles.dm41's XMBCD, 2026-10-04) ---
+#
+# A GTO/XEQ's jump-distance bytes are a cache the calculator fills in
+# (handbook pp. 45-47); hp41uc's compiler -- the source of every other
+# fixture -- always leaves them 0x00 ("unresolved"). Real captured
+# programs have real values, and the decompiler must not depend on them.
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        ("b100", "GTO 00"),  # unresolved (hp41uc style)
+        ("b2b1", "GTO 01"),  # backward, 3 bytes + 1 register (XMBCD)
+        ("b188", "GTO 00"),  # backward, 0 bytes + 8 registers (XMBCD)
+        ("b350", "GTO 02"),  # forward
+        ("bfff", "GTO 14"),  # every jump bit set, still GTO 14
+    ],
+)
+def test_encode_program_txt_compact_gto_ignores_jump_byte(raw, expected):
+    text = encode_program_txt(bytes.fromhex(raw) + bytes.fromhex("c0000d"))
+    assert text.splitlines()[0] == expected
+
+
+@pytest.mark.parametrize(
+    "raw, expected",
+    [
+        ("d00014", "GTO 20"),  # unresolved
+        ("d10014", "GTO 20"),  # bit 0 of the first byte is a register bit
+        ("dc0114", "GTO 20"),  # bytes/registers fields set
+        ("d00094", "GTO 20"),  # direction bit set in the label byte
+        ("e00007", "XEQ 07"),  # unresolved
+        ("e42204", "XEQ 04"),  # real forward jump (pi.dm41)
+        ("e0009e", "XEQ 30"),  # backward -- not "XEQ IND 30"
+        ("ec1f86", "XEQ 06"),  # real backward jump (pi.dm41)
+        ("d00068", "GTO C"),  # local letter label
+    ],
+)
+def test_encode_program_txt_long_gto_xeq_ignore_jump_bytes(raw, expected):
+    text = encode_program_txt(bytes.fromhex(raw) + bytes.fromhex("c0000d"))
+    assert text.splitlines()[0] == expected
+
+
+def test_encode_program_txt_resolved_jumps_recompile_as_unresolved():
+    '''The cached jump distance isn't preserved through text (there's
+    nowhere in the text to put it), so recompiling gives the unresolved
+    form -- which the calculator re-resolves on first run -- and
+    decompiling *that* gives back the same text.'''
+    original = bytes.fromhex("b2b1" "b188" "e42204" "c0000d")
+    text = encode_program_txt(original)
+    assert text.splitlines()[:3] == ["GTO 01", "GTO 00", "XEQ 04"]
+    recompiled = decode_program_txt(text)
+    assert recompiled.startswith(bytes.fromhex("b200" "b100" "e00004"))
+    assert encode_program_txt(recompiled) == text
+
+
+def test_encode_program_txt_manyfiles_xmbcd_has_no_unknown_opcodes():
+    '''The real-hardware program that surfaced the bug: its inner and
+    outer loops (`ISG 00 / GTO 01` and `ISG 01 / GTO 00`) came out as
+    "; UNKNOWN OPCODE: B2 B1" and "; UNKNOWN OPCODE: B1 88".'''
+    from memory import Memory
+
+    memory = Memory.from_file(DATA_DIR / "manyfiles.dm41")
+    texts = [
+        encode_program_txt(memory.programs.get_program_bytes(p))
+        for p in memory.programs.list_programs()
+    ]
+    (xmbcd,) = [t for t in texts if t.startswith('LBL "XMBCD"')]
+    lines = xmbcd.splitlines()
+    assert not any("UNKNOWN OPCODE" in line for line in lines)
+    assert lines[-7:] == [
+        "ISG 00",
+        "GTO 01",
+        "ISG 01",
+        "GTO 00",
+        '"DONE"',
+        "AVIEW",
+        "END ;103 BYTES",
+    ]
+
+
+def test_encode_program_txt_no_unknown_goto_xeq_in_any_fixture():
+    '''Sweep: no real sample dump has a GTO/XEQ left undecoded.'''
+    import os
+
+    from memory import Memory
+
+    for filename in os.listdir(DATA_DIR):
+        if not filename.endswith(".dm41"):
+            continue
+        memory = Memory.from_file(DATA_DIR / filename)
+        for program in memory.programs.list_programs():
+            text = encode_program_txt(memory.programs.get_program_bytes(program))
+            for line in text.splitlines():
+                if line.startswith("; UNKNOWN OPCODE:"):
+                    first = int(line.split(":")[1].split()[0], 16)
+                    assert not (0xB1 <= first <= 0xBF or 0xD0 <= first <= 0xEF), (
+                        filename,
+                        line,
+                    )

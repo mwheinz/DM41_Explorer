@@ -7,13 +7,13 @@ black==26.5.1
 click==8.4.2
 iniconfig==2.3.0
 mypy_extensions==1.1.0
-packaging==26.2
+packaging
 pathspec==1.1.1
-Pillow==12.2.0
+Pillow
 platformdirs==4.10.1
 pluggy==1.6.0
 Pygments==2.20.0
-pyinstaller==6.22.0
+pyinstaller
 pytest==9.1.1
 pytokens==0.4.1
 

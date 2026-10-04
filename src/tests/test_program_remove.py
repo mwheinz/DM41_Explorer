@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from memory import Memory, DM41LMemoryError, Program
+from memory import Memory, DM41MemoryError, Program
 
 DATA_DIR = Path(__file__).parent / "data"
 

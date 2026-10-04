@@ -351,7 +351,7 @@ def test_xm_import_duplicate_name_shows_error_not_silent_success(root, tmp_path,
     matches one already present used to silently add a duplicate
     directory entry (something a real DM41L would reject). The model-
     level fix is tested directly in test_memory.py; this confirms the GUI
-    surfaces the resulting DM41LMemoryError as an error dialog instead of
+    surfaces the resulting DM41MemoryError as an error dialog instead of
     quietly succeeding."""
     memory = Memory.from_file(DATA_DIR / "6x-xm.dm41")  # already has "XM1.000"
     tab = XMFilesTab(root)

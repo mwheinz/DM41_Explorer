@@ -11,7 +11,7 @@ through here.
 
 from typing import Optional, TYPE_CHECKING
 
-from .registers import Register, AlphaRegister, DM41LMemoryError
+from .registers import Register, AlphaRegister, DM41MemoryError
 from .regions import MemoryRegion
 from .constants import STATUS_REGISTERS_RANGE, STATUS_REGISTER_LABELS
 
@@ -210,7 +210,7 @@ class StatusRegisters(MemoryRegion):
             raise ValueError(f"Flag number must be 0-{self.FLAG_COUNT - 1}, got {n}")
         d = self.get_register(self.REG_D_ADDR)
         if d.size != 7:
-            raise DM41LMemoryError("Flags register is an invalid size.")
+            raise DM41MemoryError("Flags register is an invalid size.")
 
         byte_index, bit_in_byte = divmod(n, 8)
         return bool((d.get_bytes()[byte_index] >> (7 - bit_in_byte)) & 1)
@@ -220,7 +220,7 @@ class StatusRegisters(MemoryRegion):
             raise ValueError(f"Flag number must be 0-{self.FLAG_COUNT - 1}, got {n}")
         d = self.get_register(self.REG_D_ADDR)
         if d.size != 7:
-           raise DM41LMemoryError("Flags register is an invalid size.")
+           raise DM41MemoryError("Flags register is an invalid size.")
 
         data = bytearray(d.get_bytes())
         byte_index, bit_in_byte = divmod(n, 8)
@@ -235,7 +235,7 @@ class StatusRegisters(MemoryRegion):
         '''Returns a list of FLAG_COUNT bools, flag 0 first.'''
         d = self.get_register(self.REG_D_ADDR)
         if d.size != 7:
-           raise DM41LMemoryError("Flags register is an invalid size.")
+           raise DM41MemoryError("Flags register is an invalid size.")
 
         bits = int.from_bytes(d.get_bytes(), "big")
         binary = format(bits, f"0{self.FLAG_COUNT}b")

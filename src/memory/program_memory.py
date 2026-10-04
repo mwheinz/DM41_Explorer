@@ -20,7 +20,7 @@ calculation below goes through them.
 
 from typing import Optional, TYPE_CHECKING
 
-from .registers import Register, DM41LMemoryError
+from .registers import Register, DM41MemoryError
 from .regions import MemoryRegion
 from .constants import PRIMARY_DATA_END, KEY_ASSIGNMENTS_RANGE, MIN_SANE_R00
 from .program_info import ProgramInfo, ProgramLabel, Program
@@ -455,7 +455,7 @@ class ProgramMemory(MemoryRegion):
         Raises ValueError if `program` doesn't match any entry in the
         current program list (e.g. it's stale, from a `list_programs()`
         call before the dump changed).
-        Raises DM41LMemoryError if `find_program_end()` disagrees with
+        Raises DM41MemoryError if `find_program_end()` disagrees with
         the chain-derived length -- signals corrupt data or a program
         that isn't well-formed HP-41 code.
         '''
@@ -468,7 +468,7 @@ class ProgramMemory(MemoryRegion):
                     candidate.start_addr, candidate.start_offset, candidate.length
                 )
                 if find_program_end(instruction_bytes) != candidate.length:
-                    raise DM41LMemoryError(
+                    raise DM41MemoryError(
                         f"Program {candidate.names_label!r}'s own bytes "
                         "don't form one well-formed HP-41 program (forward "
                         "opcode scan disagrees with the global chain) -- "
@@ -578,7 +578,7 @@ class ProgramMemory(MemoryRegion):
         7. Enough free program memory to hold all of this (the program's
            own bytes, plus whatever zero-padding is needed to land the
            fresh `.END.` on a register boundary, plus its own 3 bytes)?
-           If not, raises `DM41LMemoryError` rather than overwriting the
+           If not, raises `DM41MemoryError` rather than overwriting the
            Key Assignments/Alarms regions below it.
         8. Writes the (patched) instruction bytes into registers
            (`write_bytes_forward()`), zero-pads up to the next register
@@ -597,11 +597,11 @@ class ProgramMemory(MemoryRegion):
 
         Raises `ValueError` if `instruction_bytes` isn't one well-formed
         program, or contains a global label name that already exists in
-        this memory. Raises `DM41LMemoryError` if there's no valid R00/
+        this memory. Raises `DM41MemoryError` if there's no valid R00/
         `.END.` partition loaded yet, or if there isn't enough free
         program memory.
 
-        Two more `DM41LMemoryError` cases are checked defensively below
+        Two more `DM41MemoryError` cases are checked defensively below
         but are dead given this region's own bounds, not reachable
         failure modes today: `_relink_outermost_marker()`'s 9-bit-
         register-count overflow (the widest possible gap between the Key
@@ -624,7 +624,7 @@ class ProgramMemory(MemoryRegion):
                 "find_program_end() disagrees with the file's own length."
             )
         if not (MIN_SANE_R00 <= status.R00() <= PRIMARY_DATA_END):
-            raise DM41LMemoryError(
+            raise DM41MemoryError(
                 "No valid program memory partition is loaded -- load or "
                 "start a memory buffer first."
             )
@@ -633,7 +633,7 @@ class ProgramMemory(MemoryRegion):
         if not chain_entries:
             # Defensive only -- dead in practice given the guard just
             # above: see this method's own docstring.
-            raise DM41LMemoryError(
+            raise DM41MemoryError(
                 "Could not find a valid END/label marker in this "
                 "program's own bytes -- it may be corrupt."
             )
@@ -688,7 +688,7 @@ class ProgramMemory(MemoryRegion):
 
         programs = self.list_programs()
         if not programs or programs[-1].length != len(instruction_bytes):
-            raise DM41LMemoryError(
+            raise DM41MemoryError(
                 "Import produced an inconsistent program chain -- this "
                 "looks like a bug, please report it."
             )
@@ -728,7 +728,7 @@ class ProgramMemory(MemoryRegion):
           not converted here -- see `import_program()`'s own comment on
           why that has to wait until after the room check.
 
-        Raises `DM41LMemoryError` if this memory's program chain is
+        Raises `DM41MemoryError` if this memory's program chain is
         non-empty but doesn't resolve to any real program at all (would
         only happen for corrupt data -- see `list_programs()`'s
         docstring).
@@ -740,7 +740,7 @@ class ProgramMemory(MemoryRegion):
         boundary = chain[-1]  # always the permanent .END. entry
         programs = self.list_programs()
         if not programs:
-            raise DM41LMemoryError(
+            raise DM41MemoryError(
                 "This memory's program chain doesn't resolve to any "
                 "real program -- it may be corrupt."
             )
@@ -776,7 +776,7 @@ class ProgramMemory(MemoryRegion):
         starting at `insertion_addr` -- or to "no predecessor" (`bbb =
         distance_registers = 0`) if `link_addr` is `None` (this is the
         first program in memory). Its own third byte is preserved as-is.
-        Raises `DM41LMemoryError` if the computed distance doesn't fit
+        Raises `DM41MemoryError` if the computed distance doesn't fit
         the format's 9-bit register-count field -- checked defensively,
         but dead in practice given this region's own bounds: the widest
         possible gap, from the Key Assignments floor (`0xC0`) to
@@ -789,7 +789,7 @@ class ProgramMemory(MemoryRegion):
             outermost_dest_addr = insertion_addr - outermost["index"]
             new_dr, new_bbb = divmod(link_addr - outermost_dest_addr, 7)
             if new_dr > 0x1FF:
-                raise DM41LMemoryError(
+                raise DM41MemoryError(
                     "This program lands too far from the existing program "
                     "chain to encode -- program memory may be unusually "
                     "large or fragmented."
@@ -805,7 +805,7 @@ class ProgramMemory(MemoryRegion):
         `insertion_addr` and however much zero-padding gets it to that
         boundary -- and checks that against the Alarms/Key Assignments
         boundary. Returns `(end_marker_addr, next_free_addr)` if there's
-        room; raises `DM41LMemoryError` if not.'''
+        room; raises `DM41MemoryError` if not.'''
         floor_reg = self._memory.alarms.end_exclusive
         program_end_addr = insertion_addr - data_len + 1
         next_free_addr = program_end_addr - 1
@@ -816,7 +816,7 @@ class ProgramMemory(MemoryRegion):
             lowest_free_addr = self.addr_for(floor_reg, 6)
             available = insertion_addr - lowest_free_addr + 1
             needed = insertion_addr - end_marker_last_addr + 1
-            raise DM41LMemoryError(
+            raise DM41MemoryError(
                 f"Not enough free program memory to import this program "
                 f"(needs {needed} bytes, only {max(available, 0)} available)."
             )
@@ -875,7 +875,7 @@ class ProgramMemory(MemoryRegion):
         nothing at all, or if R00/`.END.` do not look like a real
         partition yet (matching `list_global_chain()`'s own guard).
 
-        Raises `DM41LMemoryError` if the scan cannot safely determine
+        Raises `DM41MemoryError` if the scan cannot safely determine
         where real content ends: if real (non-zero) bytes are found but
         no marker at all could be located in them, if the very last
         marker found is a label with nothing closing it, or if non-zero
@@ -904,7 +904,7 @@ class ProgramMemory(MemoryRegion):
         markers = scan_global_markers_forward(bytes(data))
         if not markers:
             if any(data):
-                raise DM41LMemoryError(
+                raise DM41MemoryError(
                     "Program memory contains data, but no recognizable "
                     "global chain marker (a label or END) could be found "
                     "in it -- pack() can't safely determine where a "
@@ -914,14 +914,14 @@ class ProgramMemory(MemoryRegion):
 
         last_marker = markers[-1]
         if last_marker["is_label"]:
-            raise DM41LMemoryError(
+            raise DM41MemoryError(
                 "Program memory ends with a global label that's never "
                 "closed by an END -- pack() can't safely determine where "
                 "that program ends."
             )
         tail_start = last_marker["index"] + 3
         if any(data[tail_start:]):
-            raise DM41LMemoryError(
+            raise DM41MemoryError(
                 "Program memory has unrecognized data after its last "
                 "global chain marker -- pack() can't safely determine "
                 "where program memory's real boundary is."
@@ -944,7 +944,7 @@ class ProgramMemory(MemoryRegion):
                 # PRIMARY_DATA_END 0x1FF) is only 319 registers. Left in
                 # place as cheap insurance in case those bounds ever
                 # change.
-                raise DM41LMemoryError(
+                raise DM41MemoryError(
                     "Two global chain markers are too far apart to "
                     "re-link -- program memory may be unusually large or "
                     "fragmented."
@@ -1211,7 +1211,7 @@ class ProgramMemory(MemoryRegion):
         memory is then left untouched rather than guessing at a `.END.`
         for an empty partition this method did not create.
 
-        Raises `DM41LMemoryError` if `_forward_scan_programs()` cannot
+        Raises `DM41MemoryError` if `_forward_scan_programs()` cannot
         safely determine program memory's real content -- see that
         method's own docstring for exactly when that happens. Nothing is
         changed if that happens: the scan runs, and can raise, before

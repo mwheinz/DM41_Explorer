@@ -33,7 +33,7 @@ import datetime
 import math
 from typing import List, Optional, Tuple, TYPE_CHECKING
 
-from .registers import Register, DM41LMemoryError
+from .registers import Register, DM41MemoryError
 from .regions import MemoryRegion
 from .constants import PRIMARY_DATA_END
 from .trigraphs import encode_trigraphs, decode_trigraphs
@@ -229,14 +229,14 @@ class Alarms(MemoryRegion):
         count = header[1]
         old_end = old_start + count
         if count <= 0 or old_end - 1 > PRIMARY_DATA_END:
-            raise DM41LMemoryError("Alarm memory is corrupt.")
+            raise DM41MemoryError("Alarm memory is corrupt.")
 
         if new_start + count - 1 > PRIMARY_DATA_END:
             # Nowhere to put it -- on real hardware this would be an
             # out-of-memory condition this tool doesn't model; the
             # safest thing to do here is decline to move the buffer
             # rather than truncate or wrap it into an invalid address.
-            raise DM41LMemoryError("Insufficient memory.")
+            raise DM41MemoryError("Insufficient memory.")
 
         indices = range(count - 1, -1, -1) if delta > 0 else range(count)
         for i in indices:
@@ -261,7 +261,7 @@ class Alarms(MemoryRegion):
     def _decode_bcd_centiseconds(cls, reg_bytes: bytes) -> int:
         nibbles = cls._bcd_nibbles(reg_bytes[:6])
         if not all(0 <= n <= 9 for n in nibbles):
-            raise DM41LMemoryError(
+            raise DM41MemoryError(
                 "Not a valid BCD time/duration register: "
                 + reg_bytes.hex()
             )
@@ -299,7 +299,7 @@ class Alarms(MemoryRegion):
         precision (confirmed against the real calculator's own `ALMCAT`,
         which displays the `.9` and reads the alarm as non-repeating) --
         the old check misread its nonzero tenths digit as the repeats
-        flag and raised `DM41LMemoryError` looking for a repeat register
+        flag and raised `DM41MemoryError` looking for a repeat register
         that doesn't exist. `trigger_time` now keeps the tenths digit;
         only the flag digit itself is zeroed out of it, since that digit
         is a marker `_encode_time()` writes, not real elapsed time.'''
@@ -400,7 +400,7 @@ class Alarms(MemoryRegion):
         repeat_interval = None
         if repeats:
             if addr >= limit_addr:
-                raise DM41LMemoryError(
+                raise DM41MemoryError(
                     f"Alarm at 0x{entry_start:03X} claims to repeat "
                     "(its time register's repeats-flag digit is set) but "
                     "there's no register left before the delimiter for "
@@ -408,7 +408,7 @@ class Alarms(MemoryRegion):
                 )
             candidate = self._memory.get_register(addr).get_bytes()
             if not self._looks_like_repeat_register(candidate):
-                raise DM41LMemoryError(
+                raise DM41MemoryError(
                     f"Alarm at 0x{entry_start:03X} claims to repeat, but "
                     f"the register right after its time register (0x"
                     f"{addr:03X}) doesn't look like a valid repeat "
@@ -527,7 +527,7 @@ class Alarms(MemoryRegion):
         if self.is_empty:
             total = n + 2  # header + entries + delimiter
             if self.start + total - 1 > ceiling:
-                raise DM41LMemoryError(
+                raise DM41MemoryError(
                     "Insufficient memory: no room for a new alarm."
                 )
             self._memory.set_register(
@@ -546,7 +546,7 @@ class Alarms(MemoryRegion):
         old_count = old_header[1]
         old_delim_addr = self.end
         if old_delim_addr + n > ceiling:
-            raise DM41LMemoryError(
+            raise DM41MemoryError(
                 "Insufficient memory: no room for a new alarm."
             )
 
@@ -562,7 +562,7 @@ class Alarms(MemoryRegion):
 
         new_count = old_count + n
         if new_count > 0xFF:
-            raise DM41LMemoryError("Alarm buffer is too large to represent.")
+            raise DM41MemoryError("Alarm buffer is too large to represent.")
         new_header = Register(
             data=bytes([self.HEADER_MARKER, new_count]) + bytes(old_header[2:7])
         )
@@ -593,7 +593,7 @@ class Alarms(MemoryRegion):
         False to override.
 
         Raises `ValueError` for an out-of-range text length, and
-        `DM41LMemoryError` if there isn't room to grow the buffer.'''
+        `DM41MemoryError` if there isn't room to grow the buffer.'''
         if past_due is None:
             past_due = trigger_time < datetime.datetime.now()
 

@@ -28,7 +28,7 @@ from pathlib import Path
 
 import pytest
 
-from memory import Memory, DM41LMemoryError, Register
+from memory import Memory, DM41MemoryError, Register
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -270,7 +270,7 @@ def test_pack_raises_when_no_marker_can_be_found_at_all():
     for index in (0, 23, 32):
         _zero_marker(memory, index)
 
-    with pytest.raises(DM41LMemoryError):
+    with pytest.raises(DM41MemoryError):
         memory.pack()
     # Program memory itself must be untouched by a call that raises.
     assert memory.status_registers.DotEnd() == before_dot_end
@@ -286,7 +286,7 @@ def test_pack_raises_when_the_last_marker_is_an_unterminated_label():
     raw = memory.programs.get_program_bytes(program)
     _zero_marker(memory, len(raw) - 3)
 
-    with pytest.raises(DM41LMemoryError):
+    with pytest.raises(DM41MemoryError):
         memory.pack()
     assert memory.status_registers.DotEnd() == before_dot_end
 
@@ -304,6 +304,6 @@ def test_pack_raises_when_unrecognized_data_follows_the_last_marker():
     data[3] = 0x55
     memory.set_register(extra_reg, Register(data=bytes(data)))
 
-    with pytest.raises(DM41LMemoryError):
+    with pytest.raises(DM41MemoryError):
         memory.pack()
     assert memory.status_registers.DotEnd() == before_dot_end

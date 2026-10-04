@@ -24,7 +24,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox
 import customtkinter as ctk
 
-from memory import Memory, ExtendedMemory, DM41LMemoryError, parse_data_line
+from memory import Memory, ExtendedMemory, DM41MemoryError, parse_data_line
 from gui.xm_file_dialog import XMFileDialog
 from gui.tab_common import (
     build_caption_label,
@@ -214,7 +214,7 @@ class XMFilesTab(ctk.CTkFrame):
 
         try:
             files = self._xm().list_files()
-        except DM41LMemoryError as e:
+        except DM41MemoryError as e:
             logger.warning("Could not list XM files: %s", e)
             self._header_label.configure(text=f"Could not list XM files: {e}")
             self._update_action_buttons(None)
@@ -312,14 +312,14 @@ class XMFilesTab(ctk.CTkFrame):
                 # remain, rather than keeping its original slot.
                 xm.remove_file(replacing_addr)
             xm.add_file(name, file_type, **kwargs)
-        except (ValueError, DM41LMemoryError) as e:
+        except (ValueError, DM41MemoryError) as e:
             verb = "save" if replacing_addr is not None else "add"
             logger.warning("Could not %s XM file %r: %s", verb, name, e)
             if restore is not None:
                 try:
                     restore_name, restore_type, restore_kwargs = restore
                     xm.add_file(restore_name, restore_type, **restore_kwargs)
-                except (ValueError, DM41LMemoryError) as restore_error:
+                except (ValueError, DM41MemoryError) as restore_error:
                     logger.error(
                         "Could not restore XM file %r after a failed edit "
                         "-- it has been lost: %s",
@@ -441,7 +441,7 @@ class XMFilesTab(ctk.CTkFrame):
             return
         try:
             self._xm().remove_file(header_addr)
-        except DM41LMemoryError as e:
+        except DM41MemoryError as e:
             logger.warning("Could not remove XM file %r: %s", name, e)
             messagebox.showerror("Could Not Remove File", str(e))
             return

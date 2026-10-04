@@ -13,7 +13,7 @@ import logging
 from tkinter import messagebox
 import customtkinter as ctk
 
-from memory import Memory, DM41LMemoryError
+from memory import Memory, DM41MemoryError
 from gui.alarm_edit_dialog import AlarmEditDialog
 from gui.tab_common import (
     build_tab_header,
@@ -151,7 +151,7 @@ class AlarmsTab(ctk.CTkFrame):
 
         try:
             alarms = memory.alarms.list_alarms()
-        except DM41LMemoryError as e:
+        except DM41MemoryError as e:
             logger.warning("Could not list alarms: %s", e)
             self._header_label.configure(text=f"Could not list alarms: {e}")
             self._update_action_buttons(None)
@@ -200,7 +200,7 @@ class AlarmsTab(ctk.CTkFrame):
             if replacing_addr is not None:
                 alarms.delete_alarm(replacing_addr)
             alarms.add_alarm(**kwargs)
-        except (ValueError, DM41LMemoryError) as e:
+        except (ValueError, DM41MemoryError) as e:
             verb = "save" if replacing_addr is not None else "add"
             logger.warning("Could not %s alarm: %s", verb, e)
             if replacing_alarm is not None:
@@ -215,7 +215,7 @@ class AlarmsTab(ctk.CTkFrame):
                 # alarm after it until the next full reload.
                 try:
                     alarms.add_alarm(**_alarm_to_add_kwargs(replacing_alarm))
-                except (ValueError, DM41LMemoryError) as restore_error:
+                except (ValueError, DM41MemoryError) as restore_error:
                     logger.error(
                         "Could not restore alarm %r after a failed edit "
                         "-- it has been lost from the buffer: %s",
@@ -268,7 +268,7 @@ class AlarmsTab(ctk.CTkFrame):
             return
         try:
             self._memory.alarms.delete_alarm(alarm.start_addr)
-        except (ValueError, DM41LMemoryError) as e:
+        except (ValueError, DM41MemoryError) as e:
             logger.warning("Could not remove alarm: %s", e)
             messagebox.showerror("Could Not Remove Alarm", str(e))
             return

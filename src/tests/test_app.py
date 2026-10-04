@@ -34,10 +34,10 @@ from gui.app import DM41LExplorerApp
 @pytest.fixture
 def prefs_file(tmp_path, monkeypatch):
     """Same isolation trick as test_config.py's fixture -- keep the test
-    from reading/writing the real ~/.voyager_prefs.json. Also points
+    from reading/writing the real ~/.dm41_test_prefs.json. Also points
     log_directory at a throwaway path so _setup_logging() doesn't write
     into the real home directory during tests."""
-    fake_prefs_path = tmp_path / ".voyager_prefs.json"
+    fake_prefs_path = tmp_path / ".dm41_test_prefs.json"
     fake_prefs_path.write_text(json.dumps({"log_directory": str(tmp_path / "logs")}))
     monkeypatch.setattr(ProjectConfig, "PREFS_FILE", fake_prefs_path)
     return fake_prefs_path

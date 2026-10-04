@@ -1,5 +1,5 @@
 '''
-A representation of the memory of a DM41L emulator.
+A representation of the memory of a DM41-series emulator (DM41L, DM41X).
 
 The dump consists of three parts: the header ("DM41") the dump of main
 memory, and the "special registers" which I believe represent the emulated
@@ -15,7 +15,7 @@ Memory classes.
 This used to be a single memory.py file; it was split into this package
 for readability. The current components are:
 
-  registers.py     Register, AlphaRegister, DM41LMemoryError,
+  registers.py     Register, AlphaRegister, DM41MemoryError (alias DM41LMemoryError),
                     format_data_line/parse_data_line (DATA line format)
   trigraphs.py     encode_trigraphs/decode_trigraphs/focal_to_unicode (docs/trigraphs.md --
                     the HP41/DM41L FOCAL character set's non-ASCII symbols)
@@ -97,6 +97,7 @@ for readability. The current components are:
 '''
 
 from .registers import (
+    DM41MemoryError,
     DM41LMemoryError,
     Register,
     AlphaRegister,
@@ -110,9 +111,9 @@ from .constants import (
     KEY_ASSIGNMENTS_RANGE,
     PRIMARY_DATA_END,
     ZERO_REGISTER_HEX,
-    ZERO_REGISTER,
     EOM_REGISTER_HEX,
-    EOM_REGISTER,
+    zero_register,
+    eom_register,
     STATUS_REGISTER_LABELS,
     XM_REGIONS,
     MIN_SANE_R00,
@@ -144,6 +145,7 @@ from .program_chain import (
 from .memory import Memory
 
 __all__ = [
+    "DM41MemoryError",
     "DM41LMemoryError",
     "Register",
     "AlphaRegister",
@@ -157,9 +159,9 @@ __all__ = [
     "KEY_ASSIGNMENTS_RANGE",
     "PRIMARY_DATA_END",
     "ZERO_REGISTER_HEX",
-    "ZERO_REGISTER",
     "EOM_REGISTER_HEX",
-    "EOM_REGISTER",
+    "zero_register",
+    "eom_register",
     "STATUS_REGISTER_LABELS",
     "XM_REGIONS",
     "MIN_SANE_R00",

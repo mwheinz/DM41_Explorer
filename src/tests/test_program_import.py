@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 
-from memory import Memory, DM41LMemoryError, Program
+from memory import Memory, DM41MemoryError, Program
 from memory.opcode_scan import find_program_end
 from memory.program_files import decode_program_raw, decode_program_dat
 
@@ -264,7 +264,7 @@ def test_import_raises_when_program_memory_is_full_and_leaves_memory_unchanged()
     before_programs = dest.programs.list_programs()
 
     tower_bytes = decode_program_raw((DATA_DIR / "tower.raw").read_bytes())
-    with pytest.raises(DM41LMemoryError):
+    with pytest.raises(DM41MemoryError):
         dest.programs.import_program(tower_bytes)
 
     assert dest.status_registers.DotEnd() == before_dot_end
@@ -277,7 +277,7 @@ def test_import_rejects_when_no_valid_partition_is_loaded():
     # simulate a dump with no real partition at all.
     dest = Memory()
     dest.status_registers.set_R00(0)
-    with pytest.raises(DM41LMemoryError):
+    with pytest.raises(DM41MemoryError):
         dest.programs.import_program(bytes.fromhex("c00009"))
 
 

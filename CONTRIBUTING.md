@@ -91,7 +91,7 @@ Pick a level by what the record means, not by habit:
   run loop (see `serial_manager.py`'s read-thread crash handling).
 
 The data/model layer (`src/memory/`) deliberately has no loggers of its
-own — it raises (`ValueError`/`DM41LMemoryError`) rather than swallowing,
+own — it raises (`ValueError`/`DM41MemoryError`) rather than swallowing,
 so logging happens exactly once, at whichever GUI code catches the
 exception and decides how to present it to the user. Keep that
 separation: don't add a `logger.error()` call in `memory/*.py` right

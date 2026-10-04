@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from memory import Memory, Alarm, DM41LMemoryError, Register
+from memory import Memory, Alarm, DM41MemoryError, Register
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -123,11 +123,11 @@ def test_decode_badalarms_now_raises_matching_the_real_hardware_misread():
        (matching real hardware, docs/alarms.md sec 12) rather than the
        old magnitude-guessing heuristic, so it now reproduces the same
        misread here instead of silently recovering via a lucky guess --
-       it surfaces as a clear DM41LMemoryError once the misalignment
+       it surfaces as a clear DM41MemoryError once the misalignment
        runs into genuinely non-BCD bytes, rather than ALMCAT's silent
        on-screen garbage."""
     memory = Memory.from_file(DATA_DIR / "badalarms.dm41")
-    with pytest.raises(DM41LMemoryError):
+    with pytest.raises(DM41MemoryError):
         memory.alarms.list_alarms()
 
 
@@ -185,7 +185,7 @@ def test_decode_tenthsofasecond_preserves_tenths_and_reads_as_one_time():
     digit. The 2026-09-02 version of _decode_time() treated the whole
     last two BCD digits as the flag (`cs % 100 != 0`), so this alarm's
     genuine `.9`-second tenths digit was misread as "repeats", and
-    decoding raised DM41LMemoryError looking for a repeat register that
+    decoding raised DM41MemoryError looking for a repeat register that
     doesn't exist -- a real bug, not just a docs gap. Confirmed against
     the real calculator's own ALMCAT: it displays the `.9` and reads
     this alarm as non-repeating, i.e. only the very last digit (the
@@ -323,7 +323,7 @@ def test_decode_raises_when_repeats_flag_set_but_next_register_is_not_a_duration
     corrupted = bytearray(time_reg)
     corrupted[5] |= 0x01  # claim it repeats, without actually adding a repeat register
     memory.set_register(alarm.start_addr, Register(data=bytes(corrupted)))
-    with pytest.raises(DM41LMemoryError):
+    with pytest.raises(DM41MemoryError):
         memory.alarms.list_alarms()
 
 
@@ -521,11 +521,11 @@ def test_alarms_survive_a_to_string_from_string_round_trip():
 def test_add_alarm_raises_when_no_room_left():
     """Fills program memory right up to the Alarms buffer (via a minimal
     .END. placement) so there's no free space left, then confirms
-    add_alarm() raises DM41LMemoryError rather than writing past
+    add_alarm() raises DM41MemoryError rather than writing past
     free_space.end -- see Alarms._room_ceiling()."""
     memory = Memory()
     # Push .END. down to leave (almost) no free space above the Alarms
     # buffer's current (empty) start.
     memory.status_registers.set_DotEnd(memory.alarms.start)
-    with pytest.raises(DM41LMemoryError):
+    with pytest.raises(DM41MemoryError):
         memory.alarms.add_alarm(trigger_time=_dt(2026, 9, 5), text="TOO BIG")

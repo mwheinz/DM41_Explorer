@@ -132,17 +132,56 @@ _LBL_COMPACT_MAX = 14
 # -- Compact 2-byte local-numbered GTO forms (00-14 only) ---------------
 #
 # Confirmed against tower.txt: "GTO 00".."GTO 06" all decompile to 2
-# bytes, (0xB1 + target number) followed by a fixed 0x00 byte (the second
-# byte never varies across every example in the fixture, so it's treated
-# here as a fixed/reserved byte, not a second operand). Local numbers
-# 15-99 (and presumably local letters, though unobserved in this
-# fixture) use the general 3-byte 0xD0-prefixed form instead (confirmed:
-# "GTO 20"/"GTO 73" are 0xD0 0x00 <value>). GTO has no comparable compact
-# form for XEQ -- XEQ always uses the 3-byte 0xE0 form regardless of how
-# low the target number is (confirmed: "XEQ 07" is 0xE0 0x00 0x07).
+# bytes, (0xB1 + target number) followed by a second byte that tower.raw
+# only ever has as 0x00. That second byte is NOT a fixed/reserved byte,
+# though -- it's the instruction's cached *jump distance*, and 0x00 just
+# means "not resolved yet" (hp41uc never resolves jumps, so every GTO it
+# compiles carries 0x00). A real calculator fills it in the first time
+# the GTO runs (or when the program is packed), so a program captured
+# from real hardware has real values here -- e.g. XMBCD's `B2 B1` (GTO 01)
+# and `B1 88` (GTO 00) in tests/data/manyfiles.dm41. Per *A Programmer's
+# Handbook* v2.07 (docs/pdfs, "GTO 00 - 14", p. 45):
+#
+#     1011 llll  dbbb rrrr
+#       llll = label number + 1 (so 0xB1 = GTO 00 ... 0xBF = GTO 14)
+#       d    = direction: 0 = forward, 1 = backward
+#       bbb  = number of bytes, rrrr = number of registers (7 bytes each)
+#
+# The decompiler only needs to know *which label* is the target, so the
+# jump byte is ignored on decode (see encode_program_txt()'s 2-byte
+# branch) and the compiler always writes 0x00 and leaves the calculator
+# to resolve it. Local numbers 15-99 (and local letters) use the general
+# 3-byte 0xD0-prefixed form instead -- see _GTO_XEQ_LONG_* below.
 _GTO_COMPACT_BASE = 0xB1
 _GTO_COMPACT_MAX = 14
-_GTO_COMPACT_FIXED_BYTE2 = 0x00
+_GTO_COMPACT_UNRESOLVED_BYTE2 = 0x00
+
+# -- General 3-byte GTO/XEQ forms (any local label) ---------------------
+#
+# Handbook pp. 46-47 ("GTO 15 - 99", "XEQ"):
+#
+#     1101 bbbr  rrrr rrrr  dlll llll      (GTO: 0xD0-0xDF)
+#     1110 bbbr  rrrr rrrr  dlll llll      (XEQ: 0xE0-0xEF)
+#       bbb          = number of bytes
+#       r rrrr rrrr  = number of registers (bit 0 of the first byte is the
+#                      top bit of the 9-bit register count)
+#       d            = direction: 0 = forward, 1 = backward
+#       lll llll     = label number / letter code (same descriptor values
+#                      as _decode_register_operand's direct range)
+#
+# Again the jump distance is only a cache: hp41uc's compiler writes
+# 0xD0/0xE0, 0x00 (unresolved) and the plain label byte -- tower.txt's
+# "GTO 20"/"GTO 73" are D0 00 14 / D0 00 49, "XEQ 07" is E0 00 07 -- while
+# a real calculator has resolved most of them (e.g. E4 22 04, or a
+# backward jump with the direction bit set in the third byte: E0 00 9E is
+# XEQ 30, *not* "XEQ IND 30" -- the high bit means "backward" here, never
+# "indirect"). Decoding therefore ignores the jump bits and the direction
+# bit entirely and takes only the low 7 bits of the third byte.
+_GTO_LONG_FIRST = 0xD0
+_XEQ_LONG_FIRST = 0xE0
+_LONG_PREFIX_MASK = 0xF0
+_LONG_UNRESOLVED_BYTE2 = 0x00
+_LONG_LABEL_MASK = 0x7F  # bit 7 is the jump direction, not "indirect"
 
 # 0xAF and 0xB0 -- the two bytes between GTO/XEQ IND (0xAE) and the compact
 # GTO block (0xB1-0xBF) -- are confirmed-spare, unassigned opcodes: see
@@ -511,11 +550,12 @@ def encode_program_txt(data: bytes) -> str:
             elif c in _SPARE_OPCODES:
                 lines.append(_format_unknown(data, i, 2))
             elif _GTO_COMPACT_BASE <= c <= _GTO_COMPACT_BASE + _GTO_COMPACT_MAX:
+                # `operand` is the cached jump distance (0 = unresolved,
+                # anything else = a real calculator already resolved it) --
+                # see _GTO_COMPACT_BASE's comment. It doesn't change which
+                # instruction this is, so it's deliberately not checked.
                 target = c - _GTO_COMPACT_BASE
-                if operand == _GTO_COMPACT_FIXED_BYTE2:
-                    lines.append(f"{canonical(GTO)} {target:02d}")
-                else:
-                    lines.append(_format_unknown(data, i, 2))
+                lines.append(f"{canonical(GTO)} {target:02d}")
             elif c == 0xCF:
                 text = _decode_register_operand(operand)
                 _append_mnemonic(lines, canonical(LBL), text, data, i, 2)
@@ -559,19 +599,21 @@ def encode_program_txt(data: bytes) -> str:
             lines.append(f"{canonical(END)} ;{i + 3} BYTES")
             break
 
-        # -- 3-byte instructions: GTO/XEQ's general long form (0xD0/0xE0),
-        # or an unrecognized prefix elsewhere in 0xD0-0xEF.
+        # -- 3-byte instructions: GTO (0xD0-0xDF) / XEQ (0xE0-0xEF)'s
+        # general long form. The low nibble of the first byte and the whole
+        # second byte are the cached jump distance, and the third byte's
+        # high bit is the jump direction -- none of which say anything
+        # about *which* instruction this is, so only the label (the third
+        # byte's low 7 bits) is decoded. See _GTO_LONG_FIRST's comment.
         if 0xD0 <= c <= 0xEF:
             if i + 3 > n:
                 lines.append(_format_unknown(data, i, n - i))
                 break
-            byte2, byte3 = data[i + 1], data[i + 2]
-            if c in (0xD0, 0xE0) and byte2 == 0x00:
-                mnemonic = canonical(GTO if c == 0xD0 else XEQ)
-                text = _decode_register_operand(byte3)
-                _append_mnemonic(lines, mnemonic, text, data, i, 3)
-            else:
-                lines.append(_format_unknown(data, i, 3))
+            label_byte = data[i + 2] & _LONG_LABEL_MASK
+            is_gto = (c & _LONG_PREFIX_MASK) == _GTO_LONG_FIRST
+            mnemonic = canonical(GTO if is_gto else XEQ)
+            text = _decode_register_operand(label_byte)
+            _append_mnemonic(lines, mnemonic, text, data, i, 3)
             i += 3
             continue
 
@@ -1007,9 +1049,9 @@ def _encode_gto_xeq(is_xeq: bool, tokens: List[str]) -> bytes:
         )
     base = _parse_register_base(first_operand)
     if not is_xeq and 0 <= base <= _GTO_COMPACT_MAX:
-        return bytes([_GTO_COMPACT_BASE + base, _GTO_COMPACT_FIXED_BYTE2])
-    prefix = 0xE0 if is_xeq else 0xD0
-    return bytes([prefix, 0x00, base])
+        return bytes([_GTO_COMPACT_BASE + base, _GTO_COMPACT_UNRESOLVED_BYTE2])
+    prefix = _XEQ_LONG_FIRST if is_xeq else _GTO_LONG_FIRST
+    return bytes([prefix, _LONG_UNRESOLVED_BYTE2, base])
 
 
 def _encode_instruction(tokens: List[str]) -> Tuple[bytes, bool]:

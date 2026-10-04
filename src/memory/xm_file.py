@@ -7,9 +7,9 @@ from.
 
 from typing import Optional, TYPE_CHECKING
 
-from .registers import Register, DM41LMemoryError, format_data_line, parse_data_line
+from .registers import Register, DM41MemoryError, format_data_line, parse_data_line
 from .trigraphs import encode_trigraphs, decode_trigraphs
-from .constants import XM_REGIONS, ZERO_REGISTER, EOM_REGISTER
+from .constants import XM_REGIONS, zero_register, eom_register
 from .regions import MemoryRegion
 
 if TYPE_CHECKING:
@@ -434,18 +434,18 @@ class ExtendedMemory(MemoryRegion):
         current_region = 0
         region_header_addr = XM_REGIONS[current_region][0]
         region_header = self.get_register(region_header_addr)
-        if region_header == ZERO_REGISTER:
+        if region_header == zero_register():
             return []
 
         # Compare what the memory dump says should be the top of the first
         # XM region with what we know it should be...
         addr = (region_header[1] & 0x0F) * 256 + region_header[0]
         if addr != XM_REGIONS[current_region][1]:
-            raise DM41LMemoryError(
+            raise DM41MemoryError(
                 f"Invalid XM header: {addr:x} != 0x" f"{XM_REGIONS[current_region][1]}"
             )
 
-        while self.get_register(addr) != EOM_REGISTER:
+        while self.get_register(addr) != eom_register():
             name_register = self.get_register(addr)
             name = name_register.get_ascii()
             name_bytes = name_register.get_bytes()
@@ -456,7 +456,7 @@ class ExtendedMemory(MemoryRegion):
                 header_register = self.get_register(addr)
                 header = ExtendedMemory._parse_header(header_register.get_bytes())
             except Exception as e:
-                raise DM41LMemoryError(
+                raise DM41MemoryError(
                     "Detected invalid XM file header. "
                     f"0x{addr:x}: {header_register.get_hex()}"
                 ) from e
@@ -496,7 +496,7 @@ class ExtendedMemory(MemoryRegion):
         for i, (lo, hi) in enumerate(XM_REGIONS):
             if lo < addr <= hi:
                 return i
-        raise DM41LMemoryError(f"Address 0x{addr:x} is not within any writable XM region")
+        raise DM41MemoryError(f"Address 0x{addr:x} is not within any writable XM region")
 
     def _next_slot(self) -> tuple:
         """
@@ -518,7 +518,7 @@ class ExtendedMemory(MemoryRegion):
             return name_addr, self._find_region(name_addr), False
 
         region0_header = self.get_register(XM_REGIONS[0][0])
-        if region0_header == ZERO_REGISTER:
+        if region0_header == zero_register():
             return XM_REGIONS[0][1], 0, True
 
         # Region 0's pointer register is already initialized but every file
@@ -568,7 +568,7 @@ class ExtendedMemory(MemoryRegion):
             s = XM_REGIONS[region_index][0] - cursor
             next_region = region_index + 1
             if next_region >= len(XM_REGIONS):
-                raise DM41LMemoryError(
+                raise DM41MemoryError(
                     "Not enough free space in extended memory for this "
                     "file -- no further XM region is available to spill "
                     "into."
@@ -589,7 +589,7 @@ class ExtendedMemory(MemoryRegion):
             # regions combined, with nothing free for a terminator.
             # add_file() accepted it and wrote it successfully;
             # _place_file() then correctly avoided clobbering that
-            # pointer register with a bogus EOM_REGISTER (its own
+            # pointer register with a bogus EOM sentinel (its own
             # `next_name_addr > XM_REGIONS[ending_region][0]` guard) --
             # but never wrote ANY terminator there either, so the very
             # next list_files() call walked straight past the (perfectly
@@ -600,7 +600,7 @@ class ExtendedMemory(MemoryRegion):
             # are written -- keeps a directory this close to full from
             # ever losing its terminator in the first place.
             if cursor <= XM_REGIONS[next_region][0]:
-                raise DM41LMemoryError(
+                raise DM41MemoryError(
                     "Not enough free space in extended memory for this "
                     "file."
                 )
@@ -714,7 +714,7 @@ class ExtendedMemory(MemoryRegion):
         behavior documented in docs/memory.md sec. 4.2/4.5. There's no
         support (yet) for reusing space freed by a deleted file.
 
-        Raises DM41LMemoryError if there isn't enough contiguous XM space left
+        Raises DM41MemoryError if there isn't enough contiguous XM space left
         (see _allocate_segments()).
         """
         if not name or len(name) > 7:
@@ -748,7 +748,7 @@ class ExtendedMemory(MemoryRegion):
         # identical `.name` without being duplicates at all. Comparing
         # `.name` here would falsely flag them as colliding.
         if any(f.name_bytes == padded_name_bytes for f in self.list_files()):
-            raise DM41LMemoryError(
+            raise DM41MemoryError(
                 f"A file named {name!r} already exists in extended memory "
                 "-- duplicate names aren't allowed (the real DM41L would "
                 "reject this)."
@@ -893,7 +893,7 @@ class ExtendedMemory(MemoryRegion):
         # Terminate the directory with a fresh EOM sentinel, if there's
         # still room for one below what we just wrote.
         if next_name_addr > XM_REGIONS[ending_region][0]:
-            self.set_register(next_name_addr, EOM_REGISTER)
+            self.set_register(next_name_addr, eom_register())
 
         # The first file to actually use region 1 -- whether that's this
         # very file, or a later one appended after region 0 was already
@@ -908,7 +908,7 @@ class ExtendedMemory(MemoryRegion):
         # was invisible to it, even though this tool's own list_files()
         # never needed that field and so never caught it.
         region1_is_new = (
-            ending_region == 1 and self.get_register(XM_REGIONS[1][0]) == ZERO_REGISTER
+            ending_region == 1 and self.get_register(XM_REGIONS[1][0]) == zero_register()
         )
 
         if needs_bootstrap:
@@ -973,7 +973,7 @@ class ExtendedMemory(MemoryRegion):
         rewriting every file that comes after the one being removed (their
         register addresses will change).
 
-        Raises DM41LMemoryError if no file has a header at header_addr.
+        Raises DM41MemoryError if no file has a header at header_addr.
 
         Rebuilds go through _place_file() directly, NOT add_file(): a
         surviving file's raw name_bytes and data_registers() are written
@@ -991,7 +991,7 @@ class ExtendedMemory(MemoryRegion):
         """
         files = self.list_files()
         if not any(f.header_addr == header_addr for f in files):
-            raise DM41LMemoryError(f"No XM file with a header at 0x{header_addr:03x}")
+            raise DM41MemoryError(f"No XM file with a header at 0x{header_addr:03x}")
 
         # Snapshot each surviving file's raw name bytes, type, and actual
         # data Register objects *before* clearing anything -- data_registers()

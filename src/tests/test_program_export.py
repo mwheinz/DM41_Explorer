@@ -36,7 +36,7 @@ import pytest
 
 from memory import (
     Memory,
-    DM41LMemoryError,
+    DM41MemoryError,
     Program,
     encode_program_raw,
     encode_program_dat,
@@ -163,7 +163,7 @@ def test_get_program_bytes_finds_a_real_unnamed_program_mid_chain():
 def test_get_program_bytes_terminates_on_every_sample_dump():
     """Defensive/regression coverage, matching
     test_list_programs_terminates_on_every_sample_dump(): exporting every
-    program in every sample dump should never raise DM41LMemoryError (a
+    program in every sample dump should never raise DM41MemoryError (a
     corrupt-data signal) or hang, and every program's own bytes must form
     exactly one well-formed program (find_program_end() agrees on where
     it ends)."""
@@ -249,19 +249,19 @@ def test_encode_program_dat_round_trips_tower():
 def test_decode_program_raw_rejects_corrupt_checksum():
     data = bytearray(encode_program_raw(APPTEST_BYTES))
     data[len(APPTEST_BYTES)] ^= 0xFF  # flip the checksum byte
-    with pytest.raises(DM41LMemoryError):
+    with pytest.raises(DM41MemoryError):
         decode_program_raw(bytes(data))
 
 
 def test_decode_program_dat_rejects_corrupt_checksum():
     data = bytearray(encode_program_dat(APPTEST_BYTES))
     data[-1] ^= 0x0F  # perturb one checksum hex digit
-    with pytest.raises(DM41LMemoryError):
+    with pytest.raises(DM41MemoryError):
         decode_program_dat(bytes(data))
 
 
 def test_decode_program_dat_rejects_truncated_file():
-    with pytest.raises(DM41LMemoryError):
+    with pytest.raises(DM41MemoryError):
         decode_program_dat(b"001A")  # header only, no body/checksum
 
 
@@ -336,7 +336,7 @@ def test_decode_program_ppc_tolerates_crlf_line_endings():
 def test_decode_program_ppc_rejects_corrupt_checksum():
     data = bytearray(encode_program_ppc(APPTEST_BYTES))
     data[-2] ^= 0x0F  # perturb the checksum's last hex digit (data[-1] is "\n")
-    with pytest.raises(DM41LMemoryError):
+    with pytest.raises(DM41MemoryError):
         decode_program_dat(bytes(data))
 
 
@@ -346,7 +346,7 @@ def test_decode_program_ppc_rejects_corrupt_checksum():
 # converters (see program_files.py's own docstring) -- the actual opcode
 # table and tokenizer are already exhaustively tested directly against
 # tower.txt/tower.raw in test_program_text.py; these tests only check the
-# file-format wrapping (bytes in, bytes out, DM41LMemoryError instead of a
+# file-format wrapping (bytes in, bytes out, DM41MemoryError instead of a
 # bare ValueError) that gui/program_tab.py's Export/Import dispatch relies
 # on, matching RAW/DAT/PPC's own coverage above.
 
@@ -407,17 +407,17 @@ def test_decode_program_txt_falls_back_to_cp437():
 def test_decode_program_txt_non_utf8_garbage_is_a_compile_error():
     # CP437 decodes any byte, so non-UTF-8 junk is no longer rejected at
     # the decoding step -- it must still fail as an unrecognized
-    # instruction, and still as DM41LMemoryError.
-    with pytest.raises(DM41LMemoryError, match="unrecognized instruction"):
+    # instruction, and still as DM41MemoryError.
+    with pytest.raises(DM41MemoryError, match="unrecognized instruction"):
         decode_program_txt(b'LBL "T1"\n\xff\xfe\nEND\n')
 
 
 def test_decode_program_txt_rejects_uncompilable_text():
     # program_text.decode_program_txt() itself raises a bare ValueError
     # for this (see test_program_text.py); the program_files.py wrapper
-    # must translate that into DM41LMemoryError, matching
+    # must translate that into DM41MemoryError, matching
     # decode_program_raw()/decode_program_dat()'s own error type, so
-    # gui/program_tab.py's shared `except (OSError, DM41LMemoryError)`
+    # gui/program_tab.py's shared `except (OSError, DM41MemoryError)`
     # handler actually catches it.
-    with pytest.raises(DM41LMemoryError):
+    with pytest.raises(DM41MemoryError):
         decode_program_txt(b'LBL "T1"\nNOTAREALINSTRUCTION\nEND\n')

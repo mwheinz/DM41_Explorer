@@ -27,9 +27,21 @@ REGISTER_SIZE_BYTES = 7
 SPECIAL_REGISTER_SIZE_OVERRIDES = {"G": 1}
 
 ZERO_REGISTER_HEX = "00000000000000"
-ZERO_REGISTER = Register(size=7)
 EOM_REGISTER_HEX = "ffffffffffffff"
-EOM_REGISTER = Register.from_hex(EOM_REGISTER_HEX)
+
+
+# A Register wraps a mutable bytearray, so these are functions that build a
+# fresh one each call, not shared module-level objects: a shared instance
+# stored into a Memory (set_register(addr, EOM_REGISTER)) could be changed
+# in place later, silently altering the "constant" for every other user.
+def zero_register() -> Register:
+    '''A new all-zero 7-byte register (what a missing address reads as).'''
+    return Register(size=REGISTER_SIZE_BYTES)
+
+
+def eom_register() -> Register:
+    '''A new end-of-XM-directory sentinel register (all 0xFF).'''
+    return Register.from_hex(EOM_REGISTER_HEX)
 
 # Labels for the 16 status registers, in address order.
 STATUS_REGISTER_LABELS = [

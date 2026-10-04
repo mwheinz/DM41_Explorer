@@ -329,7 +329,7 @@ grouping the (now internally self-consistent) per-program byte ranges,
 avoids that.
 
 Because this only trusts `R00()`/`DotEnd()` and the physical opcode
-bytes -- nothing about the existing chain -- it raises `DM41LMemoryError`
+bytes -- nothing about the existing chain -- it raises `DM41MemoryError`
 (and changes nothing) rather than guessing wherever it cannot be sure it
 has found every real program without risking silently dropping one: if
 real (non-zero) data is present but no marker at all can be found in it,

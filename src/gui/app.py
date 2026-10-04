@@ -113,12 +113,14 @@ LOG_FILE_BACKUP_COUNT = 3
 #   CRITICAL Reserved for failures serious enough to abort a whole run
 #            loop (see serial_manager.py's read-thread crash handling).
 # The data/model layer (memory/*.py) deliberately has no loggers of its
-# own -- it raises (ValueError/DM41LMemoryError) rather than swallowing,
+# own -- it raises (ValueError/DM41MemoryError) rather than swallowing,
 # so logging happens exactly once, at whichever GUI boundary catches the
 # exception and decides how to present it to the user.
 
 
-def _setup_logging(config_store):
+def _setup_logging(config_store, log_basename="dm41l_explorer"):
+    # `log_basename` names the log file (<log_basename>.log) so each app in
+    # this repository writes its own, instead of all sharing one.
     level = getattr(logging, config_store.logging_level.upper(), logging.INFO)
 
     log_dir = config_store.log_directory
@@ -137,7 +139,7 @@ def _setup_logging(config_store):
             Path.home(),
         )
         log_dir = Path.home()
-    log_file = log_dir / "dm41l_explorer.log"
+    log_file = log_dir / f"{log_basename}.log"
 
     file_handler = logging.handlers.RotatingFileHandler(
         log_file,
@@ -577,7 +579,8 @@ class DM41LExplorerApp(ctk.CTk):
             self.config_store.save()
         except Exception as e:
             logger.error(
-                "Could not save %s to %s: %s", context, ProjectConfig.PREFS_FILE, e
+                "Could not save %s to %s: %s",
+                context, self.config_store.PREFS_FILE, e
             )
             messagebox.showerror(
                 "Could Not Save Preferences", f"Could not save {context}: {e}"
@@ -703,9 +706,10 @@ class DM41LExplorerApp(ctk.CTk):
         try:
             self.config_store.save()
         except Exception as e:
-            logger.error("Could not save preferences to %s: %s", ProjectConfig.PREFS_FILE, e)
+            logger.error("Could not save preferences to %s: %s",
+                         self.config_store.PREFS_FILE, e)
             messagebox.showerror("Could not save preferences",
-                                 f"{ProjectConfig.PREFS_FILE}, {e}")
+                                 f"{self.config_store.PREFS_FILE}, {e}")
         self._set_status(f"Connected to {port} -- verifying...")
 
         self.engine.execute(
