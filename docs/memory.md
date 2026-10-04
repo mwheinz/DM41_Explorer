@@ -119,7 +119,7 @@ reflected in the DM41L emulator.
 | O | Alpha characters 15-21 | 0x07 | 
 | P | Alpha characters 22-25: P[0:3], scratch: P[4-6] | 0x08 |
 | Q | scratch | 0x09 |
-| R | Some sources call this "F" or "Append" (it is displayed as the append symbol). unshifted key assignment bitmask: R[3:6], scratch: R[0:2] | 0x0a |
+| R | Some sources call this "F" or "Append" (it is displayed as the append symbol). unshifted key assignment bitmask: R[0:3], scratch: R[4:6] | 0x0a |
 | Execution Stack | 2 registers that provide a 6-level address stack. Each entry in the stack is 2 bytes long. | 0x0b-0x0c |
 | a | return stack part 2 | 0x0b |
 | b | return stack part 1 | 0x0c | 
