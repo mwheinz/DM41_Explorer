@@ -45,19 +45,19 @@ Eleven file types live in nine special folders; four are already understood, and
 
 | Folder | File type | What it holds | Format status | Priority |
 | --- | --- | --- | --- | --- |
-| `/STATE` | `.d41` | Full calculator state: main memory, XM, CPU registers | Unknown — check first whether it matches the DM41L `.dm41` dump or SwissMicros' online decoder input | 1 |
+| `/STATE` | `.d41` | Full calculator state: main memory, XM, CPU registers | Known: the same text format as the DM41L `.dm41` dump (`dm41x_first_look_2026-10-04.md`) | 1 |
 | `/PROG` | `.raw` | One program, same as GETP/SAVEP | Known (hp41uc; DM41L_Explorer import/export) | 1 |
-| `/KEYS` | `.cst` | CST menu: 16 keys A–P plus Shift-▲, Shift-▼, Shift-α, each a command name | Unknown | 1 |
+| `/KEYS` | `.cst` | CST menu: 16 keys A–P plus Shift-▲, Shift-▼, Shift-α, each a command name | Decoded from samples: `cst.md` (limits and special characters still untested) | 1 |
 | `/MODS` | `.mod` | Plug-in module ROMs | Known: public MOD1 format; samples confirm 729-byte header + 5,188 bytes per page | 2 |
-| `/STATE` | `.m41` | Module list: filenames + active/inactive flag | Partial: contents documented, layout not | 2 |
-| `/BACKUP` | `.b41` | Backup manifest naming its `.cst` `.d41` `.m41` `.ram` siblings | Partial: purpose documented, layout not | 2 |
-| `/RAM` | `.ram` | Up to 8 RAM Area pages used by modules | Unknown | 3 |
+| `/STATE` | `.m41` | Module list: filenames + active/inactive flag | Decoded from samples and the manual: `backup_set.md` | 2 |
+| `/BACKUP` | `.b41` | Backup manifest naming its `.cst` `.d41` `.m41` `.ram` siblings | Decoded from samples and the manual: `backup_set.md` | 2 |
+| `/RAM` | `.ram` | Up to 8 RAM Area pages used by modules | Partial: 40,960 bytes, all zero in both samples; layout with real contents unknown (`backup_set.md`) | 3 |
 | `/OFFIMG` | `.bmp` | Images shown while off | Known: 400×240, 1-bit BMP | 2 |
 | `/SCREENS` | `.bmp` | LCD screenshots | Known: BMP | 3 |
 | `/HELP` | `.html` | Built-in help (`41x.html`) | Known: HTML | 3 |
 | root | `param.cfg`, `rtccalib.cfg` | Settings export; RTC correction integer C (−511 to 512) | Partial | 3 |
 
-The samples on hand cover only `/MODS` (20 files), `/OFFIMG` (25) and `/HELP` (4). One **Setup › Settings › Create Full Backup** on the calculator produces a `.b41`, `.cst`, `.d41`, `.m41` and `.ram` together, which is the fastest way to get the rest.
+As of 2026-10-04 the samples on hand are `/MODS` (20 files), `/OFFIMG` (25) and `/HELP` (4) in `DM41X/DM41X_Data`, plus in `src/tests/data` a full backup set (`backuptest.*`), `CSTtest.cst` and the real DM41X dump `dm41x_manyfiles.dm41`. Still missing: a `.ram` with real contents, `/PROG` and `/SCREENS` files, and a `.cst` that tests limits and special characters. One **Setup › Settings › Create Full Backup** on the calculator produces a `.b41`, `.cst`, `.d41`, `.m41` and `.ram` together, which is the fastest way to get the rest.
 
 Reverse-engineering follows the method that worked for DM41L alarms and key assignments: change one thing on the calculator, save, diff the bytes, write it down, and confirm against a second sample.
 
@@ -179,7 +179,7 @@ Seven desktop phases, two web phases and a DM41XN phase that waits for hardware,
 | --- | --- | --- | --- |
 | 0. Repo layout and setup | Monorepo layout (core, transports, shared GUI, three app entry points); DM41L_Explorer moved to `src/apps/dm41l/` unchanged in behaviour; CI builds and tests each app on macOS, Windows, Linux | DM41L_Explorer passes its full suite and builds from the new layout; empty DM41X_Explorer launches | S |
 | 1. Samples and format research | Sample set for every folder (Full Backup, RAW saves, CST variants, RAM pages, screenshots); `docs/` for `.d41`, `.cst`, `.m41`, `.b41`, `.ram`, `param.cfg` | `.d41` and `.cst` documented; every field explained by at least two samples | L |
-| 2. Core library | Device profiles for DM41L and DM41X (600 XM registers) with N-region handling; transport interface separating serial from disk; `.d41` and `.cst` readers/writers following the portability rules; JSON dump views | Full suite passes; byte-identical round trip on every sample; DM41_Explorer release tagged | L |
+| 2. Core library | Device profiles for DM41L and DM41X (600 XM registers) with N-region handling; transport interface separating serial from disk; `.d41` and `.cst` readers/writers following the portability rules; JSON dump views | Full suite passes; round trip on every sample (byte-identical for `.cst`, `.m41` and `.b41`; for dump-format `.d41`/`.dm41` files, identical after normalising whitespace: trailing spaces on each line and the gap between special-register pairs, see `dump_format.md`); DM41_Explorer release tagged | L |
 | 3. DM41X_Explorer shell | Disk transport: volume detection, Open Folder, one Treeview tab per folder; copy in/out, rename, delete; backup-before-write; eject reminder | Files managed on the real DM41X with no stray macOS `._*` files left behind | M |
 | 4. Format tabs | PROG (RAW↔TXT↔DAT↔PPC), STATE (shared views and edits on a `.d41`), KEYS (CST editor + keyboard view), MODS (`.mod` header info, `.m41` view), OFFIMG (image → 400×240 1-bit BMP), BACKUP (manifest view, trim for sharing) | Each file edited by the tool loads correctly on the calculator | L |
 | 5. Program editor | Line-numbered editor in the shared GUI (so all three apps get it), syntax colouring, jump-to-error, save to `.raw` / `.txt` / `.d41`; short editor spec for the website | Program written in the editor runs on the calculator; a bad line opens at that line | M |
@@ -214,8 +214,8 @@ Seven desktop phases, two web phases and a DM41XN phase that waits for hardware,
 ## Open questions
 
 - [ ] Should DM41X_Explorer also open DM41L `.dm41` dumps, making it a superset, or stay DM41X-only?
-- [ ] Is `.d41` a binary file, or the same text layout as a DM41L `.dm41` dump? Settle this first in phase 1; it decides how much of the existing parser and the website's port carries over.
-- [ ] Is CST stored inside `.d41` as well, or only in `.cst` files?
+- [x] Is `.d41` a binary file, or the same text layout as a DM41L `.dm41` dump? **Resolved 2026-10-04:** same text layout; the existing loader reads it unchanged.
+- [ ] Is CST stored inside `.d41` as well, or only in `.cst` files? Open: Create Full Backup writes `.cst` as its own file and nothing in the sample `.d41` has been identified as CST, but it has not been tested by changing only the CST and comparing two `.d41` files.
 - [ ] Program editor: confirm it belongs in v1 (phase 5) or moves to v2.
 - [ ] Which sample-generating sessions on the calculator are you willing to run (Full Backup, CST variants, RAM pages)?
 - [ ] `dm41decoder` lives under the swissmicros GitHub organisation: will the port go in as pull requests for SwissMicros to review, or do you merge directly?
@@ -229,5 +229,6 @@ Seven desktop phases, two web phases and a DM41XN phase that waits for hardware,
 - `DM41X/notes.md` — project notes (9 points).
 - `DM41X/DM41X_Data/dm41x_user_manual.pdf` — DM41X User Manual v1.34, 2026-09-24 ([online copy](https://technical.swissmicros.com/dm41x/doc/dm41x_user_manual.pdf)).
 - `DM41X/DM41X_Data/` — sample `/MODS`, `/OFFIMG`, `/HELP` folders.
+- `docs/dm41x_first_look_2026-10-04.md`, `docs/cst.md`, `docs/backup_set.md`, `docs/dump_format.md` — findings from the first hands-on samples; `src/tests/data/CSTtest.cst`, `backuptest.*` and `dm41x_manyfiles.dm41` are the samples.
 - `DM41_Explorer/` (formerly DM41L_Explorer) — `src/memory/`, `src/gui/`, `docs/`, `README.md`.
 - `dm41decoder/` — `README.md`, `reference/README.md`, `tests/oracle/provenance.json`, `tests/oracle/generate.py`, `docs/dm41-divergences.md`, `Source/compile.c`, `src/dm41/constants.ts`, `src/dm41/memory.ts`, `src/ui/shell/tabs.tsx`, `src/classes/App.ts`.

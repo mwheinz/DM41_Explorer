@@ -89,7 +89,7 @@ The DM41X `.d41` is the DM41L `.dm41` text format:
 - first line `DM41` (not `DM41X`);
 - register lines keyed by hex address, four registers per line, only non-zero groups listed;
 - then `A:`, `B:`, `C:`, `S:`, `M:`, `N:`, `G:` lines;
-- LF line endings and a trailing double space on each register line;
+- LF line endings and a trailing double space on each register line (see "Trailing spaces" below: this is not specific to the DM41X, and the calculator does not need it);
 - 331 bytes, the same size as `src/tests/data/empty.dm41`.
 
 `Memory.from_file()` loaded both DM41X files (BACKUP and STATE copies) without modification.
@@ -128,8 +128,8 @@ What those low bits encode is not known. They behave like state that varies inde
 | File | Observation |
 | --- | --- |
 | `.b41` | Plain text, one line per sibling: `MODS memorylost.m41`, `RAM: memorylost.ram`, `STAT memorylost.d41`, `KEYS memorylost.cst`. |
-| `.m41` | One line, `N PRINTER.mod`. The meaning of the leading `N` is unknown. |
-| `.cst` | One `X.` line per slot: `A.` to `P.`, then `1.`, `2.`, `3.` (the three special slots), all with empty assignments. |
+| `.m41` | One line, `N PRINTER.mod`. The leading `N` marks a module that is in flash but not active; see `backup_set.md`. |
+| `.cst` | One `X.` line per slot: `A.` to `P.`, then `1.`, `2.`, `3.` (the three special slots), all with empty assignments. Decoded from further samples in `cst.md`. |
 | `.ram` | 40,960 bytes, all zero. This is 8 pages of 5,120 bytes if the packed page size matches `.mod` pages (inference); no information content in this sample. |
 | `.mod` | `MOD1` header, sizes consistent with the plan (729-byte header plus 5,188 bytes per page). |
 | `.bmp` (OFFIMG) | 400×240, 1-bit, as documented. |
@@ -140,10 +140,10 @@ They have empty extended memory, and all-zero register groups are omitted from t
 
 ## Follow-ups
 
-- Capture samples: a `.d41` with XM files in the third block; a `.cst` with real assignments; a `.ram` with a RAM-using module active; a second `.d41` taken with a different flag state.
+- Capture samples: ~~a `.d41` with XM files in the third block~~ (done: `dm41x_manyfiles.dm41`); ~~a `.cst` with real assignments~~ (done: `CSTtest.cst`); a `.ram` with a RAM-using module active; a second `.d41` taken with a different flag state.
 - Run the `system_profiler SPUSBDataType` check from section 1.
 - Test `SETIME`/`SETDATE` on the calculator to see whether they change the RTC shown in Settings.
-- Find out what the leading `N` in `.m41` means (compare after toggling a module's active state).
+- ~~Find out what the leading `N` in `.m41` means.~~ Done: see the addendum below and `backup_set.md`.
 
 ## Sources
 
@@ -154,3 +154,23 @@ They have empty extended memory, and all-zero register groups are omitted from t
 - [dmpy](https://github.com/fnordsh/dmpy) (USB-serial status).
 - [DM42n review](https://magazinmehatronika.com/en/swissmicros-dm42n-review/) (power draw; different model).
 - This repo: `docs/key_assignments.md`, `docs/flags.md`, `docs/memory.md`, `docs/dm41x_explorer_plan.md`, `src/memory/status_registers.py`, `src/tests/data/*.dm41`.
+
+## Addendum (2026-10-04, later the same day)
+
+Findings from the second round of samples: `src/tests/data/CSTtest.cst`, `backuptest.*` and `dm41x_manyfiles.dm41`. The detail is in `cst.md`, `backup_set.md` and, for the dump text format, `dump_format.md`.
+
+### Corrections to the sections above
+
+- **`.m41` flag.** The "unknown `N`" in the table is resolved. The DM41X manual (§4.5) describes each module as active (in the Active Modules list and flash) or non-active (flash only). In the samples `A` marks the two modules that were plugged in and `N` marks every inactive one, including `PRINTER.mod`, the Thermal Printer module pre-loaded in flash.
+- **`.m41` paths.** Path does not follow the flag: two inactive modules carry a `/MODS/` path and `PRINTER.mod` is a bare name.
+- **`.cst`.** The empty file in the table was not enough to decode the format; `CSTtest.cst` fills in the details. The three special slots are `1.` Shift-α, `2.` Shift-▲ and `3.` Shift-▼ (observed once). The calculator accepts any name as a command and only fails when the key is used.
+- **XM map.** `dm41x_manyfiles.dm41` is a real DM41X dump. It loads with the `DM41X` profile and its XM files lie in all three regions. The "samples cannot show" paragraph under section 4 is therefore out of date for the XM map.
+
+### Trailing spaces in dump files
+
+The "trailing double space" noted in section 4 is **not specific to the DM41X**, and the calculator does not need it.
+
+- Every register line ends in two spaces in these files: `dm41x_manyfiles.dm41`, `backuptest.d41`, `dm41x_pack_dotend.dm41`, `dm41x_pack_dotend-packed.dm41` and `fillextended.dm41`, and also in the DM41L fixtures `empty.dm41` and `empty-128.dm41`. Most other DM41L fixtures have none.
+- `Memory.to_string()` writes no trailing spaces, so a file saved by DM41L_Explorer loses them. That does not explain every file: `lander.dm41` and `targ.dm41` have the calculator-style two-space gap between special-register pairs but no trailing spaces. The two-space gap, not the trailing spaces, is the reliable marker of calculator-style output. See `dump_format.md` for the full comparison; why those two files differ was not investigated.
+- A copy of `dm41x_manyfiles.dm41` with all trailing whitespace removed by hand was loaded back into the DM41X without a problem. That is one file on one model. No equivalent test has been done on a DM41L.
+- Consequence for the plan: the phase 2 round-trip gate compares dump files after stripping trailing whitespace from each line, and no code change to `to_string()` is needed. (`dump_format.md` records that `to_string()` also changes the two-space gaps between special-register pairs to one space, which should go into the same comparison.)

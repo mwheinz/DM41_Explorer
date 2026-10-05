@@ -57,6 +57,8 @@ checked against EMDIR on a real DM41X.)
 
 ## 1. Special XM Registers
 
+> **Known discrepancy (flagged 2026-10-04, not resolved).** This section describes `dm41x_manyfiles.dm41` as having 52 files, with register 0x040 = `000340342ef0bf` (WW = 0x34 = 52). The copy of that file now in `src/tests/data` lists 59 XM files and has 0x040 = `0003c03c2ef0bf` (0x3c = 60). The 0x201 and 0x301 values below do match the current file. The 52-file figures may come from an earlier version of the dump; that has not been checked, and the region map itself is not affected.
+
 Each XM region starts with a reserved pointer register. The DM41L has two
 regions; the DM41X has three (confirmed against
 `tests/data/dm41x_manyfiles.dm41`, a real DM41X dump with 52 files that
