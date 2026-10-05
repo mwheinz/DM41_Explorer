@@ -119,13 +119,13 @@ reflected in the DM41L emulator.
 | O | Alpha characters 15-21 | 0x07 | 
 | P | Alpha characters 22-25: P[0:3], scratch: P[4-6] | 0x08 |
 | Q | scratch | 0x09 |
-| R | Some sources call this "F" or "Append" (it is displayed as the append symbol). unshifted key assignment bitmask: R[0:3], scratch: R[4:6] | 0x0a |
+| R | Some sources call this "F" or "Append" (it is displayed as the append symbol). unshifted key assignment bitmask: R[0:3] plus the high nibble of R[4] (36 bits), scratch: low nibble of R[4], R[5:6] | 0x0a |
 | Execution Stack | 2 registers that provide a 6-level address stack. Each entry in the stack is 2 bytes long. | 0x0b-0x0c |
 | a | return stack part 2 | 0x0b |
 | b | return stack part 1 | 0x0c | 
 | c | Contains ∑REG, R00, and ".END." | 0x0d |
 | d | User and System flags. | 0x0e | 
-| e | shifted key assignment bitmask: e[3:6], scratch: e[2], LineNo e[0:1] | 0x0f |
+| e | shifted key assignment bitmask: e[0:3] plus the high nibble of e[4] (36 bits), scratch: low nibble of e[4], LineNo: e[5:6] | 0x0f |
 
 ### 3.2 HP41 Alpha display:
 
