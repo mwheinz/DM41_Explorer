@@ -1316,10 +1316,14 @@ def test_key_assignments_end_is_start_when_no_assignments():
     tenth-of-a-second trigger-time precision, used to correct the sec 12
     repeats-flag digit to the last BCD nibble only rather than the last
     two) carries the same inherited ALMCAT/XYZALM pair and is excluded
-    for the same reason."""
+    for the same reason. So do manyfiles-packed.dm41 and the
+    dm41x_pack_dotend pair (2026-10-04, real before/after PACK captures
+    taken from the same calculators)."""
     excluded = {
         "keyassigns.dm41", "xrom-keyassignments.dm41",
-        "manyfiles.dm41", "dm41x_manyfiles.dm41",
+        "manyfiles.dm41", "dm41x_manyfiles.dm41", "manyfiles-packed.dm41",
+        "dm41x_pack_dotend.dm41", "dm41x_pack_dotend-packed.dm41",
+        "manyfiles-repacked.dm41",
         "alarmtest.dm41", "alarmtest2.dm41", "alarmtest3.dm41",
         "4alarmtest.dm41", "repeater.dm41", "badalarms.dm41",
         "goodalarms.dm41", "past-due.dm41", "tenthsofasecond.dm41",

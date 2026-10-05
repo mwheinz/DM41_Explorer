@@ -192,3 +192,125 @@ def scan_global_markers_forward(data: bytes) -> list:
                 state = State.BYTE1
 
     return entries
+
+
+# -- Instruction-level walking and the byte-level half of PACK -------------
+
+# Number-entry bytes: the digits 0-9, '.', EEX and CHS-in-a-number
+# (0x10-0x1C). The HP-41 puts a NULL in front of every number keyed into a
+# program, and a real PACK deletes it again unless it's what keeps two
+# consecutive numbers from running together.
+NUMBER_ENTRY_FIRST = 0x10
+NUMBER_ENTRY_LAST = 0x1C
+
+
+def _instruction_length(data, i: int) -> int:
+    '''
+    Byte length of the instruction starting at `data[i]` (a global END/LBL
+    marker counts as one instruction, including a label's key byte and
+    name), using exactly the classification `find_program_end()` uses.
+    Never runs past `len(data)`: a truncated final instruction just gets
+    whatever bytes are left.
+    '''
+    c = data[i]
+    if 0x1D <= c <= 0x1F:
+        if i + 1 >= len(data):
+            return 1
+        c2 = data[i + 1]
+        length = 2 if c2 <= 0xF0 else 2 + (c2 & 0x0F)
+    elif (0x90 <= c <= 0xBF) or (0xCE <= c <= 0xCF):
+        length = 2
+    elif 0xC0 <= c <= 0xCD:
+        if i + 2 >= len(data):
+            return len(data) - i
+        third = data[i + 2]
+        length = 3 + (third & 0x0F if third >= 0xF0 else 0)
+    elif 0xD0 <= c <= 0xEF:
+        length = 3
+    elif 0xF0 <= c <= 0xFF:
+        length = 1 + (c & 0x0F)
+    else:
+        length = 1
+    return min(length, len(data) - i)
+
+
+def iter_instructions(data):
+    '''Yields `(start_index, length)` for every instruction in `data`, in
+    order. A global END/LBL marker is one instruction.'''
+    i = 0
+    while i < len(data):
+        length = _instruction_length(data, i)
+        yield i, length
+        i += length
+
+
+def _clear_jump_cache(instruction: bytearray):
+    '''Zeroes the cached jump-distance bits of one GTO/XEQ instruction, in
+    place (docs/program.md; Handbook "GTO"/"XEQ"): the second byte of the
+    compact `0xB1-0xBF` form, and in the general 3-byte `0xD0-0xEF` form
+    the low nibble of the first byte, all of the second, and the direction
+    bit (top bit) of the third, which holds the label itself in its low 7
+    bits.'''
+    first = instruction[0]
+    if 0xB1 <= first <= 0xBF and len(instruction) == 2:
+        instruction[1] = 0x00
+    elif 0xD0 <= first <= 0xEF and len(instruction) == 3:
+        instruction[0] = first & 0xF0
+        instruction[1] = 0x00
+        instruction[2] &= 0x7F
+
+
+def clear_jump_caches(data: bytes) -> bytes:
+    '''`data` with every GTO/XEQ's cached jump distance reset to "not
+    resolved yet" (zero) -- the calculator works the real distance out
+    again when the program next runs. Everything else is copied verbatim,
+    including global END/LBL markers.'''
+    out = bytearray(data)
+    for start, length in iter_instructions(data):
+        instruction = bytearray(out[start : start + length])
+        _clear_jump_cache(instruction)
+        out[start : start + length] = instruction
+    return bytes(out)
+
+
+def compact_program_stream(data: bytes) -> bytes:
+    '''
+    The byte-level half of what a real PACK does to program memory,
+    confirmed against before/after captures from a real DM41L/DM41X
+    (tests/data/manyfiles*.dm41 and the lander/targ pairs):
+
+    - every standalone NULL is deleted, except one that sits between two
+      number-entry instructions (it is what keeps them apart: "12345 NULL
+      67890" is two numbers, "1234567890" is one);
+    - every GTO/XEQ's cached jump distance is cleared (`clear_jump_caches`)
+      because deleting bytes can invalidate it.
+
+    Markers (END, labels, and `.END.`) are copied verbatim -- the caller
+    is responsible for re-linking them, since this changes the distances
+    between them. Operand bytes that happen to be zero (`FIX 0`, `ISG 00`,
+    ...) are never touched: only a NULL that is itself an instruction goes.
+    '''
+    instructions = list(iter_instructions(data))
+    out = bytearray()
+    previous_is_number = False
+    for position, (start, length) in enumerate(instructions):
+        first = data[start]
+        if first == 0x00:
+            # Only the *last* NULL of a run can matter -- peek past the run
+            # to see what follows it.
+            following = position + 1
+            while following < len(instructions) and data[instructions[following][0]] == 0x00:
+                following += 1
+            if following == position + 1:  # last NULL of its run
+                next_is_number = following < len(instructions) and (
+                    NUMBER_ENTRY_FIRST <= data[instructions[following][0]] <= NUMBER_ENTRY_LAST
+                )
+                if previous_is_number and next_is_number:
+                    out.append(0x00)
+                    previous_is_number = False
+            continue
+        instruction = bytearray(data[start : start + length])
+        _clear_jump_cache(instruction)
+        out += instruction
+        previous_is_number = NUMBER_ENTRY_FIRST <= first <= NUMBER_ENTRY_LAST
+    return bytes(out)

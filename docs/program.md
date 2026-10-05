@@ -261,7 +261,8 @@ arithmetic of their own:
    labels' key assignments (but not touching KEYFLAGS -- §4.5 -- which
    live in a separate register and were never cleared in the first
    place).
-4. Best-effort cleanup: `import_program()`'s own step 8 always writes a
+4. Best-effort cleanup (`remove_program()` only -- `pack()` deliberately does
+   NOT do this, see "What a real PACK does" below): `import_program()`'s own step 8 always writes a
    *separate*, freshly register-aligned `.END.` sentinel after whatever
    it just imported, even when that program is the last one being
    rebuilt -- leaving it `terminator == "END"` rather than the more
@@ -297,9 +298,56 @@ already been edited, but will close any gaps that had accumulated in a dump
 that was loaded from a DM41L. current as a side effect -- a no-op for a dump
 this app has only ever edited itself, but self-healing for one that wasn't.
 Returns the number of registers reclaimed (`DotEnd() - alarms_end()`'s
-increase), 0 if nothing needed packing; verified never negative and idempotent
-(a second `pack()` call always returns 0) across every sample dump in
-`src/tests/data/` -- see `src/tests/test_pack.py`.
+increase), 0 if nothing needed packing; idempotent (a second `pack()` call
+always returns 0) across every sample dump in `src/tests/data/`. It is
+negative (-1) only when a newest program was closed by `.END.` directly and
+now needs a real END plus an empty `.END.` -- see below. See
+`src/tests/test_pack.py` and `src/tests/test_pack_hardware.py`.
+
+#### What a real PACK does
+
+Established from four before/after pairs captured on real hardware
+(`manyfiles` and `lander`/`targ` on a DM41L, `dm41x_pack_dotend` on a DM41X,
+each with a `-packed` twin in `src/tests/data/`) and reproduced exactly by
+`pack()`, apart from the jump caches (rule 2):
+
+1. **NULLs.** Every standalone `0x00` instruction is deleted, except one
+   sitting between two number-entry instructions (`0x10`-`0x1C`), which is
+   what keeps "12345 NULL 67890" two numbers. Zeros that are part of an
+   instruction (`FIX 0` is `9C 00`, `ISG 00`, a label header, a character
+   inside an ALPHA string) are never touched. manyfiles.dm41: 47 bytes
+   deleted, `.END.` moved up 7 registers.
+2. **Jump caches.** A GTO/XEQ's cached jump distance (§ Compact/General
+   GTO forms in `program_text.py`) is stale once bytes move. A real PACK
+   resolves it again or clears it, and the calculator re-resolves it the next
+   time the program runs; `pack()` clears every one
+   (`opcode_scan.clear_jump_caches()`): the second byte of `B1`-`BF`, and in
+   the 3-byte `D0`-`EF` forms the low nibble of byte 1, all of byte 2 and
+   the direction bit of byte 3. A real PACK leaves a cache alone when nothing
+   moved, so the tests treat these bytes as don't-cares.
+3. **END flags and chain.** Every END is marked packed (third byte low nibble
+   `9`, versus `D`/`F` for "needs packing") and the chain is re-linked.
+4. **The newest program is always closed by a real END**, placed immediately
+   after its last instruction, followed by the permanent `.END.` as a
+   separate, empty marker (`C? ?? 20`) on the next register boundary -- even
+   when the source closed the program with `.END.` directly
+   (`dm41x_pack_dotend`, `targ`, `lander`). This can cost a register
+   (targ: 79 -> 80), and a packed buffer packs to itself.
+
+`twolabels.dm41` has the same shape as `dm41x_pack_dotend.dm41` (`.END.`
+closing the program, flagged `2D`); a real DM41L PACK of it
+(`twolabels-packed.dm41`) came out byte-for-byte what `pack()` produces. A
+real PACK of an already-packed file (`manyfiles-repacked.dm41`) changes no
+program byte, including cached jumps, which is why `pack()` is idempotent
+apart from clearing them.
+
+Not reproduced: a real PACK also moves the program counter (status register
+`b`) along with whatever it pointed at, e.g. `twolabels`: `…4198` ->
+`…1198`, from the start of the old `.END.` to the start of the END that
+replaced it. `pack()` leaves `b` alone.
+Checked on a DM41L: `manyfiles.dm41` packed by the Explorer (so `.END.` moves 7
+registers with `b` left stale) loads and CAT 1 lists its programs correctly.
+Stepping through the programs (SST) after such a load has not been tried.
 
 #### Rebuilding the chain, not just compacting it.
 

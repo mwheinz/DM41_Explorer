@@ -428,7 +428,10 @@ class Memory:
         Program memory (docs/program.md sec 5) gets more than a repack --
         see `ProgramMemory.repack()`, which rebuilds the global chain
         from a forward opcode scan rather than trusting the existing
-        backlinks.
+        backlinks, deletes NULLs and clears cached jump distances the way
+        a real PACK does, and closes the newest program with a real END
+        plus an empty `.END.` (which can cost one register -- the return
+        value is then -1).
 
         Meant to be run explicitly after loading a dump file or before an
         Import to guarantee the maximum possible free space is available for
@@ -439,7 +442,8 @@ class Memory:
 
         Returns the number of additional registers now free as a result
         (the change in the free-space region's size) -- 0 if nothing
-        needed packing.
+        needed packing, -1 if the newest program was closed by `.END.`
+        directly and now needs a real END as well.
 
         Raises `DM41MemoryError` if the program-memory scan cannot safely
         determine program memory's real content -- see

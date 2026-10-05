@@ -219,3 +219,19 @@ def test_remove_every_program_in_every_sample_dump_one_at_a_time():
             after = fresh.programs.list_programs()
             assert len(after) == len(fresh_programs) - 1, path.name
             assert _names_lengths(after) == expected_remaining, path.name
+
+
+def test_remove_newest_program_leaves_no_stale_marker_in_the_space_it_frees():
+    # When the new newest program collapses back to being .END.-terminated
+    # (_collapse_trailing_end_into_dot_end()), the old separate .END.
+    # register is handed back as free space and has to read as zeros. An
+    # earlier version cleared the wrong range (it iterated upward from the
+    # END instead of downward to the old .END.) and left a stray
+    # c0 01 20 marker behind.
+    memory = Memory.from_file(DATA_DIR / "6x-xm.dm41")
+    programs = memory.programs.list_programs()
+
+    memory.programs.remove_program(programs[-1])
+
+    free = range(memory.alarms.end_exclusive, memory.status_registers.DotEnd())
+    assert all(memory.get_register(r).get_hex() == "0" * 14 for r in free)

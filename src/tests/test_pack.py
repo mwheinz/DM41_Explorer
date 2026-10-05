@@ -29,6 +29,8 @@ from pathlib import Path
 import pytest
 
 from memory import Memory, DM41MemoryError, Register
+from memory.opcode_scan import clear_jump_caches
+from memory.program_text import encode_program_txt
 from fixture_loading import load_fixture
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -47,34 +49,56 @@ STABLE_FIXTURES = [p for p in ALL_FIXTURES if p.name not in REPAIR_FIXTURES]
 # -- Safety/idempotence across every real sample dump ------------------------
 
 
+def _listings(memory):
+    """Each program's instructions as text, minus the closing 'END ;nnn
+    BYTES' line. NULLs and cached jump distances never show up in a
+    listing -- which is exactly what a real PACK is allowed to change
+    (see test_pack_hardware.py) -- while every real instruction does."""
+    return [
+        encode_program_txt(memory.programs.get_program_bytes(p)).splitlines()[:-1]
+        for p in memory.programs.list_programs()
+    ]
+
+
 @pytest.mark.parametrize("path", STABLE_FIXTURES, ids=lambda p: p.name)
 def test_pack_never_loses_or_reorders_programs(path):
     # Excludes REPAIR_FIXTURES -- see test_pack_repairs_a_broken_backward_chain
     # below for lander.dm41/targ.dm41, where pack() is supposed to change
-    # what list_programs() reports (that's the fix).
+    # what list_programs() reports (that's the fix). A program's byte length
+    # CAN shrink (a real PACK deletes its NULLs), so only its identity and
+    # its instructions are compared.
     memory = load_fixture(path)
-    before = [(p.names_label, p.length) for p in memory.programs.list_programs()]
-    before_bytes = [memory.programs.get_program_bytes(p) for p in memory.programs.list_programs()]
+    before_names = [p.names_label for p in memory.programs.list_programs()]
+    before_listings = _listings(memory)
 
     memory.pack()
 
-    after_programs = memory.programs.list_programs()
-    assert [(p.names_label, p.length) for p in after_programs] == before
-    assert [memory.programs.get_program_bytes(p) for p in after_programs] == before_bytes
+    assert [p.names_label for p in memory.programs.list_programs()] == before_names
+    assert _listings(memory) == before_listings
+
+
+# A real PACK can use ONE MORE register than it started with: a newest
+# program the source closed with the permanent .END. directly comes out
+# as a real END plus an empty .END. -- real hardware did exactly that to
+# targ.dm41 (79 -> 80 registers, targ-packed.dm41). twolabels.dm41 is in
+# the same state (.END. closing the program, flagged "needs packing", like
+# dm41x_pack_dotend.dm41) and a real DM41L PACK of that very file cost one
+# register too (twolabels-packed.dm41).
+COSTS_ONE_REGISTER = {"targ.dm41", "twolabels.dm41"}
 
 
 @pytest.mark.parametrize("path", ALL_FIXTURES, ids=lambda p: p.name)
-def test_pack_never_reports_a_negative_reclaim(path):
-    # The regression this guards: an earlier version of the newest-
-    # program collapse optimization (_collapse_trailing_end_into_dot_end())
-    # didn't check register alignment before rewriting DotEnd, and could
-    # move it the WRONG way (using *more* register space than before,
-    # e.g. on twolabels.dm41 -- a single program terminated only by the
-    # permanent .END., already in its most-compact form). pack() must
-    # never make memory less free than it started.
+def test_pack_never_reports_a_negative_reclaim_except_for_dot_end_closed_programs(path):
+    # Guards the regression an earlier version of the newest-program
+    # collapse optimization caused: pack() moved DotEnd the WRONG way
+    # (using *more* space) on a buffer that did not need that. The only
+    # legitimate cost is the one register above, and never more.
     memory = load_fixture(path)
     freed = memory.pack()
-    assert freed >= 0, f"{path.name}: pack() reported a NEGATIVE reclaim ({freed})"
+    if path.name in COSTS_ONE_REGISTER:
+        assert freed == -1, f"{path.name}: expected PACK to cost one register ({freed})"
+    else:
+        assert freed >= 0, f"{path.name}: pack() reported a NEGATIVE reclaim ({freed})"
 
 
 @pytest.mark.parametrize("path", ALL_FIXTURES, ids=lambda p: p.name)
@@ -100,12 +124,15 @@ def test_pack_round_trips_through_to_string_and_from_string(path):
 # -- twolabels.dm41: the specific alignment regression ------------------------
 
 
-def test_pack_on_twolabels_stays_at_the_optimal_dot_end_terminated_layout():
+def test_pack_on_twolabels_closes_the_program_with_end_and_an_empty_dot_end():
     # FIRST/SECOND (twolabels.dm41) has no explicit END at all -- only
-    # the permanent .END. terminates it, already the most compact form a
-    # single newest program can take (Program's own docstring). This is
-    # exactly the fixture that caught the alignment bug during
-    # development (see test_pack_never_reports_a_negative_reclaim).
+    # the permanent .END. closes it (flagged "needs packing"). A real PACK
+    # of this very file on a DM41L (twolabels-packed.dm41, and likewise
+    # dm41x_pack_dotend.dm41 -> -packed; see test_pack_hardware.py) wrote
+    # a real END right after the last instruction and left .END. as a
+    # separate, empty marker. The old expectation here -- that
+    # .END.-terminated is "already the most compact form" and PACK keeps
+    # it -- was never checked on hardware and contradicted those captures.
     memory = Memory.from_file(DATA_DIR / "twolabels.dm41")
     before = memory.programs.list_programs()[0]
     assert before.terminator == ".END."
@@ -113,10 +140,11 @@ def test_pack_on_twolabels_stays_at_the_optimal_dot_end_terminated_layout():
 
     freed = memory.pack()
 
-    after = memory.programs.list_programs()[0]
-    assert freed == 0
-    assert after.terminator == ".END."
-    assert memory.status_registers.DotEnd() == before_dot_end
+    after = memory.programs.list_programs()
+    assert len(after) == 1
+    assert after[0].terminator == "END"
+    assert freed == -1
+    assert memory.status_registers.DotEnd() == before_dot_end - 1
 
 
 # -- Key Assignments / Alarms --------------------------------------------------
@@ -208,11 +236,10 @@ def test_pack_repairs_a_broken_backward_chain(unpacked_name, label, real_length)
 
     programs = memory.programs.list_programs()
     assert [p.names_label for p in programs] == [label]
-    # Recovered content may be a few zero-padding bytes longer than a
-    # real hardware PACK's own register-alignment choice (see
-    # test_pack_repaired_bytes_match_real_hardware_content below) but
-    # never shorter -- nothing real was dropped.
-    assert programs[0].length >= real_length
+    # Exactly the length a real hardware PACK produced -- since pack()
+    # also deletes NULLs and puts the END right after the last instruction
+    # (see test_pack_hardware.py), there's no padding difference left.
+    assert programs[0].length == real_length
 
 
 @pytest.mark.parametrize(
@@ -220,13 +247,10 @@ def test_pack_repairs_a_broken_backward_chain(unpacked_name, label, real_length)
     [("lander.dm41", "lander-packed.dm41"), ("targ.dm41", "targ-packed.dm41")],
 )
 def test_pack_repaired_bytes_match_real_hardware_content(unpacked_name, packed_name):
-    # The repaired program's own real content (opcodes, embedded labels,
-    # key bytes) must match a real hardware PACK exactly. The only
-    # allowed difference is *where* harmless zero-alignment padding sits
-    # in front of the final chain marker -- an already-accepted tradeoff
-    # of rebuilding programs through import_program() (see
-    # _collapse_trailing_end_into_dot_end()'s own docstring) that has
-    # nothing to do with this repair specifically.
+    # The repaired program (opcodes, embedded labels, key bytes, and its
+    # closing END marker) must match a real hardware PACK byte for byte.
+    # The one allowed difference: pack() clears every GTO/XEQ's cached
+    # jump distance, which a real PACK only does when something moved.
     memory = Memory.from_file(DATA_DIR / unpacked_name)
     memory.pack()
     mine = memory.programs.get_program_bytes(memory.programs.list_programs()[0])
@@ -234,14 +258,7 @@ def test_pack_repaired_bytes_match_real_hardware_content(unpacked_name, packed_n
     reference = Memory.from_file(DATA_DIR / packed_name)
     real = reference.programs.get_program_bytes(reference.programs.list_programs()[0])
 
-    assert len(mine) >= len(real)
-    padding = len(mine) - len(real)
-    # Real content (everything except the trailing marker) must match
-    # exactly; only zero padding may separate it from mine's own marker.
-    assert mine[: len(real) - 3] == real[:-3]
-    assert mine[len(real) - 3 : len(real) - 3 + padding] == bytes(padding)
-    # And mine's own trailing marker must still be a valid one (0xC0-0xCD).
-    assert 0xC0 <= mine[-3] <= 0xCD
+    assert mine == clear_jump_caches(real)
 
 
 @pytest.mark.parametrize("unpacked_name,label", [("lander.dm41", "LANDER"), ("targ.dm41", "TARG")])

@@ -24,7 +24,11 @@ from .registers import Register, DM41MemoryError
 from .regions import MemoryRegion
 from .constants import PRIMARY_DATA_END, KEY_ASSIGNMENTS_RANGE, MIN_SANE_R00
 from .program_info import ProgramInfo, ProgramLabel, Program
-from .opcode_scan import find_program_end, scan_global_markers_forward
+from .opcode_scan import (
+    compact_program_stream,
+    find_program_end,
+    scan_global_markers_forward,
+)
 from .program_chain import walk_chain, encode_chain_marker
 
 if TYPE_CHECKING:
@@ -901,6 +905,15 @@ class ProgramMemory(MemoryRegion):
             self.read_bytes_forward(top_reg, top_offset, top_addr - floor_addr + 1)
         )
 
+        # What a real PACK does to the program bytes themselves: delete
+        # every NULL that isn't keeping two numbers apart and clear the
+        # cached GTO/XEQ jump distances (opcode_scan.compact_program_stream
+        # has the details and the evidence). This works on a local copy --
+        # nothing live is touched until _rebuild() -- and it has to happen
+        # before the markers are located and re-linked below, because
+        # deleting bytes changes the distance between every marker.
+        data = bytearray(compact_program_stream(bytes(data)))
+
         markers = scan_global_markers_forward(bytes(data))
         if not markers:
             if any(data):
@@ -950,8 +963,17 @@ class ProgramMemory(MemoryRegion):
                     "fragmented."
                 )
             start = marker["index"]
+            third_byte = marker["third_byte"]
+            if not marker["is_label"]:
+                # Every END comes out of a real PACK marked "packed" (low
+                # nibble 9, versus d/f for "needs packing"), and a `.END.`
+                # that was closing the newest program directly becomes a
+                # plain END -- _rebuild() writes the empty permanent
+                # `.END.` after it (see repack()).
+                high = third_byte & 0xF0
+                third_byte = (0x00 if high == 0x20 else high) | 0x09
             data[start : start + 3] = encode_chain_marker(
-                bbb, distance_registers, marker["third_byte"]
+                bbb, distance_registers, third_byte
             )
 
         programs = []
@@ -981,7 +1003,7 @@ class ProgramMemory(MemoryRegion):
 
         return programs
 
-    def _rebuild(self, programs: list):
+    def _rebuild(self, programs: list, collapse_trailing_end: bool = True):
         '''
         Physically rewrites this region from scratch so it exactly
         contains `programs` -- a list of `(instruction_bytes,
@@ -1027,6 +1049,11 @@ class ProgramMemory(MemoryRegion):
         already correct before this call, restoring the header byte alone
         is enough to leave a kept program's key assignment exactly as it
         was.
+
+        `collapse_trailing_end` (default True) runs
+        `_collapse_trailing_end_into_dot_end()` afterward -- what
+        `remove_program()` wants. `repack()` passes False: a real PACK
+        never does that (see `repack()`).
         '''
         status = self._memory.status_registers
         for reg in range(self._memory.alarms.end_exclusive, status.R00()):
@@ -1042,7 +1069,7 @@ class ProgramMemory(MemoryRegion):
                         label.header_addr, label.header_offset, key_byte
                     )
 
-        if programs:
+        if programs and collapse_trailing_end:
             self._collapse_trailing_end_into_dot_end()
 
     def _collapse_trailing_end_into_dot_end(self):
@@ -1094,6 +1121,13 @@ class ProgramMemory(MemoryRegion):
         program -- with none, `.END.` is already sitting at `R00()` (no
         separate sentinel was ever written) and there is nothing to
         collapse.
+
+        Used by `remove_program()` only. `repack()` does NOT call it: real
+        hardware never collapses an END and the empty `.END.` after it --
+        every real PACK capture (tests/data/*-packed.dm41 and
+        dm41x_pack_dotend-packed.dm41) ends END + empty `.END.`, even when
+        the unpacked source had `.END.` closing the program directly. See
+        `repack()` and docs/program.md "What a real PACK does".
         '''
         status = self._memory.status_registers
         chain = self.list_global_chain()
@@ -1110,9 +1144,12 @@ class ProgramMemory(MemoryRegion):
         data[offset] = (data[offset] & 0x0F) | 0x20  # end-type nibble -> 2 (.END.)
         self._memory.set_register(reg, Register(data=bytes(data)))
 
+        # Programs grow downward, so the old, separate `.END.` register
+        # sits at a LOWER address than the END that just became `.END.`:
+        # it (and anything between) is the stale space to give back.
         old_dot_end_reg = status.DotEnd()
         status.set_DotEnd(pred_reg)
-        for stale in range(pred_reg + 1, old_dot_end_reg + 1):
+        for stale in range(old_dot_end_reg, pred_reg):
             self._memory.set_register(stale, Register(size=7))
 
     def remove_program(self, program: Program):
@@ -1207,6 +1244,25 @@ class ProgramMemory(MemoryRegion):
         register-alignment drift the same way `remove_program()` does for
         the program it deletes.
 
+        Matches what a REAL PACK does, as observed in before/after dumps
+        captured from a real DM41L/DM41X (tests/data: manyfiles,
+        dm41x_pack_dotend, lander, targ, each with a `-packed` twin; see
+        tests/test_pack_hardware.py):
+
+        - standalone NULLs are deleted (except one between two numbers)
+          and every GTO/XEQ's cached jump distance is cleared --
+          `_forward_scan_programs()` does this, via
+          `opcode_scan.compact_program_stream()`;
+        - every END is marked "packed" and the chain is re-linked;
+        - the newest program is ALWAYS closed by a real END placed right
+          after its last instruction, with the permanent `.END.` as a
+          separate empty marker on the next register boundary -- even
+          when the source closed it with `.END.` directly. So this does
+          NOT run `_collapse_trailing_end_into_dot_end()`, and a packed
+          buffer packs to itself (idempotent). It can even cost a
+          register: a `.END.`-closed program needs its END plus an empty
+          `.END.` (`pack()` then reports a negative reclaim).
+
         Safe to call on a buffer with no programs at all -- program
         memory is then left untouched rather than guessing at a `.END.`
         for an empty partition this method did not create.
@@ -1219,7 +1275,7 @@ class ProgramMemory(MemoryRegion):
         '''
         keep = self._forward_scan_programs()
         if keep:
-            self._rebuild(keep)
+            self._rebuild(keep, collapse_trailing_end=False)
 
     # -- Global label (program) key assignments --------------------------
     #
