@@ -1,10 +1,10 @@
 # FOCAL Mnemonic Dialects — Design Plan
 
-Status: design only, no code changes yet. Revised 2026-09-22 after checking
-the plan against hp41uc's source (`~/Work/hp41uc`, commit ff23b21) and the
-current `memory/program_text.py`. Open decisions resolved and phasing
-revised later the same day (§5, §7).
-Related: `docs/program_text_io_plan.md` (the `.txt` program read/write feature this builds on).
+Status: Currently complete. Unless new bugs are discovered, this document is
+left only for reference purposes. Much of the issues this effort needed to
+resolve were my own fault for trying to blend HP48 concepts (trigraphs) with
+HP41 coding, without realizing what previous HP41 coders had already
+standardized on.
 
 ## 1. Problem
 
