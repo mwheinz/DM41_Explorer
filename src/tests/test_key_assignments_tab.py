@@ -89,25 +89,25 @@ def test_both_grids_stay_in_sync_for_a_program_assignment(tab):
 
 def test_layouts_are_separate_subtabs_dm41l_first(tab):
     """Issue #39: each keyboard layout lives on its own sub-tab, DM41L
-    first and HP41 second, and DM41L is the one shown by default."""
-    from gui.key_assignments_tab import DM41L_TAB, HP41_TAB
+    first and DM41X second, and DM41L is the one shown by default."""
+    from gui.key_assignments_tab import DM41L_TAB, DM41X_TAB
 
-    assert tab._layout_tabs._name_list == [DM41L_TAB, HP41_TAB]
+    assert tab._layout_tabs._name_list == [DM41L_TAB, DM41X_TAB]
     assert tab._layout_tabs.get() == DM41L_TAB
 
 
 def test_each_grid_is_built_on_its_own_subtab(tab):
     """Each key's two buttons (one per layout) live under different
-    sub-tabs -- the DM41L button under the DM41L tab's frame, the HP41
-    button under the HP41 tab's frame."""
-    from gui.key_assignments_tab import DM41L_TAB, HP41_TAB
+    sub-tabs -- the DM41L button under the DM41L tab's frame, the DM41X
+    button under the DM41X tab's frame."""
+    from gui.key_assignments_tab import DM41L_TAB, DM41X_TAB
 
     memory = Memory.from_file(DATA_DIR / "manyfiles.dm41")
     tab.render(memory)
 
     dm41l_btn, hp41_btn = tab._key_buttons[(11, False)]
     dm41l_tab = tab._layout_tabs.tab(DM41L_TAB)
-    hp41_tab = tab._layout_tabs.tab(HP41_TAB)
+    hp41_tab = tab._layout_tabs.tab(DM41X_TAB)
     assert str(dm41l_btn).startswith(str(dm41l_tab) + ".")
     assert str(hp41_btn).startswith(str(hp41_tab) + ".")
 
