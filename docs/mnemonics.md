@@ -19,6 +19,10 @@ Import accepts any of these in upper or lower case, and `∑`
 
 The Key Assignment dialog accepts the same spellings.
 
+A note of *DM41X only* marks a function that the DM41X (and DM41XN)
+added to the HP-41CX set. A DM41L doesn't have it, but programs and
+key assignments that use it still open, display and save.
+
 ## Instructions
 
 | Display | Canonical (export) | Other spellings | Encoding | Notes |
@@ -32,9 +36,11 @@ The Key Assignment dialog accepts the same spellings.
 | `1/X` | `1/X` |  | 0x60 |  |
 | `10↑X` | `10^X` | `10**X`, `10\^\|X` | 0x57 |  |
 | `ABS` | `ABS` |  | 0x61 |  |
+| `ABSP` | `ABSP` |  | XROM 26,38 | DM41X only |
 | `ACOS` | `ACOS` |  | 0x5D |  |
 | `ADATE` | `ADATE` |  | XROM 26,01 |  |
 | `ADV` | `ADV` |  | 0x8F |  |
+| `AINT` | `AINT` |  | XROM 26,39 | DM41X only |
 | `ALENG` | `ALENG` |  | XROM 25,01 |  |
 | `ALMCAT` | `ALMCAT` |  | XROM 26,02 |  |
 | `ALMNOW` | `ALMNOW` |  | XROM 26,03 |  |
@@ -51,6 +57,7 @@ The Key Assignment dialog accepts the same spellings.
 | `ASN` | `ASN` |  | 0x0F | keyboard only |
 | `ASROOM` | `ASROOM` |  | XROM 25,49 |  |
 | `ASTO` | `ASTO` |  | 0x9A |  |
+| `ASWAP` | `ASWAP` |  | XROM 26,40 | DM41X only |
 | `ATAN` | `ATAN` |  | 0x5E |  |
 | `ATIME` | `ATIME` |  | XROM 26,04 |  |
 | `ATIME24` | `ATIME24` |  | XROM 26,05 |  |
@@ -62,9 +69,11 @@ The Key Assignment dialog accepts the same spellings.
 | `CF` | `CF` |  | 0xA9 |  |
 | `CHS` | `CHS` |  | 0x54 |  |
 | `CLA` | `CLA` |  | 0x87 |  |
+| `CLAC` | `CLAC` |  | XROM 26,41 | DM41X only |
 | `CLALMA` | `CLALMA` |  | XROM 26,31 |  |
 | `CLALMX` | `CLALMX` |  | XROM 26,32 |  |
 | `CLD` | `CLD` |  | 0x7F |  |
+| `CLEM` | `CLEM` |  | XROM 26,42 | DM41X only |
 | `CLFL` | `CLFL` |  | XROM 25,08 |  |
 | `CLK12` | `CLK12` |  | XROM 26,06 |  |
 | `CLK24` | `CLK24` |  | XROM 26,07 |  |
@@ -96,7 +105,7 @@ The Key Assignment dialog accepts the same spellings.
 | `DMY` | `DMY` |  | XROM 26,15 |  |
 | `DOW` | `DOW` |  | XROM 26,16 |  |
 | `DSE` | `DSE` |  | 0x97 |  |
-| `ED` | `ED` |  | XROM 25,51 |  |
+| `ED` | `ED` | `ED$` | XROM 25,51 |  |
 | `EMDIR` | `EMDIR` |  | XROM 25,14 |  |
 | `EMDIRX` | `EMDIRX` |  | XROM 25,52 |  |
 | `EMROOM` | `EMROOM` |  | XROM 25,53 |  |
@@ -106,10 +115,15 @@ The Key Assignment dialog accepts the same spellings.
 | `E↑X` | `E^X` | `E**X`, `E\^\|X` | 0x55 |  |
 | `E↑X-1` | `E^X-1` | `E**X-1`, `E\^\|X-1` | 0x58 |  |
 | `FACT` | `FACT` |  | 0x62 |  |
+| `FAST` | `FAST` |  | XROM 26,43 | DM41X only |
 | `FC?` | `FC?` |  | 0xAD |  |
 | `FC?C` | `FC?C` |  | 0xAB |  |
+| `FILL` | `FILL` |  | XROM 26,44 | DM41X only |
 | `FIX` | `FIX` |  | 0x9C |  |
+| `FLCOPY` | `FLCOPY` |  | XROM 26,45 | DM41X only |
+| `FLHD` | `FLHD` |  | XROM 26,46 | DM41X only |
 | `FLSIZE` | `FLSIZE` |  | XROM 25,15 |  |
+| `FLTYPE` | `FLTYPE` |  | XROM 26,47 | DM41X only |
 | `FRC` | `FRC` |  | 0x69 |  |
 | `FS?` | `FS?` |  | 0xAC |  |
 | `FS?C` | `FS?C` |  | 0xAA |  |
@@ -134,6 +148,8 @@ The Key Assignment dialog accepts the same spellings.
 | `ISG` | `ISG` |  | 0x96 |  |
 | `LASTX` | `LASTX` |  | 0x76 |  |
 | `LBL` | `LBL` |  | 0xCF |  |
+| `LKAOFF` | `LKAOFF` |  | XROM 26,48 | DM41X only |
+| `LKAON` | `LKAON` |  | XROM 26,49 | DM41X only |
 | `LN` | `LN` |  | 0x50 |  |
 | `LN1+X` | `LN1+X` |  | 0x65 |  |
 | `LOG` | `LOG` |  | 0x56 |  |
@@ -166,7 +182,9 @@ The Key Assignment dialog accepts the same spellings.
 | `RDN` | `RDN` |  | 0x75 |  |
 | `REGMOVE` | `REGMOVE` |  | XROM 25,35 |  |
 | `REGSWAP` | `REGSWAP` |  | XROM 25,36 |  |
+| `RENMFL` | `RENMFL` |  | XROM 26,50 | DM41X only |
 | `RESZFL` | `RESZFL` |  | XROM 25,55 |  |
+| `RETPFL` | `RETPFL` |  | XROM 26,51 | DM41X only |
 | `RND` | `RND` |  | 0x6E |  |
 | `RTN` | `RTN` |  | 0x85 |  |
 | `RUNSW` | `RUNSW` |  | XROM 26,20 |  |
@@ -191,6 +209,7 @@ The Key Assignment dialog accepts the same spellings.
 | `SIN` | `SIN` |  | 0x59 |  |
 | `SIZE` | `SIZE` |  | 0x06 | keyboard only |
 | `SIZE?` | `SIZE?` |  | XROM 25,44 |  |
+| `SLOW` | `SLOW` |  | XROM 26,52 | DM41X only |
 | `SQRT` | `SQRT` |  | 0x52 |  |
 | `ΣREG` | `SREG` | `SIGREG`, `SIGMAREG`, `\EREG` | 0x99 |  |
 | `ΣREG?` | `SREG?` | `SIGREG?`, `SIGMAREG?`, `\EREG?` | XROM 25,56 |  |
@@ -209,7 +228,9 @@ The Key Assignment dialog accepts the same spellings.
 | `TAN` | `TAN` |  | 0x5B |  |
 | `TIME` | `TIME` |  | XROM 26,28 |  |
 | `TONE` | `TONE` |  | 0x9F |  |
+| `TRNG` | `TRNG` |  | XROM 26,36 | DM41X only |
 | `VIEW` | `VIEW` |  | 0x98 |  |
+| `WORKFL` | `WORKFL` |  | XROM 26,53 | DM41X only |
 | `X≠0?` | `X#0?` | `X!=0?`, `X<>0?`, `X\/=0?` | 0x63 |  |
 | `X≠NN?` | `X#NN?` | `X!=NN?`, `X<>NN?`, `X\/=NN?` | XROM 25,58 |  |
 | `X≠Y?` | `X#Y?` | `X!=Y?`, `X<>Y?`, `X\/=Y?` | 0x79 |  |
@@ -220,6 +241,7 @@ The Key Assignment dialog accepts the same spellings.
 | `X<>` | `X<>` |  | 0xCE |  |
 | `X<>F` | `X<>F` |  | XROM 25,46 |  |
 | `X<>Y` | `X<>Y` |  | 0x71 |  |
+| `X<I>Y` | `X<I>Y` |  | XROM 25,63 | DM41X only |
 | `X<NN?` | `X<NN?` |  | XROM 25,59 |  |
 | `X<Y?` | `X<Y?` |  | 0x44 |  |
 | `X=0?` | `X=0?` |  | 0x67 |  |
@@ -271,3 +293,4 @@ and exactly three decimal digits (`\126` is Σ). See
 ## Sources
 
 - **hp41uc alternates**: hp41uc compile.h alt_fcn1/alt_fcn2 and compile.c
+- **DM41X manual**: DM41X User Manual v1.34, sec 3.8.4 (ED is renamed ED$)

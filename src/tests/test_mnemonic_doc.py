@@ -93,6 +93,20 @@ def test_notes_and_encodings():
     assert _row("SIN").notes == ""
 
 
+def test_dm41x_additions_are_noted_and_originals_are_not():
+    assert _row("LKAOFF").notes == "DM41X only"
+    assert _row("LKAOFF").encoding == "XROM 26,48"
+    assert _row("X<I>Y").notes == "DM41X only"
+    assert _row("TRNG").notes == "DM41X only"
+    assert _row("SWPT").notes == ""  # the last original Time function
+    assert _row("ED").notes == ""  # ED$ is only another name for ED
+
+
+def test_ed_dollar_is_listed_as_another_spelling_of_ed():
+    assert "ED$" in _row("ED").other_spellings
+    assert "DM41X manual" in render_mnemonic_reference()
+
+
 def test_rows_sort_by_canonical_name():
     canonicals = [r.canonical.upper() for r in mnemonic_reference_rows()]
     assert canonicals == sorted(canonicals)

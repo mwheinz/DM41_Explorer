@@ -94,7 +94,7 @@ def test_profile_derived_sizes():
 )
 def test_profile_rejects_bad_regions(regions):
     with pytest.raises(ValueError):
-        DeviceProfile("bad", regions)
+        DeviceProfile("bad", regions, frozenset())
 
 
 def test_memory_defaults_to_the_dm41l_profile():

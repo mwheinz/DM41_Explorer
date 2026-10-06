@@ -7,21 +7,34 @@ text format (a DM41L `.dm41` dump and a DM41X `.d41` state file are the same
 format, with the same `DM41` header line), so a file cannot say which model
 wrote it. The caller says: Memory.from_string(text, profile=DM41X).
 
-Right now a profile is just the list of extended-memory regions. Each region
-is (lo, hi): `lo` is the region's reserved pointer/link register and the
-usable registers are lo+1 .. hi inclusive -- see docs/extended_memory.md.
+A profile holds the list of extended-memory regions and the set of XROM
+functions the model has built in. Each region is (lo, hi): `lo` is the
+region's reserved pointer/link register and the usable registers are
+lo+1 .. hi inclusive -- see docs/extended_memory.md. An XROM is identified by
+its (byte1, byte2) pair, as in memory/functions.py.
 '''
 
 from dataclasses import dataclass
-from typing import Tuple
+from typing import FrozenSet, Tuple
+
+from .functions import CX_XROM_FUNCTIONS, XROM_FUNCTIONS
 
 
 @dataclass(frozen=True)
 class DeviceProfile:
-    '''An immutable description of one DM41 model's memory map.'''
+    '''An immutable description of one DM41 model's memory map and the XROM
+    functions built into it.
+
+    `builtin_xroms` is only about what the *calculator* has. The name
+    registry in memory/mnemonics.py always knows every XROM in
+    functions.XROM_FUNCTIONS, whatever profile is in use, so a program using
+    a DM41X function still compiles and decompiles. Something that needs to
+    know whether a given model can run it (the check before sending a state
+    to a DM41L) asks the profile.'''
 
     name: str
     xm_regions: Tuple[Tuple[int, int], ...]
+    builtin_xroms: FrozenSet[Tuple[int, int]]
 
     def __post_init__(self):
         if not self.xm_regions:
@@ -64,11 +77,24 @@ class DeviceProfile:
 # The DM41L has region 0 plus ONE Extended Memory module. Note that its
 # second region actually extends down to address 0x200, but that register is
 # never used on a DM41L and is always zero.
-DM41L = DeviceProfile("DM41L", ((0x40, 0xBF), (0x201, 0x2EF)))
+#
+# Its XROMs are only those of the original HP-41CX modules (Extended
+# Functions/Memory and Time); it cannot load any other module.
+DM41L = DeviceProfile(
+    "DM41L",
+    ((0x40, 0xBF), (0x201, 0x2EF)),
+    frozenset(CX_XROM_FUNCTIONS),
+)
 
 # The DM41X adds a second Extended Memory module at 0x301-0x3EF -- confirmed
 # against tests/data/dm41x_manyfiles.dm41, a real dump whose files span all
-# three regions.
-DM41X = DeviceProfile("DM41X", ((0x40, 0xBF), (0x201, 0x2EF), (0x301, 0x3EF)))
+# three regions. Its XROMs are the CX set plus its own additions (X<I>Y, TRNG
+# and the DM41X module), which is all of functions.XROM_FUNCTIONS. The
+# DM41XN is treated identically (docs/dm41x_explorer_plan.md).
+DM41X = DeviceProfile(
+    "DM41X",
+    ((0x40, 0xBF), (0x201, 0x2EF), (0x301, 0x3EF)),
+    frozenset(XROM_FUNCTIONS),
+)
 
 PROFILES = {profile.name: profile for profile in (DM41L, DM41X)}

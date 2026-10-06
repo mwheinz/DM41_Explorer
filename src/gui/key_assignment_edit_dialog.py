@@ -25,11 +25,20 @@ import customtkinter as ctk
 
 from gui.dialog_common import build_dialog_button_row
 from gui.tab_common import MONOSPACE_FONT_FAMILY
-from memory.mnemonics import assignable_display_names, key_bytes_for, resolve
+from memory.mnemonics import (
+    assignable_display_names,
+    is_dm41x_only,
+    key_bytes_for,
+    resolve,
+)
 
 logger = logging.getLogger(__name__)
 
 PLATFORM_SYSTEM = platform.system()
+
+# Shown under the Function box when the chosen function is one the DM41X
+# added to the HP-41CX set. Assigning it is allowed on any model's state.
+_DM41X_ONLY_HINT = "DM41X only: a DM41L does not have this function."
 
 # Every assignable function's HP-41 display name, alphabetically --
 # single-byte and XROM/peripheral functions merged into one list, since
@@ -136,6 +145,18 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
             variable=self._function_var,
             width=300,
         ).pack(anchor="w", padx=8, fill="x")
+        # Typing and picking both change the variable, so one trace covers
+        # both.
+        self._dm41x_hint = ctk.CTkLabel(
+            tabs.tab("Function"),
+            text="",
+            text_color="gray50",
+            wraplength=320,
+            justify="left",
+        )
+        self._dm41x_hint.pack(anchor="w", padx=8, pady=(8, 0))
+        self._function_var.trace_add("write", self._update_dm41x_hint)
+        self._update_dm41x_hint()
 
         # -- Raw Hex tab: 2 hex digits (single-byte) or 4 (XROM 2-byte) --
         self._hex_var = ctk.StringVar(value=_hex_for_assignment(assignment))
@@ -212,6 +233,16 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         )
 
         self.protocol("WM_DELETE_WINDOW", self.destroy)
+
+    def _update_dm41x_hint(self, *_trace_args):
+        """Says so under the Function box when the function in it is one
+        only a DM41X has. Any spelling import accepts counts, as on Save."""
+        try:
+            op = resolve(self._function_var.get().strip(), programmable_only=False)
+        except ValueError:
+            op = None  # empty, half-typed or unknown: Save reports it
+        dm41x_only = op is not None and is_dm41x_only(op)
+        self._dm41x_hint.configure(text=_DM41X_ONLY_HINT if dm41x_only else "")
 
     def _on_save_clicked(self):
         which = self._tabs.get()

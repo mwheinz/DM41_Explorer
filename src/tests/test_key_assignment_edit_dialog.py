@@ -103,6 +103,51 @@ def test_dropdown_uses_hp41_display_names(root):
     assert dlg._tabs.get() == "Function"
 
 
+def test_dm41x_only_hint_follows_the_function_in_the_box(root):
+    dlg = _make_dialog(root)
+
+    def hint():
+        return dlg._dm41x_hint.cget("text")
+
+    dlg._function_var.set("LKAOFF")
+    assert "DM41X only" in hint()
+    dlg._function_var.set("cos")
+    assert hint() == ""
+    # Any spelling Save accepts counts, and so does a function whose
+    # name is only another spelling of an original one.
+    dlg._function_var.set("trng")
+    assert "DM41X only" in hint()
+    dlg._function_var.set("ED$")
+    assert hint() == ""
+    # Half-typed or unknown: no hint (Save reports the problem).
+    dlg._function_var.set("lka")
+    assert hint() == ""
+    dlg._function_var.set("")
+    assert hint() == ""
+
+
+def test_dm41x_only_hint_is_shown_for_the_current_assignment(root):
+    dlg = _make_dialog(
+        root,
+        assignment={
+            "key_number": 1, "shifted": False,
+            "fn_byte1": 0xA6, "fn_byte2": 0xB1, "name": "LKAON",
+        },
+    )
+    assert dlg._function_var.get() == "LKAON"
+    assert "DM41X only" in dlg._dm41x_hint.cget("text")
+
+
+def test_dm41x_only_function_can_be_assigned(root):
+    on_save = mock.Mock()
+    dlg = _make_dialog(root, on_save=on_save)
+    dlg._function_var.set("LKAOFF")
+
+    dlg._on_save_clicked()
+
+    on_save.assert_called_once_with("function", (0xA6, 0xB0))
+
+
 def test_unknown_function_error_suggests_close_match(root, monkeypatch):
     errors = []
     monkeypatch.setattr(

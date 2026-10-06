@@ -134,8 +134,10 @@ SINGLE_BYTE_FUNCTIONS = {
 }
 
 # (byte1, byte2) -> function name, for every Extended Functions ROM (25,xx)
-# and Time ROM (26,xx) function -- confirmed encoding, docs sec 4.8.
-XROM_FUNCTIONS = {
+# and Time ROM (26,xx) function built into the original HP-41CX (and so the
+# DM41L) -- confirmed encoding, docs sec 4.8. The DM41X's additions are in
+# DM41X_XROM_FUNCTIONS below; XROM_FUNCTIONS is the union of the two.
+CX_XROM_FUNCTIONS = {
     (0xA6, 0x41): 'ALENG',
     (0xA6, 0x42): 'ANUM',
     (0xA6, 0x43): 'APPCHR',
@@ -232,3 +234,38 @@ XROM_FUNCTIONS = {
     (0xA6, 0xA2): 'RCLALM',
     (0xA6, 0xA3): 'SWPT',
 }
+
+# The XROMs the DM41X (and the DM41XN) add to the CX set: X<I>Y, an
+# extension of the Extended Functions ROM (25,63); TRNG, an extension of the
+# Time ROM (26,36); and the 16 functions of the DM41X's own module
+# (26,38 - 26,53). Names and codes are hp41uc's (hp41ucg.h, its "-DM 41X-"
+# section) except X<I>Y, which hp41uc doesn't have yet. Every entry is
+# confirmed by a real DM41X/DM41XN state file (docs/dm41x_explorer_plan.md,
+# S5 results). This dict is the "since" flag: an XROM is DM41X-only if and
+# only if it is listed here.
+DM41X_XROM_FUNCTIONS = {
+    (0xA6, 0x7F): 'X<I>Y',
+    (0xA6, 0xA4): 'TRNG',
+    (0xA6, 0xA6): 'ABSP',
+    (0xA6, 0xA7): 'AINT',
+    (0xA6, 0xA8): 'ASWAP',
+    (0xA6, 0xA9): 'CLAC',
+    (0xA6, 0xAA): 'CLEM',
+    (0xA6, 0xAB): 'FAST',
+    (0xA6, 0xAC): 'FILL',
+    (0xA6, 0xAD): 'FLCOPY',
+    (0xA6, 0xAE): 'FLHD',
+    (0xA6, 0xAF): 'FLTYPE',
+    (0xA6, 0xB0): 'LKAOFF',
+    (0xA6, 0xB1): 'LKAON',
+    (0xA6, 0xB2): 'RENMFL',
+    (0xA6, 0xB3): 'RETPFL',
+    (0xA6, 0xB4): 'SLOW',
+    (0xA6, 0xB5): 'WORKFL',
+}
+
+# Every XROM function the DM41X knows: the CX set plus its additions. This
+# is the table the instruction-name registry (mnemonics.py) is built from,
+# since a state file opens with the DM41X profile whichever model made it.
+# Which of these a given model has built in is DeviceProfile.builtin_xroms.
+XROM_FUNCTIONS = {**CX_XROM_FUNCTIONS, **DM41X_XROM_FUNCTIONS}

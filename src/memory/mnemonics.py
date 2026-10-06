@@ -46,7 +46,7 @@ import logging
 from dataclasses import dataclass
 from typing import Dict, Hashable, Iterable, List, Optional, Set, Tuple, Union
 
-from .functions import SINGLE_BYTE_FUNCTIONS, XROM_FUNCTIONS
+from .functions import DM41X_XROM_FUNCTIONS, SINGLE_BYTE_FUNCTIONS, XROM_FUNCTIONS
 from .mnemonic_dialects import DIALECTS, Dialect
 from .trigraphs import decode_trigraphs, focal_to_unicode
 
@@ -151,6 +151,10 @@ class Entry:
     # "display", "substitution", or a dialect name). Case-insensitive
     # matches of these are accepted too.
     aliases: Tuple[Tuple[str, str], ...]
+    # True for an XROM the DM41X added to the HP-41CX set (a DM41L doesn't
+    # have it). The registry knows these names whatever the model, so a
+    # program that uses one still compiles and decompiles.
+    dm41x_only: bool = False
 
 
 class Registry:
@@ -216,6 +220,7 @@ class Registry:
                 display=display_name,
                 programmable=programmable,
                 aliases=tuple(sources[op].items()),
+                dm41x_only=op.kind is OpKind.XROM and op.code in DM41X_XROM_FUNCTIONS,
             )
             for op, (canonical_name, display_name, programmable) in base.items()
         }
@@ -340,6 +345,13 @@ def display(op: Op) -> str:
 
 def is_known(op: Op) -> bool:
     return _REGISTRY.is_known(op)
+
+
+def is_dm41x_only(op: Op) -> bool:
+    """True if `op` is an XROM the DM41X added (X<I>Y, TRNG and the DM41X
+    module's functions), so a DM41L doesn't have it. Raises KeyError for an
+    op that isn't registered -- check is_known() first."""
+    return _REGISTRY.entry(op).dm41x_only
 
 
 def entries() -> List[Entry]:

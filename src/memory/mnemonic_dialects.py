@@ -56,4 +56,15 @@ HP41UC_ALTERNATES = Dialect(
     },
 )
 
-DIALECTS: Tuple[Dialect, ...] = (HP41UC_ALTERNATES,)
+# The DM41X renamed ED (the Extended Functions ASCII file editor, XROM
+# 25,51) to ED$, "same XROM code of course". The canonical name stays ED,
+# so a state file or program decompiles the same on every model.
+DM41X_MANUAL = Dialect(
+    name="DM41X manual",
+    source="DM41X User Manual v1.34, sec 3.8.4 (ED is renamed ED$)",
+    aliases={
+        "ED": ("ED$",),
+    },
+)
+
+DIALECTS: Tuple[Dialect, ...] = (HP41UC_ALTERNATES, DM41X_MANUAL)
