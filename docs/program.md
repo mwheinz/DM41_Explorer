@@ -1,7 +1,7 @@
 # 5 Program Memory
 
 The following are the author's own notes on trying to build a catalog of the
-programs contained in a DM41L dump file.
+programs contained in a DM41L state file.
 
 ## 5.1 Traversing Program Memory
 
@@ -50,9 +50,9 @@ label's name length, plus one. See §5.2 below for the full label format.
 
 ### Addressing within program memory
 
-When dealing with a memory dump, register offset and absolute address run in
+When dealing with a memory state, register offset and absolute address run in
 *opposite* directions within a register. (That is, in an actual calculator
-register, byte 0 is the LSB, but in DM41L Explorer, Register._data\[0\] is the
+register, byte 0 is the LSB, but in DM41_Explorer, Register._data\[0\] is the
 MSB of the register.) This can be confusing. If `reg` is a register's decimal
 value and `offset` is the byte position counting left-to-right through its
 printed hex (0 = the first/ leftmost byte, 6 = the last/rightmost byte), then:
@@ -83,7 +83,7 @@ DM41
 ...
 ```
 
-This is a dump of a DM41L that has just been initalized; there are no programs
+This is a state of a DM41L that has just been initalized; there are no programs
 in memory. ("empty.dm41" in the tests/data folder) R00 is 19c and .END. is 19b. The END instruction appears in the last 3 bytes of register 19b: 'c0 00 20'
 which appears to encode a distance of 0 registers and 0 bytes to the next END.
 
@@ -103,7 +103,7 @@ DM41
 This example contains a single program, called "APPTEST" (26 bytes), in an
 otherwise empty DM41L emulator.
 
-In this dump, R00 is register 19c and .END. is register 197. Register 197
+In this state, R00 is register 19c and .END. is register 197. Register 197
 contains "00 00 00 00 c4 01 20" which decodes like this:
 
 | Instruction | bbb | rrrrrrrrr | eeee ffff | 
@@ -142,7 +142,7 @@ DM41
 ```
 
 
-This example is a part of a larger dump that contains three apps, called "XMBCD",
+This example is a part of a larger state that contains three apps, called "XMBCD",
 "XMALPHA", and "PURXM". R00 is 19c (which seems to be the default for the DM41L) and .END. is set to register 188. Looking at register 188 we find "00 00 00 00 c2 01 20". (In all samples, .END. is always found in the last 3 bytes of a register, even if that means padding it with null bytes.)
 
 | Instruction | bbb | rrrrrrrrr | eeee ffff | 
@@ -240,7 +240,7 @@ out while a newer program was added after it.
      program left off and `.END.`'s own marker is zero. If so, that's
      nothing but register-alignment padding -- not a program.
 
-Every existing sample dump in `src/tests/data/` that has a trailing gap
+Every existing sample state in `src/tests/data/` that has a trailing gap
 before `.END.` turns out to be pure zero-padding once checked this way.
 
 ### 5.4 Removing a Program, and Packing
@@ -294,12 +294,12 @@ program's own labels that held a key assignment, since its header is gone and
 reclaiming any incidental register-alignment drift the same way. It also
 explicitly re-runs the Key Assignments/Alarms repack
 (`_encode_key_assignment_entries()`). This is a no-op for assignments that have
-already been edited, but will close any gaps that had accumulated in a dump
-that was loaded from a DM41L. current as a side effect -- a no-op for a dump
+already been edited, but will close any gaps that had accumulated in a state
+that was loaded from a DM41L. current as a side effect -- a no-op for a state
 this app has only ever edited itself, but self-healing for one that wasn't.
 Returns the number of registers reclaimed (`DotEnd() - alarms_end()`'s
 increase), 0 if nothing needed packing; idempotent (a second `pack()` call
-always returns 0) across every sample dump in `src/tests/data/`. It is
+always returns 0) across every sample state in `src/tests/data/`. It is
 negative (-1) only when a newest program was closed by `.END.` directly and
 now needs a real END plus an empty `.END.` -- see below. See
 `src/tests/test_pack.py` and `src/tests/test_pack_hardware.py`.

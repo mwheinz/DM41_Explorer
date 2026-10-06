@@ -12,7 +12,7 @@ Three recurring problems with text-format HP-41 programs:
 
 1. **Dialects.** FOCAL listings in the wild spell the same instruction in
    different ways (`RDN` vs `R↓`, `SQRT` vs `√X`, `P-R` vs `P->R` vs `P→R`,
-   `STO+` vs `ST+`, ...). DM41L_Explorer's importer accepts only a few
+   `STO+` vs `ST+`, ...). DM41_Explorer's importer accepts only a few
    spellings per instruction, so importing a program written in another
    dialect fails.
 2. **Non-ASCII mnemonics.** Instructions whose names contain characters like
@@ -405,7 +405,7 @@ The Markdown viewer choice (§4) covers README only, and is deferred.
 
 Not part of this feature (decision 5). Kept for when README in the Help
 menu is picked up. If done, README must be bundled via `datas` in
-`dm41l.spec` (precedent: `gui/flags_doc.py` and `docs/flags.md`), and
+`dm41explorer.spec` (precedent: `gui/flags_doc.py` and `docs/flags.md`), and
 an in-app viewer also needs the 8 screenshots in `resources/screenshots/`.
 
 | Option | Fidelity | Dependencies | Notes |

@@ -1,8 +1,8 @@
 """
-Centralized configuration for the DM41_Explorer apps (DM41L_Explorer,
-DM41X_Explorer, ...). Each app keeps its own preferences file -- see
-ProjectConfig's `prefs_filename` argument -- so installing more than one
-never makes them overwrite each other's settings or recent-file lists.
+Centralized configuration for DM41_Explorer (and any sibling app that shares
+this code). Each app keeps its own preferences file -- see ProjectConfig's
+`prefs_filename` argument -- so installing more than one never makes them
+overwrite each other's settings or recent-file lists.
 """
 
 import json
@@ -16,8 +16,8 @@ class ProjectConfig:
     """Centralized configuration with file-based persistence."""
 
     # Persistent storage location in the user's home directory. This is the
-    # DM41L_Explorer's file (its name predates the other apps, and existing
-    # users' settings live there). Another app passes its own
+    # DM41_Explorer's file. Its name is the app's original one (DM41L_Explorer)
+    # and is kept on purpose, because existing users' settings live there. Another app passes its own
     # `prefs_filename` to __init__() instead, which shadows this class
     # attribute on that instance only.
     PREFS_FILE = Path.home() / ".dm41l_explorer.json"
@@ -33,7 +33,7 @@ class ProjectConfig:
         "color_theme": "blue",  # CustomTkinter built-in theme name
         "font_family": "",  # "" = use CustomTkinter's built-in per-platform default
         "font_size": 0,  # 0 = use CustomTkinter's built-in default size
-        "recent_files": [],  # paths of recently opened/saved dump files, most-recent first
+        "recent_files": [],  # paths of recently opened/saved state files, most-recent first
     }
 
     # File > Open Recent is capped at this many entries -- oldest
@@ -45,7 +45,7 @@ class ProjectConfig:
 
         `prefs_filename` (e.g. ".dm41x_explorer.json") names this app's own
         preferences file in the user's home directory. Omit it to use the
-        class-level PREFS_FILE (DM41L_Explorer's)."""
+        class-level PREFS_FILE (DM41_Explorer's)."""
         if prefs_filename is not None:
             self.PREFS_FILE = Path.home() / prefs_filename
         self._prefs = self.DEFAULT_PREFS.copy()
@@ -154,7 +154,7 @@ class ProjectConfig:
 
     @property
     def recent_files(self) -> list:
-        """Paths of recently opened/saved dump files, most-recent
+        """Paths of recently opened/saved state files, most-recent
         first. Returns a defensive copy -- there's no setter; use
         add_recent_file()/remove_recent_file()/clear_recent_files()
         instead, so the dedup/cap invariants always hold."""
@@ -176,7 +176,7 @@ class ProjectConfig:
     def remove_recent_file(self, path) -> None:
         """Drops `path` from the recent-files list, if present --
         used when a listed file turns out to be missing at open
-        time (see gui/app.py's open_dump_file())."""
+        time (see gui/app.py's open_state_file())."""
         path_str = str(path)
         self._prefs["recent_files"] = [
             p for p in self._prefs["recent_files"] if p != path_str

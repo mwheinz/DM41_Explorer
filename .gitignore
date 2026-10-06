@@ -4,7 +4,7 @@ docs/pdfs
 resources/MyIcon.*
 src/build/**
 src/dist/**
-src/dm41lversion.py
+src/dm41version.py
 src/engine/__pycache__/**
 src/gui/__pycache__/**
 src/scratch

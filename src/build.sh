@@ -1,5 +1,5 @@
 #!/bin/bash
-# Builds DM41L Explorer.app via PyInstaller. Run from src/ (or just
+# Builds DM41_Explorer.app via PyInstaller. Run from src/ (or just
 # ./build.sh from anywhere, it cd's there itself), with the project's venv
 # active and its build requirements installed:
 #
@@ -10,8 +10,8 @@
 #   cd src
 #   ./build.sh
 #
-# Output lands in src/dist/DM41L Explorer.app (macOS) or
-# src/dist/dm41lexplorer/ (Linux/Windows).
+# Output lands in src/dist/DM41_Explorer.app (macOS) or
+# src/dist/dm41explorer/ (Linux/Windows).
 
 set -e
 cd "$(dirname "$0")"
@@ -19,30 +19,30 @@ cd "$(dirname "$0")"
 rm -rf build dist
 
 # Generate a version id for the about box.
-echo "APP_VERSION = '$(git describe --tags --always)'" >dm41lversion.py
+echo "APP_VERSION = '$(git describe --tags --always)'" >dm41version.py
 
 # Make the icons
 bash ../resources/makeicon.sh
 
 # Generate the binary
-pyinstaller dm41l.spec
+pyinstaller dm41explorer.spec
 
 # macOS requires at least an ad-hoc signature for the app to launch at all
 # on Apple Silicon -- this is separate from (and needed even without) a
 # real Apple Developer ID; see docs/release_checklist.md. No-op elsewhere.
 if [ "$(uname)" = "Darwin" ]; then
-    codesign --force --deep --sign - "dist/DM41L Explorer.app"
+    codesign --force --deep --sign - "dist/DM41_Explorer.app"
     cp -r ../README.md "dist/README.md"
 else
     # Drop a short README into that output directory so anyone
     # who unzips a release and sees an unfamiliar _internal folder next
     # to the exe knows it's required, not clutter.
-    cp "../resources/dist_readme.txt" "dist/dm41lexplorer/README.txt"
+    cp "../resources/dist_readme.txt" "dist/dm41explorer/README.txt"
 
     # Add a "sample" icon to the Linux bundle.
     if [ "$(uname)" = "Linux" ]; then
-        cp "../resources/MyIcon.png" "dist/dm41lexplorer/MyIcon.png"
+        cp "../resources/MyIcon.png" "dist/dm41explorer/MyIcon.png"
     fi
 
-    cp -r ../README.md "dist/dm41lexplorer/README.md"
+    cp -r ../README.md "dist/dm41explorer/README.md"
 fi

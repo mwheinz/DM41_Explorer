@@ -4,7 +4,7 @@
 #
 # icon.png should be a large (e.g. 1024x1024) square PNG.
 #
-# dm41l.spec picks the right one of these automatically based on
+# dm41explorer.spec picks the right one of these automatically based on
 # platform.system() -- see ICON_BY_OS there. MyIcon.png isn't wired into
 # the spec (PyInstaller doesn't embed an icon into Linux binaries the way
 # it does .ico/.exe on Windows or .icns/.app on macOS); it's generated

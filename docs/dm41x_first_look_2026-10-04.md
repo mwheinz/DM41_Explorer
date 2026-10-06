@@ -157,7 +157,7 @@ They have empty extended memory, and all-zero register groups are omitted from t
 
 ## Addendum (2026-10-04, later the same day)
 
-Findings from the second round of samples: `src/tests/data/CSTtest.cst`, `backuptest.*` and `dm41x_manyfiles.dm41`. The detail is in `cst.md`, `backup_set.md` and, for the dump text format, `dump_format.md`.
+Findings from the second round of samples: `src/tests/data/CSTtest.cst`, `backuptest.*` and `dm41x_manyfiles.dm41`. The detail is in `cst.md`, `backup_set.md` and, for the dump text format, `state_format.md`.
 
 ### Corrections to the sections above
 
@@ -171,6 +171,6 @@ Findings from the second round of samples: `src/tests/data/CSTtest.cst`, `backup
 The "trailing double space" noted in section 4 is **not specific to the DM41X**, and the calculator does not need it.
 
 - Every register line ends in two spaces in these files: `dm41x_manyfiles.dm41`, `backuptest.d41`, `dm41x_pack_dotend.dm41`, `dm41x_pack_dotend-packed.dm41` and `fillextended.dm41`, and also in the DM41L fixtures `empty.dm41` and `empty-128.dm41`. Most other DM41L fixtures have none.
-- `Memory.to_string()` writes no trailing spaces, so a file saved by DM41L_Explorer loses them. That does not explain every file: `lander.dm41` and `targ.dm41` have the calculator-style two-space gap between special-register pairs but no trailing spaces. The two-space gap, not the trailing spaces, is the reliable marker of calculator-style output. See `dump_format.md` for the full comparison; why those two files differ was not investigated.
+- `Memory.to_string()` writes no trailing spaces, so a file saved by DM41L_Explorer loses them. That does not explain every file: `lander.dm41` and `targ.dm41` have the calculator-style two-space gap between special-register pairs but no trailing spaces. The two-space gap, not the trailing spaces, is the reliable marker of calculator-style output. See `state_format.md` for the full comparison; why those two files differ was not investigated.
 - A copy of `dm41x_manyfiles.dm41` with all trailing whitespace removed by hand was loaded back into the DM41X without a problem. That is one file on one model. No equivalent test has been done on a DM41L.
-- Consequence for the plan: the phase 2 round-trip gate compares dump files after stripping trailing whitespace from each line, and no code change to `to_string()` is needed. (`dump_format.md` records that `to_string()` also changes the two-space gaps between special-register pairs to one space, which should go into the same comparison.)
+- Consequence for the plan: the phase 2 round-trip gate compares dump files after stripping trailing whitespace from each line, and no code change to `to_string()` is needed. (`state_format.md` records that `to_string()` also changes the two-space gaps between special-register pairs to one space, which should go into the same comparison.)

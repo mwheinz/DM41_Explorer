@@ -15,7 +15,7 @@ class EngineState(Enum):
     '''
     Really simple state machine. Only 3 states, no decisions. Any
     deviation from the pattern is an error. Most commands return an immediate
-    response, the only one that's more complex is sending a memory dump to the
+    response, the only one that's more complex is sending a memory state to the
     calculator. That one requires a first reply, then sending data, then
     another reply.
     '''

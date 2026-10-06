@@ -5,33 +5,33 @@ find) on how alarms are managed, just where they are stored in user memory. The
 buffer-level layout, the per-alarm entry format, the fire/reschedule/ expire
 lifecycle, the message-length range, alarm TYPE encoding
 (message/control/conditional), and a best-effort "past due" marker are all
-**confirmed against real DM41L dumps**, including:
+**confirmed against real DM41L states**, including:
 `src/tests/data/alarmtest.dm41`, `src/tests/data/alarmtest2.dm41`,
 `src/tests/data/alarmtest3.dm41`, `src/tests/data/repeater.dm41`, and
-`src/tests/data/4alarmtest.dm41`. Each memory dump built on the previous test
+`src/tests/data/4alarmtest.dm41`. Each memory state built on the previous test
 to build an understanding of how alarms are stored.
 
 It has been concerning that there doesn't seem to be any way to definitively
 know how the HP41CX/DM41L tell the difference between a repeating and a
 one-shot alarm, but it is where we are. Also, note that if an "old" DM41L
-dumpfile that contains alarms is loaded into the emulator all elapsed alarms
+state file that contains alarms is loaded into the emulator all elapsed alarms
 will be triggered again when the emulator is turned on.
 
 ## 1. Sources
 
 - **`src/tests/data/alarmtest.dm41`, `alarmtest2.dm41`, `alarmtest3.dm41`,
-  `repeater.dm41`, `4alarmtest.dm41`** — real DM41L dumps created by the user
+  `repeater.dm41`, `4alarmtest.dm41`** — real DM41L states created by the user
   specifically for research into alarms. These are the primary source for
   everything in §3–7 and §9 below.
 - **HP-41 Synthetic Programming Made Easy**, Keith Jarett (SYNTHETIX) Chapter 6
   ("On-Line Memory"), Figure 6.2 ("On-Line Memory Usage") and its accompanying
   text. Source for the buffer's overall shape (header register, top delimiter,
   "time plus optional message/repeat" per alarm) before it was checked against
-  the real dumps.
+  the real states.
 - **HP-41 Advanced Programming Tips**, Alan McCornack & Keith Jarett
   (SYNTHETIX). Contains a full FOCAL program, "SA"/"RA" (Save Alarms / Recall
   Alarms), with line-by-line commentary that independently confirmed the
-  header's marker byte and its position before the real-dump check.
+  header's marker byte and its position before the real-state check.
 - **A Programmer's Handbook v2.07**. A microcode/hardware-level reference.
   Documents the physical Timer chip's own "Alarm Register A/B" (a different
   thing from the main-memory alarm buffer — see §8), and its
@@ -54,7 +54,7 @@ will be triggered again when the emulator is turned on.
 
 ## 3. Alarm Region Structure
 
-The structure of the Alarm region was derived from studying the alarm memory dumps.
+The structure of the Alarm region was derived from studying the alarm memory states.
 Here is one of the test cases, `alarmtest3.dm41`:
 
 ```

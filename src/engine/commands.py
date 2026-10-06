@@ -29,7 +29,7 @@ class PingCommand(BaseCommand):
 
 class MemoryStringCommand(BaseCommand):
     '''
-    "s" command - Causes the calculator to dump its memory to the console
+    "s" command - Causes the calculator to send its memory state to the console
     as ASCII encoded text data. This data is returned as a string.
     '''
 
@@ -41,12 +41,12 @@ class MemoryStringCommand(BaseCommand):
         return "s"
 
     def parse_response(self, raw_data: str) -> Any:
-        dump = raw_data.strip()
-        return dump
+        state = raw_data.strip()
+        return state
 
 
 class LoadMemoryStringCommand(BaseCommand):
-    ''''l' command - Streams a string to hardware as a memory dump.'''
+    ''''l' command - Streams a string to hardware as a memory state.'''
 
     def __init__(self, args: list, timeout: float = 5.0, serial=None):
         super().__init__(args=args, timeout=timeout, serial=serial)

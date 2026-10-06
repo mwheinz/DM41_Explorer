@@ -91,7 +91,7 @@ These need further samples from the calculator; none has been tested.
 - **Case.** All samples are upper case. Whether lower case can be entered, and whether it is stored as typed, is unknown.
 - **Special characters.** The manual says `[SHIFT]` enters special characters in the editor. How characters such as Σ, →, ≠ or the append mark are written to the file (UTF-8, a single byte in an HP-41 character set, or something else) is unknown.
 - **Spaces, quotes and other punctuation** in a command: not tested.
-- **Tolerance on load.** Not tested: a missing trailing newline, CRLF endings, missing lines, extra lines, or trailing whitespace. The related `.d41` dump format was shown to load without its trailing whitespace; see `dm41x_first_look_2026-10-04.md`.
+- **Tolerance on load.** Not tested: a missing trailing newline, CRLF endings, missing lines, extra lines, or trailing whitespace. The related `.d41` state format was shown to load without its trailing whitespace; see `dm41x_first_look_2026-10-04.md`.
 - **Whether CST is also stored inside the `.d41` state file.** Nothing in `backuptest.d41` has been identified as CST data, and Create Full Backup writes the `.cst` as its own file, but the question has not been tested by changing only the CST and comparing two `.d41` files.
 - **Firmware dependence.** Whether the format differs between firmware versions is unknown. The firmware version of the unit was not recorded with the samples.
 

@@ -78,7 +78,7 @@ A brand-new assignment is always written into the **lowest** register
 (`0x0C0`), immediately after its marker byte, pushing every existing entry up
 toward `.END.`. Reading the buffer from `0x0C0` upward therefore lists
 assignments **newest first** — the opposite of a naive top-to-bottom read of a
-printed dump. This also means that if alarms are in use, they have to be moved
+printed state. This also means that if alarms are in use, they have to be moved
 every time a new register is needed for key assignments.
 
 ### Key Position Encoding

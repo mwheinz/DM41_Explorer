@@ -1,4 +1,4 @@
-# DM41L Explorer
+# DM41_Explorer
 
 A Windows, MacOS, and Linux desktop GUI for reading, writing, and editing the
 memory of a [DM41L](https://www.swissmicros.com/) (HP‑41CX emulator) over its
@@ -19,7 +19,7 @@ serial console.
   (Data, ASCII, and Program types).
 - **Key Assignments** - view, add, edit, and remove user key assignments.
 - Connect directly to a DM41L over USB serial, or work entirely offline from a
-  saved `.dm41` dump file (File > Open / Save Dump).
+  saved `.dm41` state file (File > Open / Save State).
 - **Hex View** — a full, color-coded map of the entire memory space (status
   registers, extended memory, program memory, data memory, and unused space).
 
@@ -27,61 +27,62 @@ serial console.
 
 - Python 3.10 or later (developed and tested with 3.12).
 - A DM41L connected over USB, if you want to talk to real hardware —
-  otherwise you only need a `.dm41` dump file to explore.
+  otherwise you only need a `.dm41` state file to explore.
 
-## Using DM41L_Explorer
+## Using DM41_Explorer
 
 ### Launching the app for the first time
 
-You can launch DM41L_Explorer either with or without your DM41L already
-connected via USB.
+DM41_Explorer starts offline: it never touches a serial port until you ask it
+to. You can work on memory state files without a calculator at all, or connect
+to your DM41L whenever you like.
 
 To prepare your DM41L for connection, you must enable the serial console, which
 is activated by turning the calculator off, then pressing \<ON\> and "C" at the
 same time, then releasing them. 
 
 Once your calculator is in SERIAL CONSOLE mode and connected to your computer
-with a USB cable, launch DM41L_Explorer. You will see a dialog box similar to
-this one:
+with a USB cable, choose Connect > Connect / Reconnect... (Ctrl+K, or Cmd+K on
+a Mac). You will see a dialog box similar to this one:
 
 ![Connection](resources/screenshots/connection.png)
 
-Select the appropriate serial port and click connect. Once connected you will
-see the Overview tab.
+Select the appropriate serial port and click connect. Once connected, the
+calculator's memory is read in (unless you already have a state loaded or
+modified) and you will see it in the Overview tab.
 
 #### Which serial port do I use? 
 
 Good question. You may have to do some trial-and-error to figure this out. If
 you're not sure if the correct serial port is even listed, try clicking the
-"Rescan" button. Once you've successfully connected, however, DM41L Explorer
-will save the port you used and automatically select it the next time you
-launch.
+"Rescan" button. Once you've successfully connected, however, DM41_Explorer
+will save the port you used and preselect it in this dialog the next time.
 
 #### Launching without the DM41L
 
-If you want to work on an existing memory dump file (or create a new one) just
-click "Cancel" when the connection dialog appears. If, later, you decide to
-connect to the DM41L, just go to the Connect menu and select Connect/Reconnect.
+If you want to work on an existing memory state file (or create a new one),
+just open it from the File menu; there is nothing to cancel. If, later, you
+decide to connect to the DM41L, go to the Connect menu and select
+Connect / Reconnect...
 
-#### Loading and saving memory dump files
+#### Loading and saving memory state files
 
-During the initial launch of DM41L Explorer, it will try to automatically
-connect to the DM41L and, if it does connect it will load the current contents
-of the calculator's memory. If you want to load a dump from the calculator
-again later, use the Connect menu.
+When you connect to the DM41L, DM41_Explorer loads the current contents of the
+calculator's memory if you have not already opened or changed a state. To load
+a state from the calculator again later, use the Connect menu.
 
-To write a memory dump to the calculator, the Connect menu has you covered
+To write a memory state to the calculator, the Connect menu has you covered
 there, too.
 
 The File menu contains options to load an existing memory file from disk, to
-save the currently loaded dump, and for creating a blank one to work on.
+save the currently loaded state, and for creating a blank one to work on.
 
 ### Overview Tab
 
 ![Overview](resources/screenshots/overview.png)
 
 The Overview tab shows a quick summary of either the state of the DM41L or the
-currently loaded memory dump. It is almost entirely read-only, except for the
+currently loaded memory state. It is almost entirely read-only, except for the
 address of the R00 register, which you can adjust if you want to experiment
 with synthetic programming.
 
@@ -109,7 +110,7 @@ import new ones.
 ![Key Assigns - HP41 layout](resources/screenshots/key_assigns_hp41.png)
 
 The Key Assignments tab allows you to view and edit the user key assignments in
-the loaded dump. It has two sub-tabs: the first shows the keys in the DM41L
+the loaded state. It has two sub-tabs: the first shows the keys in the DM41L
 layout, and the second in the original HP41 layout. Both show the same
 assignments, so an edit made on either one appears on the other. Clicking on a
 key will let you edit that key's current assignment - you can either select
@@ -144,22 +145,22 @@ region. It is useful for studying how HP41 memory is organized.
 
 ## Keyboard Shortcuts
 
-DM41L Explorer is menu-driven, and every shortcut below mirrors a menu item
+DM41_Explorer is menu-driven, and every shortcut below mirrors a menu item
 (or, for Export/Import, a tab's header button). `Ctrl` is used on Windows and
 Linux; macOS uses `Cmd` for the same shortcuts.
 
 | Action | Windows / Linux | macOS |
 | --- | --- | --- |
 | New Memory Buffer | Ctrl+N | Cmd+N |
-| Open Dump... | Ctrl+O | Cmd+O |
-| Save Dump | Ctrl+S | Cmd+S |
+| Open State... | Ctrl+O | Cmd+O |
+| Save State | Ctrl+S | Cmd+S |
 | Preferences | Ctrl+, | Cmd+, |
 | Quit | Ctrl+Q | Cmd+Q |
 | Connect / Reconnect... | Ctrl+K | Cmd+K |
 | Disconnect | Ctrl+D | Cmd+D |
 | Set Calculator Time | Ctrl+T | Cmd+T |
-| Get Dump from DM41L | Ctrl+G | Cmd+G |
-| Send Dump to DM41L | Ctrl+U | Cmd+U |
+| Get State from DM41L | Ctrl+G | Cmd+G |
+| Send State to DM41L | Ctrl+U | Cmd+U |
 | Refresh Tabs | F5 | F5 |
 | Export... | Ctrl+E | Cmd+E |
 | Import... | Ctrl+I | Cmd+I |
@@ -176,11 +177,11 @@ you if you are curious about the internals of the HP41 and the DM41L emulator.
 
 Most of my notes are derived from 40 year old memories and classic HP41 texts
 like *Synthetic Programming* by Jonathan Wickes, supplemented by
-reverse-engineering DM41L memory dumps. Other sources include *A Programmer's
+reverse-engineering DM41L memory states. Other sources include *A Programmer's
 Handbook* by Poul Kaarup, *HP-41 Advanced Programming Tips* by Alan McCornack &
 Keith Jarett, and *Synthetic Programming Made Easy* by Keith Jarett. Other
 information came from conducting experiments and studying the resulting memory
-dumps
+states
 
 ## Running from source
 
@@ -207,7 +208,7 @@ pip install -r requirements-dev.txt
 
 ## Building the standalone application
 
-A PyInstaller spec (`src/dm41l.spec`) and build script (`src/build.sh`)
+A PyInstaller spec (`src/dm41explorer.spec`) and build script (`src/build.sh`)
 are included, producing a self-contained app — a macOS `.app` bundle
 (with `.dm41` file association) on macOS, and a onedir bundle on Linux and
 Windows.
@@ -220,7 +221,7 @@ cd src
 Output lands in `src/dist/`. `build.sh` is a shell script — on Windows,
 run it from Git Bash (installed alongside [Git for
 Windows](https://git-scm.com/download/win)) or WSL, or invoke PyInstaller
-directly with `pyinstaller dm41l.spec` after generating `dm41lversion.py`
+directly with `pyinstaller dm41explorer.spec` after generating `dm41version.py`
 yourself (see the comment at the top of `build.sh`).
 
 On Linux and Windows, the executable needs the `_internal/` folder that's

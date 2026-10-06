@@ -1,4 +1,4 @@
-# Contributing to DM41L Explorer
+# Contributing to DM41_Explorer
 
 Thanks for taking a look at this project. It's an independently-developed
 hobby tool, so there's no formal process — just a few notes to make
@@ -70,9 +70,9 @@ Pick a level by what the record means, not by habit:
 
 - **DEBUG** — internal detail only useful while actively debugging (raw
   serial bytes, state-machine transitions, an exception that was caught
-  and handled as an expected, no-op case — e.g. "no dump loaded yet").
+  and handled as an expected, no-op case — e.g. "no state loaded yet").
 - **INFO** — a normal lifecycle event a user could plausibly want to see
-  in their own log: connect/disconnect, a dump loaded or saved, an XM
+  in their own log: connect/disconnect, a state loaded or saved, an XM
   file added/edited/removed, a register or flag edited, preferences
   saved.
 - **WARNING** — something unexpected happened but the app recovered on
@@ -112,7 +112,7 @@ before a `raise` — let the catching code log it instead.
   should stay in sync with the code.
 - Describe *why* a change is needed in the PR description, not just
   what changed — especially for anything reverse-engineered from real
-  DM41L memory dumps, since the reasoning is often as valuable as the
+  DM41L memory states, since the reasoning is often as valuable as the
   fix itself.
 
 ## Reporting bugs / requesting features
@@ -123,7 +123,7 @@ with:
 - What you did, what you expected, and what actually happened.
 - Your OS and how you're running the app (from source vs. a built
   binary).
-- A `.dm41` dump file if the issue is about how memory is decoded or
+- A `.dm41` state file if the issue is about how memory is decoded or
   displayed — that's usually the fastest way to reproduce it.
 
 See the README's [Known limitations](README.md#known-limitations)

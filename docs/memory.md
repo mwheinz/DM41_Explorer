@@ -1,6 +1,6 @@
-# DM41L Explorer: Hardware Memory Architecture Reference
+# DM41_Explorer: Hardware Memory Architecture Reference
 
-The purpose of the DM41L Explorer project is to design a python application
+The purpose of the DM41_Explorer project is to design a python application
 that can read, write, and edit the memory of the DM41L emulator via the DM41L's
 serial port. This document outlines the memory architecture of the original
 HP41C calculator hardware and it's implementation in the DM41L. 
@@ -13,7 +13,7 @@ cartridge, an extended functions cartridge, and an extended memory cartridge
 already installed.
 
 A note on confidence: most of this document describes hardware behavior
-confirmed against real memory dumps (see `src/tests/data/*.dm41`), or is
+confirmed against real memory states (see `src/tests/data/*.dm41`), or is
 derived from published documentation.
 
 A note on sources: Much of this data was derived from "HP-41 Advanced
@@ -32,7 +32,7 @@ documentation found on the internet.
   employs an execution model where the instruction pointer moves
   from higher memory addresses to lower memory addresses ($N \rightarrow 0$).
   This explains why program termination sequences (like ".END.") appear at
-  relatively low register indices in dumps, while the entry point resides in
+  relatively low register indices in states, while the entry point resides in
   high memory. This same high-to-low convention governs files in Extended
   Memory (see §4), but not user data stored in main memory.
 
@@ -40,7 +40,7 @@ documentation found on the internet.
 
 Several regions grow toward *lower* addresses as more gets added to them, so
 the newest/most-recent content ends up at the low-address end rather than
-the high-address end a normal top-to-bottom dump printout would suggest.
+the high-address end a normal top-to-bottom state printout would suggest.
 The exact flip differs by region, so don't assume one region's convention
 applies to another — check this table first:
 

@@ -2,7 +2,7 @@
 
 2026-10-04 · Michael Heinz (research by Claude)
 
-This document describes three small files in the DM41X's Full Backup set: the `.b41` manifest, the `.m41` module list and the `.ram` RAM-page file. The other two files in a Full Backup are the `.cst` (see `cst.md`) and the `.d41`, which is the same text dump format as a DM41L `.dm41` file (see `dm41x_first_look_2026-10-04.md`).
+This document describes three small files in the DM41X's Full Backup set: the `.b41` manifest, the `.m41` module list and the `.ram` RAM-page file. The other two files in a Full Backup are the `.cst` (see `cst.md`) and the `.d41`, which is the same text state format as a DM41L `.dm41` file (see `dm41x_first_look_2026-10-04.md`).
 
 **Status.** `.b41` and `.m41` are decoded from samples and the manual. `.ram` is only partly understood: both samples are entirely zero.
 

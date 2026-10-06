@@ -1,9 +1,9 @@
-DM41L Explorer
+DM41_Explorer
 ==============
 
 This folder is the complete application:
 
-  dm41lexplorer (or dm41lexplorer.exe on Windows)   <- run this
+  dm41explorer (or dm41explorer.exe on Windows)     <- run this
   _internal/                                        <- required support
                                                         files (Python
                                                         runtime, bundled
@@ -18,8 +18,8 @@ move it along with the executable rather than leaving it behind. This is
 standard PyInstaller "onedir" packaging, not something specific to this
 app.
 
-library/ is just data -- sample programs to load via File > Open Dump,
-or Import into an existing dump. Nothing else in the app depends on it,
+library/ is just data -- sample programs to load via File > Open State,
+or Import into an existing state. Nothing else in the app depends on it,
 so it's fine to browse, copy files out of, or delete.
 
 Full usage instructions, known limitations, and how to get past the
