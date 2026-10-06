@@ -130,6 +130,23 @@ See the README's [Known limitations](README.md#known-limitations)
 section before filing — a few gaps (key assignments/alarms decoding,
 program editing) are already tracked there rather than as open issues.
 
+## Screenshots
+
+The pictures in the README (`resources/screenshots/`) are made by
+`tools/make_screenshots.py`, which starts the app with a throwaway preferences
+file and no serial port, loads sample states from `src/tests/data`, and
+photographs each tab. Run it from the repository root with the project's
+environment active, and leave the window uncovered while it runs:
+
+```sh
+python3 tools/make_screenshots.py              # all of them
+python3 tools/make_screenshots.py --only overview xm_files
+```
+
+On a Mac the window comes out with its native title bar, at Retina size. Check
+the pictures before committing them, since they show whatever the app looks
+like at that moment.
+
 ## License
 
 By contributing, you agree your changes are licensed under this
