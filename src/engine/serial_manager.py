@@ -10,6 +10,8 @@ from typing import Optional, Callable
 import serial
 import serial.tools.list_ports
 
+from memory import DM41L, DeviceProfile
+
 logger = logging.getLogger(__name__)
 
 
@@ -17,7 +19,15 @@ class SerialManager:
     """
     Manages serial communication and hardware discovery in a dedicated background thread.
     This class is the single source of truth for all hardware-level operations.
+
+    `profile` is the model on the other end of this connection: the app
+    checks a memory state against it before sending (memory.check_profile_fit).
+    It is declared by the driver, never inferred from the transport. The
+    serial console is the DM41L's, so that is what this driver declares; a
+    driver for another model's serial interface would declare its own.
     """
+
+    profile: DeviceProfile = DM41L
 
     def __init__(self, error_callback: Optional[Callable[[str], None]] = None):
         self.serial_inst = None

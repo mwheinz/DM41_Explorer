@@ -3,6 +3,7 @@ import threading
 import time
 from unittest.mock import MagicMock, patch
 from engine.serial_manager import SerialManager
+from memory import DM41L
 
 
 @pytest.fixture
@@ -31,6 +32,11 @@ class TestSerialManager:
         assert manager.serial_inst is None
         assert manager.incoming_queue.empty()
         assert manager.outgoing_queue.empty()
+
+    def test_the_serial_console_declares_the_dm41l(self, manager):
+        """The model on the other end is declared by the driver, not
+        inferred; the Send check uses it (docs/dm41x_explorer_plan.md)."""
+        assert manager.profile is DM41L
 
     @patch("serial.tools.list_ports.comports")
     def test_get_available_ports(self, mock_comports, manager):

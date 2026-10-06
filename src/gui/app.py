@@ -13,7 +13,14 @@ from tkinter import filedialog, messagebox, Menu
 
 import customtkinter as ctk
 
-from memory import Memory
+from memory import (
+    DM41X,
+    ERROR,
+    WARNING,
+    Memory,
+    check_profile_fit,
+    format_findings,
+)
 from engine.serial_manager import SerialManager
 from engine.command_engine import CommandEngine
 from engine.commands import (
@@ -182,6 +189,14 @@ def _apply_font_prefs(config_store):
         ctk.ThemeManager.theme["CTkFont"]["family"] = config_store.font_family
     if config_store.font_size:
         ctk.ThemeManager.theme["CTkFont"]["size"] = config_store.font_size
+
+
+# A DM41L `.dm41` dump and a DM41X `.d41` state file are the same text format.
+STATE_EXTENSIONS = (".dm41", ".d41")
+STATE_FILETYPES = [
+    ("DM41 memory state", ("*.dm41", "*.d41")),
+    ("All files", "*.*"),
+]
 
 
 class DM41LExplorerApp(ctk.CTk):
@@ -922,9 +937,15 @@ class DM41LExplorerApp(ctk.CTk):
             messagebox.showerror("Error", f"Could not save dump: {e}")
 
     def save_dump_as(self):
+        # A file keeps its own extension: the text format is the same.
+        extension = (
+            self.memory_source.suffix
+            if self.memory_source and self.memory_source.suffix in STATE_EXTENSIONS
+            else ".dm41"
+        )
         path = filedialog.asksaveasfilename(
-            defaultextension=".dm41",
-            filetypes=[("DM41L dump", "*.dm41"), ("All files", "*.*")],
+            defaultextension=extension,
+            filetypes=STATE_FILETYPES,
         )
         if not path:
             return
@@ -947,9 +968,7 @@ class DM41LExplorerApp(ctk.CTk):
             "Unsaved Changes", "Discard unsaved changes and load a different dump?"
         ):
             return
-        path = filedialog.askopenfilename(
-            filetypes=[("DM41L dump", "*.dm41"), ("All files", "*.*")]
-        )
+        path = filedialog.askopenfilename(filetypes=STATE_FILETYPES)
         if not path:
             return
         self._load_dump_into_buffer(path)
@@ -963,7 +982,9 @@ class DM41LExplorerApp(ctk.CTk):
         whether to prompt at all) differs by caller. This always
         overwrites the current buffer unconditionally.'''
         try:
-            self.memory = Memory.from_file(path)
+            # Every state file opens with the DM41X profile, a superset of
+            # the DM41L's, so a large state displays and saves without loss.
+            self.memory = Memory.from_file(path, profile=DM41X)
             self.memory_source = Path(path)
             self._modified_label.configure(text="")
             self._update_source_label()
@@ -1023,11 +1044,36 @@ class DM41LExplorerApp(ctk.CTk):
         if not self.serial.is_connected:
             messagebox.showwarning("Not Connected", "Connect to the DM41L first.")
             return
-        if not messagebox.askyesno(
-            "Send Dump to Calculator",
+
+        # A state can hold things the calculator on the other end does not
+        # have (every file opens with the DM41X profile). The connection
+        # declares which model that is; see memory/profile_fit.py.
+        target = self.serial.profile
+        findings = check_profile_fit(self.memory, target)
+        errors = [f for f in findings if f.level == ERROR]
+        warnings = [f for f in findings if f.level == WARNING]
+        for finding in findings:
+            logger.warning("Send check (%s): %s", finding.level, finding)
+        if errors:
+            messagebox.showerror(
+                f"Cannot Send to {target.name}",
+                f"This memory state cannot be sent to a {target.name}:\n\n"
+                f"{format_findings(errors)}\n\nNothing was sent.",
+            )
+            return
+
+        message = (
             "This will overwrite the calculator's current memory with the "
-            "currently loaded dump. Continue?",
-        ):
+            "currently loaded dump."
+        )
+        if warnings:
+            message += (
+                f"\n\nThese will not work on a {target.name}:\n\n"
+                f"{format_findings(warnings)}\n\nSend it anyway?"
+            )
+        else:
+            message += " Continue?"
+        if not messagebox.askyesno("Send Dump to Calculator", message):
             return
 
         dump_text = self.memory.to_string()

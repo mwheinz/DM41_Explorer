@@ -90,6 +90,9 @@ for readability. The current components are:
   mnemonic_doc.py  the generated FOCAL mnemonic reference: rows for the
                     Help menu dialog, and docs/mnemonics.md
                     (`python -m memory.mnemonic_doc`)
+  profile_fit.py   check_profile_fit() -- what in a memory state will not fit
+                    a given model (XM beyond its regions, XROM functions it
+                    lacks); the check before Send to a DM41L
   memory.py        Memory (the top-level dump: parsing, serialization,
                     raw register access, whole-dump pack(), and the
                     region lookup -- Memory.region(key) plus the named
@@ -147,6 +150,13 @@ from .program_chain import (
     encode_chain_marker,
 )
 from .memory import Memory
+from .profile_fit import (
+    ERROR,
+    WARNING,
+    ProfileFinding,
+    check_profile_fit,
+    format_findings,
+)
 
 __all__ = [
     "DM41MemoryError",
@@ -204,4 +214,9 @@ __all__ = [
     "decode_label_name",
     "encode_chain_marker",
     "Memory",
+    "ERROR",
+    "WARNING",
+    "ProfileFinding",
+    "check_profile_fit",
+    "format_findings",
 ]

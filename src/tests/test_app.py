@@ -19,6 +19,7 @@ the rest of the project's manual/ad-hoc GUI verification described in
 project memory.
 """
 import json
+from pathlib import Path
 
 import pytest
 
@@ -27,8 +28,9 @@ pytest.importorskip("customtkinter")
 from unittest import mock
 
 from config import ProjectConfig
-from memory import Memory
+from memory import DM41L, DM41X, Memory
 from gui.app import DM41LExplorerApp
+from gui.overview_tab import xm_total_registers
 
 
 @pytest.fixture
@@ -211,3 +213,260 @@ def test_mnemonics_reference_opens_once_and_is_reused(app):
     second = app.show_mnemonics_reference()
     assert second is not first
     second.destroy()
+
+
+# -- Send: the check against the connected calculator's model ---------------
+#
+# Phase 2 of docs/dm41x_explorer_plan.md. The serial connection declares its
+# model (SerialManager.profile, the DM41L); Send refuses what that model
+# cannot hold and asks before sending what it cannot run.
+
+DATA_DIR = Path(__file__).parent / "data"
+ORIGINAL_CONFIRMATION = (
+    "This will overwrite the calculator's current memory with the "
+    "currently loaded dump. Continue?"
+)
+
+
+@pytest.fixture
+def connected_app(app):
+    """The app with a (pretend) open serial connection and a command
+    engine that accepts every command, so nothing touches a port."""
+    app.serial.is_connected = True
+    with mock.patch.object(app.engine, "execute", return_value=True) as execute:
+        app.sent = execute
+        yield app
+
+
+def _send(app, name, *, answer=True):
+    """Opens tests/data/<name> and presses Send. Returns the mocks for the
+    error box and the confirmation, in that order."""
+    app._load_dump_into_buffer(str(DATA_DIR / name))
+    with mock.patch("gui.app.messagebox.showerror") as error, mock.patch(
+        "gui.app.messagebox.askyesno", return_value=answer
+    ) as confirm:
+        app.send_dump_to_calculator()
+    return error, confirm
+
+
+def test_the_serial_connection_declares_the_dm41l(app):
+    assert app.serial.profile is DM41L
+
+
+def test_send_refuses_xm_the_dm41l_does_not_have(connected_app):
+    error, confirm = _send(connected_app, "dm41x_manyfiles.dm41")
+
+    error.assert_called_once()
+    title, message = error.call_args.args
+    assert title == "Cannot Send to DM41L"
+    assert "23 of 59 XM files" in message
+    assert "'XMA16.'" in message
+    assert message.endswith("Nothing was sent.")
+    confirm.assert_not_called()
+    connected_app.sent.assert_not_called()
+
+
+def test_send_lists_what_a_dm41l_cannot_run_and_proceeds_on_yes(connected_app):
+    error, confirm = _send(connected_app, "xrom.d41", answer=True)
+
+    error.assert_not_called()
+    confirm.assert_called_once()
+    _title, message = confirm.call_args.args
+    assert message.startswith(ORIGINAL_CONFIRMATION[: -len(" Continue?")])
+    assert "These will not work on a DM41L:" in message
+    assert '- Program "DM41X", step 3: X<I>Y is not built into a DM41L' in message
+    # 18 warnings; the dialog shows 12 and counts the rest.
+    assert "- Program \"DM41X\", step 14:" in message
+    assert "step 15" not in message
+    assert "...and 6 more." in message
+    assert message.endswith("Send it anyway?")
+    connected_app.sent.assert_called_once()
+
+
+def test_send_stops_when_the_warnings_are_declined(connected_app):
+    error, confirm = _send(connected_app, "xrom.d41", answer=False)
+
+    confirm.assert_called_once()
+    connected_app.sent.assert_not_called()
+
+
+def test_send_lists_key_assignments_a_dm41l_cannot_run(connected_app):
+    _error, confirm = _send(connected_app, "dm41x_xrom_keys.d41")
+
+    _title, message = confirm.call_args.args
+    assert "- Key 12 (unshifted): LKAOFF is not built into a DM41L" in message
+    assert "- Key 11 (unshifted): LKAON is not built into a DM41L" in message
+
+
+def test_send_of_a_state_that_fits_asks_the_usual_question(connected_app):
+    error, confirm = _send(connected_app, "6x-xm.dm41")
+
+    error.assert_not_called()
+    confirm.assert_called_once_with("Send Dump to Calculator", ORIGINAL_CONFIRMATION)
+    connected_app.sent.assert_called_once()
+
+
+def test_send_checks_against_the_model_the_connection_declares(connected_app):
+    """The profile comes from the driver: a connection that declares a
+    DM41X would take the state the DM41L refused."""
+    connected_app.serial.profile = DM41X
+
+    error, confirm = _send(connected_app, "dm41x_manyfiles.dm41")
+
+    error.assert_not_called()
+    confirm.assert_called_once_with("Send Dump to Calculator", ORIGINAL_CONFIRMATION)
+    connected_app.sent.assert_called_once()
+
+
+def test_send_when_not_connected_does_not_check_anything(app):
+    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    with mock.patch("gui.app.messagebox.showwarning") as warn, mock.patch(
+        "gui.app.check_profile_fit"
+    ) as check:
+        app.send_dump_to_calculator()
+
+    warn.assert_called_once()
+    check.assert_not_called()
+
+
+# -- Opening a DM41X state (plan, phase 3 steps 1, 4 and 5) -------------------
+
+
+def _tree_rows(tree):
+    return [tree.item(iid, "values") for iid in tree.get_children()]
+
+
+def test_a_state_file_opens_with_the_dm41x_profile(app):
+    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+
+    assert app.memory.profile is DM41X
+
+
+def test_a_dm41l_dump_from_the_calculator_keeps_the_dm41l_profile(app):
+    app._on_dump_received(Memory().to_string())
+
+    assert app.memory.profile is DM41L
+
+
+def test_manyfiles_lists_all_its_files_across_three_regions(app):
+    with mock.patch("gui.app.messagebox.showerror") as error:
+        app._load_dump_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+
+    error.assert_not_called()
+    app.xm_files_tab.render(app.memory)  # tabs render lazily, when shown
+    rows = _tree_rows(app.xm_files_tab._tree)
+    assert len(rows) == 59
+    assert app.xm_files_tab._header_label.cget("text") == "Extended-memory files: 59"
+    assert "XMA16." in [row[0] for row in rows]
+
+
+def test_overview_reports_five_registers_free_on_manyfiles(app):
+    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+
+    files, used, free = app.overview_tab._xm_summary_texts()
+
+    assert files == "59"
+    assert used == "595/600 registers (99%)"
+    assert free == "5/600 registers (1%)"
+
+
+def test_overview_total_follows_the_profile(app):
+    assert xm_total_registers(DM41L) == 362  # real DM41L, EMDIR
+    assert xm_total_registers(DM41X) == 600  # real DM41X, plan S8
+
+    app.overview_tab.render(Memory())  # a DM41L-profile memory
+    assert app.overview_tab._xm_summary_texts()[2] == "362/362 registers (100%)"
+    app.overview_tab.render(Memory(profile=DM41X))
+    assert app.overview_tab._xm_summary_texts()[2] == "600/600 registers (100%)"
+
+
+def test_hex_view_runs_to_the_end_of_the_dm41x_map(app):
+    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    app.hex_view_tab.render(app.memory)
+
+    rows = _tree_rows(app.hex_view_tab._tree)
+
+    assert len(rows) == 0x3F0
+    assert (rows[0][0], rows[-1][0]) == ("0x000", "0x3ef")
+    assert rows[0x3EF][3] == "XM"
+    assert rows[0x2F0][3] == "Inaccessible"  # the gap between XM #1 and #2
+    assert "0x000-0x3ef (1008 registers)" in app.hex_view_tab._header_label.cget("text")
+
+
+def test_hex_view_of_a_dm41l_memory_still_ends_at_0x2ef(app):
+    app.hex_view_tab.render(Memory())
+
+    rows = _tree_rows(app.hex_view_tab._tree)
+
+    assert len(rows) == 0x2F0
+    assert rows[-1][0] == "0x2ef"
+
+
+def test_open_dialog_offers_both_extensions(app):
+    with mock.patch("gui.app.filedialog.askopenfilename", return_value="") as ask:
+        app.load_dump_from_file()
+
+    types = dict(ask.call_args.kwargs["filetypes"])
+    assert set(types["DM41 memory state"]) == {"*.dm41", "*.d41"}
+
+
+@pytest.mark.parametrize(
+    "name, extension", [("xrom.d41", ".d41"), ("6x-xm.dm41", ".dm41")]
+)
+def test_save_as_keeps_the_files_own_extension(app, name, extension):
+    app._load_dump_into_buffer(str(DATA_DIR / name))
+
+    with mock.patch("gui.app.filedialog.asksaveasfilename", return_value="") as ask:
+        app.save_dump_as()
+
+    assert ask.call_args.kwargs["defaultextension"] == extension
+
+
+def test_save_as_of_a_new_buffer_defaults_to_dm41(app):
+    with mock.patch("gui.app.filedialog.asksaveasfilename", return_value="") as ask:
+        app.save_dump_as()
+
+    assert ask.call_args.kwargs["defaultextension"] == ".dm41"
+
+
+def test_a_d41_file_saves_back_identically(app, tmp_path):
+    text = (DATA_DIR / "dm41x_xrom_keys.d41").read_text()
+    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_xrom_keys.d41"))
+    target = tmp_path / "copy.d41"
+
+    with mock.patch(
+        "gui.app.filedialog.asksaveasfilename", return_value=str(target)
+    ), mock.patch("gui.app.messagebox.showinfo"):
+        app.save_dump_as()
+
+    assert " ".join(target.read_text().split()) == " ".join(text.split())
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "dm41x_manyfiles.dm41",
+        "xrom.d41",
+        "dm41x_xrom_keys.d41",
+        "dm41xn.dm41",
+        "dm41x_retpfl_before.d41",
+        "dm41x_retpfl_after.d41",
+        "lkaoff3.d41",
+    ],
+)
+def test_every_tab_renders_every_dm41x_sample(app, name):
+    """Smoke test (plan, phase 3 step 7): no tab raises on a state opened
+    the way the app now opens every file."""
+    app._load_dump_into_buffer(str(DATA_DIR / name))
+
+    for tab in (
+        app.overview_tab,
+        app.flags_tab,
+        app.data_registers_tab,
+        app.hex_view_tab,
+        app.program_tab,
+        app.key_assignments_tab,
+        app.xm_files_tab,
+        app.alarms_tab,
+    ):
+        tab.render(app.memory)

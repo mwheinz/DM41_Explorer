@@ -10,7 +10,7 @@ import customtkinter as ctk
 from memory import (
     Memory,
     DM41MemoryError,
-    XM_REGIONS,
+    DeviceProfile,
     PRIMARY_DATA_END,
     MIN_SANE_R00,
 )
@@ -39,15 +39,14 @@ logger = logging.getLogger(__name__)
 # "program", "data") -- rather than computing them independently, so this
 # module no longer needs to know any of the raw address math itself.
 
-# Raw structural XM capacity, in registers: each region's usable span is
-# (lo, hi] -- lo itself is that region's reserved link/pointer register
-# (0x40 for region 0, 0x201 for region 1), not available for file storage
-# (see memory/xm_file.py's ExtendedMemory docstring and
-# memory/constants.py's XM_REGIONS). This is a fixed, dump-independent
-# ceiling, not something read from the dump itself -- but it is NOT the
-# same number a real DM41L's EMDIR command reports (see
-# XM_TOTAL_REGISTERS below).
-XM_RAW_REGISTERS = sum(hi - lo for lo, hi in XM_REGIONS)
+# Raw structural XM capacity comes from the memory's device profile
+# (DeviceProfile.xm_raw_registers): each region's usable span is (lo, hi] --
+# lo itself is that region's reserved link/pointer register (0x40 for region
+# 0, 0x201 for region 1, 0x301 for a DM41X's region 2), not available for
+# file storage (see memory/xm_file.py's ExtendedMemory docstring). It is a
+# fixed, dump-independent ceiling, not something read from the dump itself
+# -- but it is NOT the same number a real calculator's EMDIR command
+# reports (see xm_total_registers() below).
 
 # Registers an XM file consumes beyond its own declared data: one header
 # register and one name register, packed directly above its data (see
@@ -55,8 +54,8 @@ XM_RAW_REGISTERS = sum(hi - lo for lo, hi in XM_REGIONS)
 # only counts the file's data segments, not this per-file overhead).
 XM_FILE_OVERHEAD_REGISTERS = 2
 
-# EMDIR's "registers available" is XM_RAW_REGISTERS minus two more kinds
-# of overhead that aren't tied to any one file. One register is always
+# EMDIR's "registers available" is the profile's raw capacity minus two
+# more kinds of overhead that aren't tied to any one file. One register is always
 # spent on the FF-filled sentinel that marks where free space starts
 # (see memory/constants.py's eom_register() and
 # ExtendedMemory.list_files()) -- that's XM_EOM_SENTINEL_REGISTERS.
@@ -70,17 +69,25 @@ XM_FILE_OVERHEAD_REGISTERS = 2
 # Per "HP-41 Advanced Programming Tips" p.29 (docs/pdfs/
 # hp41-adv-prog-tips.pdf): for an N-device XM system, available =
 # raw - N (one link register per device, already excluded from
-# XM_RAW_REGISTERS above) - 1 (the shared FF sentinel), and EMDIR itself
+# the raw capacity) - 1 (the shared FF sentinel), and EMDIR itself
 # reports 2 less than that. Confirmed against a real DM41L: a
 # freshly-cleared XM (0 files) reports 362 registers available via
-# EMDIR, matching XM_RAW_REGISTERS(365) - 1 (sentinel) - 2 (EMDIR's
+# EMDIR, matching raw capacity 365 - 1 (sentinel) - 2 (EMDIR's
 # next-file reserve) for the DM41L's 2-device configuration (the
 # built-in Extended Functions Module plus one Extended Memory module).
 XM_EOM_SENTINEL_REGISTERS = 1
 XM_NEXT_FILE_RESERVE_REGISTERS = 2
-XM_TOTAL_REGISTERS = (
-    XM_RAW_REGISTERS - XM_EOM_SENTINEL_REGISTERS - XM_NEXT_FILE_RESERVE_REGISTERS
-)
+
+
+def xm_total_registers(profile: DeviceProfile) -> int:
+    """What EMDIR reports on `profile`'s calculator with extended memory
+    empty: 362 on a DM41L, and 600 on a DM41X (confirmed on a real DM41X,
+    docs/dm41x_explorer_plan.md S8)."""
+    return (
+        profile.xm_raw_registers
+        - XM_EOM_SENTINEL_REGISTERS
+        - XM_NEXT_FILE_RESERVE_REGISTERS
+    )
 
 
 class OverviewTab(ctk.CTkScrollableFrame):
@@ -366,24 +373,25 @@ class OverviewTab(ctk.CTkScrollableFrame):
         the Key Assignments/Alarms register counts (GitHub issue #23)."""
         try:
             xm = self._memory.extended_memory
+            xm_total = xm_total_registers(self._memory.profile)
             xm_files = xm.list_files()
             xm_used = sum(
                 f.num_registers + XM_FILE_OVERHEAD_REGISTERS for f in xm_files
             )
-            # xm_used can legitimately exceed XM_TOTAL_REGISTERS: that
-            # constant already has EMDIR's next-file reserve subtracted
-            # out (see its definition above), and a real file's own
+            # xm_used can legitimately exceed the profile's total: that
+            # figure already has EMDIR's next-file reserve subtracted
+            # out (see xm_total_registers()), and a real file's own
             # header+name overhead is exactly what eats into that
             # reserve once the file actually exists. Clamp the
             # free/percentage figures rather than showing negative
             # numbers -- a real DM41L would report 0 free (and refuse
             # new files), never a negative count.
-            xm_free = max(0, XM_TOTAL_REGISTERS - xm_used)
-            xm_used_pct = min(100, round(100 * xm_used / XM_TOTAL_REGISTERS))
+            xm_free = max(0, xm_total - xm_used)
+            xm_used_pct = min(100, round(100 * xm_used / xm_total))
             return (
                 str(len(xm_files)),
-                f"{xm_used}/{XM_TOTAL_REGISTERS} registers ({xm_used_pct}%)",
-                f"{xm_free}/{XM_TOTAL_REGISTERS} registers ({100 - xm_used_pct}%)",
+                f"{xm_used}/{xm_total} registers ({xm_used_pct}%)",
+                f"{xm_free}/{xm_total} registers ({100 - xm_used_pct}%)",
             )
         except DM41MemoryError as e:
             logger.warning("Could not list XM files for summary: %s", e)

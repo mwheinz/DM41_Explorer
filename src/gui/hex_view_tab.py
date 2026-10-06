@@ -28,13 +28,13 @@ from gui.tab_common import (
     clear_tree_for_render,
 )
 
-# The full addressable range this tab displays -- matches the span
-# Memory.regions() covers (0x000-0x2ef): Status Registers, an unused/"void"
-# gap, Extended Memory #0, Main Memory (itself split further, when a dump
-# with a sane R00/.END. is loaded), Extended Memory #1. This is the full
-# address space of the HP41CX calculator and the DM41L emulator.
+# The full addressable range this tab displays: from DISPLAY_START through
+# the memory's profile.display_end (0x2EF for a DM41L, 0x3EF for a DM41X).
+# Memory.regions() names Status Registers, an unused/"void" gap, Extended
+# Memory #0, Main Memory (itself split further, when a dump with a sane
+# R00/.END. is loaded) and each later Extended Memory region. On a DM41X the
+# 16 addresses 0x2F0-0x2FF belong to no region and show as Inaccessible.
 DISPLAY_START = 0x000
-DISPLAY_END = 0x2EF
 
 # One entry per region key Memory.regions() can report. `light`/`dark` are
 # the row background tints for CTk's two appearance modes -- picked
@@ -66,11 +66,10 @@ _TREE_COLUMNS = [
 
 def _region_span_for(regions: list, addr: int):
     '''The RegionSpan in `regions` (a Memory.regions() list) containing
-    `addr`, or None. `regions` covers the full display range with no gaps
-    (see Memory.regions()'s docstring), so every address in
-    [DISPLAY_START, DISPLAY_END] is expected to match something -- render()
-    below falls back to the "nonexistent" catalog entry if this somehow
-    returns None, rather than crashing.'''
+    `addr`, or None. `regions` covers the display range except a DM41X's
+    0x2F0-0x2FF gap (see Memory.regions()'s docstring); render() below
+    shows an address that matches nothing as "Inaccessible" rather than
+    crashing.'''
     for span in regions:
         if addr in span:
             return span
@@ -183,18 +182,19 @@ class HexViewTab(ctk.CTkFrame):
             return
 
         # One regions() call per render, not one per address -- render()
-        # walks up to 752 addresses below, and Memory.regions() itself
+        # walks up to 1008 addresses below, and Memory.regions() itself
         # already does the R00/.END./key-assignments/alarms boundary work
         # (including the same defensive R00/DotEnd fallback this tab used
         # to do inline) once per call.
         regions = memory.regions()
 
-        count = DISPLAY_END - DISPLAY_START + 1
+        display_end = memory.profile.display_end
+        count = display_end - DISPLAY_START + 1
         self._header_label.configure(
-            text=f"Full memory map: 0x{DISPLAY_START:03x}-0x{DISPLAY_END:03x} ({count} registers)"
+            text=f"Full memory map: 0x{DISPLAY_START:03x}-0x{display_end:03x} ({count} registers)"
         )
 
-        for addr in range(DISPLAY_START, DISPLAY_END + 1):
+        for addr in range(DISPLAY_START, display_end + 1):
             register = memory.get_register(addr)
             span = _region_span_for(regions, addr)
             region_key = span.key if span else "nonexistent"
