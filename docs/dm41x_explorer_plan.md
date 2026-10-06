@@ -1,6 +1,6 @@
 # DM41X Support Plan
 
-2026-10-05 · Michael Heinz (drafted with Claude)
+2026-10-05 · revised 2026-10-06 · Michael Heinz (drafted with Claude)
 
 Replaces the 2026-09-28 file-manager-first plan (still in git history, last committed in `ad66d8d`). That plan started from the DM41X's FAT disk. This one starts from the memory module, because everything else depends on it.
 
@@ -16,6 +16,8 @@ Replaces the 2026-09-28 file-manager-first plan (still in git history, last comm
 | --- | --- |
 | Models | DM41X and DM41XN are treated identically. The extra XROMs are the same on both. |
 | Model detection | None. A `.d41` and a `.dm41` are the same text format, and nothing in the file says which model wrote it except the extension. No auto-detect, no manual override, no model selector in the web app. |
+| Executable | One app, **DM41_Explorer**, instead of separate DM41L_, DM41X_ and DM41XN_Explorer builds (supersedes the 2026-09-28 naming). Every state file opens with the DM41X profile. The only model-specific behaviour is the upload check, which uses the target profile **declared by the connection driver**: the serial driver declares the DM41L. A later DM41XN serial driver would declare its own profile without changing the check. |
+| Terminology | "Memory state" replaces "memory dump" and "dump" for every model, in the UI, docs and code (phase 3, step 8). `.dm41` and `.d41` stay as file extensions. |
 | Protecting the DM41L | The check runs only when **uploading** a state/dump to a DM41L (Send Dump). XM data that does not fit a DM41L is an **error**. Any XROM the DM41L does not have built in (the DM41X's additions, or an XROM from another module) is a **warning**, because the user may mean to edit the program on the DM41L and replace it. Opening and saving files, including large states, is never restricted. |
 | Revisit | If LKAOFF or FAST turn out to change what is stored in a state file, model detection and the checks above get revisited. |
 | Round trip | `.d41` writes only have to match the calculator's own output after normalising whitespace (trailing spaces, the two-space gap between special-register pairs). |
@@ -43,10 +45,10 @@ Checked against the repository on 2026-10-05.
    | 26,36 | TRNG (an extension of the CX Time module) |
    | 26,38–26,53 | ABSP, AINT, ASWAP, CLAC, CLEM, FAST, FILL, FLCOPY, FLHD, FLTYPE, LKAOFF, LKAON, RENMFL, RETPFL, SLOW, WORKFL (the DM41X module) |
 
-   Because both tables already exist, the 16 DM41X-module functions need no reverse engineering, only a sample to confirm them (S5). **Confirmed 2026-10-05** from a real DM41XN dump (`tests/data/dm41xn.dm41` and `dm41xn.txt`, one program calling both): **X<I>Y is XROM 25,63** (bytes `A6 7F`) and **TRNG is XROM 26,36** (`A6 A4`), matching hp41uc for TRNG. hp41uc has no entry for X<I>Y, so one has to be added there too. **CRT?** (stealth header, XROM 25,00) is documented but still needs a sample.
+   Because both tables already exist, the 16 DM41X-module functions need no reverse engineering, only a sample to confirm them (S5). **Confirmed 2026-10-05** from a real DM41XN dump (`tests/data/dm41xn.dm41` and `dm41xn.txt`, one program calling both): **X<I>Y is XROM 25,63** (bytes `A6 7F`) and **TRNG is XROM 26,36** (`A6 A4`), matching hp41uc for TRNG. hp41uc has no entry for X<I>Y, so one has to be added there too. The 16 DM41X-module functions were confirmed by S5 (`xrom.d41`, `xrom.raw`). **CRT?** (stealth header, XROM 25,00) cannot be keyed into a program or assigned to a key, so it is parked.
 2. **Nothing stops an oversized state from being sent to a DM41L.** Nothing in the code checks a dump against a profile before upload, so a DM41X state with a third XM region would go out as-is. (Loading and saving such a file is fine and stays unrestricted; `Memory.from_string(text, profile=DM41L)` keeps the third-region registers and writes them back out.)
 3. **XM file types.** `XMFile` only accepts program, data and ASCII headers and raises on anything else. RETPFL can set types 1–15, so a retyped file may make `list_files()` fail.
-4. **Overview totals are DM41L-only.** `gui/overview_tab.py` derives its free-XM number from constants calibrated on a real DM41L (362 registers by EMDIR). The DM41X value is untested.
+4. **Overview totals are DM41L-only.** `gui/overview_tab.py` derives its free-XM number from constants calibrated on a real DM41L (362 registers by EMDIR). The DM41X formula is confirmed by S8: 600 free when empty, 5 free with `dm41x_manyfiles.dm41`.
 5. **The web decoder is two XM regions only.** `src/dm41/constants.ts` hard-codes two regions, and uploads accept only `.txt`, `.dm41` and `.raw`.
 
 ## Phase 0 · Calculator samples (you)
@@ -59,10 +61,22 @@ These produce the evidence for phases 1–3. Save each into `src/tests/data/` wi
 | S2 | `dm41x_lkaoff.d41`: S1 plus LKAOFF, saved. Also `dm41x_lkaon.d41` after LKAON | Does LKAOFF change the state file? |
 | S3 | `dm41x_fast.d41`, `dm41x_slow.d41`: S1 saved after FAST, then after SLOW | Does the speed setting change the state file? |
 | S4 | `dm41x_retpfl_before.d41`, `dm41x_retpfl_after.d41`: one XM file saved before and after RETPFL (try a program file retyped as data, and a type above 3) | File type codes 4–15, and whether the header changes |
-| S5 | `dm41x_xroms.d41` and `dm41x_xroms.raw`: one short program using the 16 DM41X-module functions (ABSP … WORKFL) and CRT?, saved as a state and exported as RAW. (X<I>Y and TRNG are already confirmed by `dm41xn.dm41`.) | Confirms 26,38–53, and shows whether CRT? is executable and its code |
-| S6 | `dm41x_xrom_keys.d41`: LKAOFF and one more new function assigned to keys | Key-assignment encoding of the new XROMs |
-| S7 | `dm41x_settings.d41`: S1 resaved with DMY/MDY, CLK24 and flag 26 changed, one at a time | What the manual's "stored in `.d41`" settings look like |
-| S8 | `dm41x_emroom.txt`: the EMROOM and EMDIR readings on a freshly cleared XM (CLEM), and with one known file | The DM41X value for the Overview tab's free-XM number |
+| S5 | `xrom.d41`, `xrom.raw` and `xrom.txt`: one short program using ED$, X<I>Y, TRNG and the 16 DM41X-module functions (ABSP … WORKFL), saved as a state, exported as RAW and written out as text. **Done, see below.** CRT? dropped. | Confirms 26,38–53 |
+| S6 | `dm41x_xrom_keys.d41`: LKAOFF and one more new function assigned to keys. **Done, see below.** | Key-assignment encoding of the new XROMs |
+| S7 | ~~`dm41x_settings.d41`: S1 resaved with DMY/MDY, CLK24 and flag 26 changed, one at a time~~ **Dropped (Mike, 2026-10-06):** these settings are standard HP-41 flags and register bits, documented in "A programmer's handbook" (`docs/pdfs/`), so no sample is needed. | What the manual's "stored in `.d41`" settings look like |
+| S8 | EMROOM/EMDIR readings on a cleared XM (CLEM), and with `dm41x_manyfiles.dm41` loaded (replaced "one known file", which would not exercise the upper regions). **Done, see below.** | The DM41X value for the Overview tab's free-XM number |
+
+**Fixtures kept (commit `58ecfaf`).** After analysis the sample set was cut to the files below. The results sections that follow name several samples that no longer exist (`dm41x_fast`, `dm41x_slow`, `dm41x_lkaoff`, `fast`, `slow`, `lkaoff`, `lkaon`, `lkaoff2`, `lkaon2`, `lkaon2_fast`, `lkaon2_slow`, `dm41x_s4b1`, `dm41x_s4b2`, and the `.d41` copy of `dm41x_manyfiles`); the register values quoted in the tables are the record of what they contained.
+
+| Kept in `src/tests/data/` | Use in Phase 3 tests |
+| --- | --- |
+| `dm41x_base.d41` | Baseline load with the DM41X profile, whitespace-normalised round trip |
+| `dm41x_lkan.d41` | LKAON, no assignments (flags all clear, indistinguishable from LKAOFF) |
+| `lkaoff3.d41`, `lkaon3.d41` | LKAOFF vs LKAON with an unshifted (key 11) and a shifted (key 12) global-label assignment: flags set only in the LKAON file, assignments in both |
+| `dm41x_retpfl_before.d41`, `dm41x_retpfl_after.d41` | XM files of types 4–6: `list_files()` must not raise, files shown as `@` |
+| `dm41x_manyfiles.dm41` | Three XM regions, 59 files |
+| `dm41xn.dm41`, `dm41xn.txt` | X<I>Y and TRNG |
+| `dm41x_xrom_keys.d41` | LKAON, LKAOFF and ED$ assigned to keys 11, 12 and 13: key assignment of a new XROM round-trips (S6) |
 
 **Results so far (2026-10-05).** S1–S3 arrived as `dm41x_base.d41`, `dm41x_lkaoff.d41`, `dm41x_lkan.d41` (LKAON), `dm41x_fast.d41` and `dm41x_slow.d41`. All five, and `dm41xn.dm41`, load with the DM41X profile and round-trip identically after normalising whitespace. Compared with each other:
 
@@ -172,17 +186,37 @@ FAST and SLOW move the low nibbles of e to `016fff` while LKAON stays in force a
 
 So RETPFL does disturb WW and PPP, and retyping a file back does not restore them. The file count did not change (22 each time), so neither field is a file count after a RETPFL. Treat both as opaque calculator working values: round-trip them byte for byte, never recompute them from the file list, and soften the "PPP = number of files" sentence in `docs/extended_memory.md`. The Q register's last byte also tracks the type just passed to RETPFL (04, 02, 06), which is consistent with the X value at the time.
 
+**S5 results (2026-10-05).** `xrom.d41` and `xrom.raw` hold `LBL "DM41X"` followed by ED$, X<I>Y, TRNG, then the 16 DM41X-module functions in the order of `xrom.txt`; `xrom.txt` was typed by hand to mirror what was keyed in. `xrom.d41` was made on a DM41X, loads with the same contents on a DM41XN, loads with the DM41X profile here and round-trips identically after normalising whitespace.
+
+- **The 16 functions are XROM 26,38 … 26,53 in exactly hp41uc's order:** ABSP 38, AINT 39, ASWAP 40, CLAC 41, CLEM 42, FAST 43, FILL 44, FLCOPY 45, FLHD 46, FLTYPE 47, LKAOFF 48, LKAON 49, RENMFL 50, RETPFL 51, SLOW 52, WORKFL 53 (bytes `A6 A6` … `A6 B5`). X<I>Y is `A6 7F` (25,63) and TRNG is `A6 A4` (26,36), as in `dm41xn.dm41`.
+- **Verified in a scratch copy** with the 18 names (the 16, X<I>Y, TRNG) added to `functions.py`: `xrom.txt` compiles to the same instruction bytes as `xrom.raw` and the program in `xrom.d41`. Only the END differs, as expected: the compiler writes a placeholder END (`C0 00 0D`), while the calculator's END (`CA 06 09`) carries the chain link. The `.raw` file also has one trailing byte (`9D`) that the program in memory does not.
+- **ED$ is the DM41X's name for ED.** The DM41X manual (§3.8.4) says the ED function was renamed ED$ to signal lower-case and special-character support, "same XROM code of course": ED$ is XROM 25,51, which `functions.py` names `ED`. `xrom.txt` as typed does not compile today (`unrecognized instruction 'ED$'`). Decision (Mike, 2026-10-05): the canonical name stays `ED`, and Phase 1 adds `ED$` as an accepted alias for 25,51.
+- **CRT? is dropped from the first release.** XROM 25,00 is a stealth function header that cannot be keyed into a program or assigned to a key by normal means (Mike), so it only matters for hand-edited state files. It is parked.
+
+**S6 results (2026-10-06).** `dm41x_xrom_keys.d41` holds three Key Assignment Register entries, all unshifted: LKAON on key 11 (`A6 B1`, key byte `01`), LKAOFF on key 12 (`A6 B0`, `11`) and ED$ on key 13 (`A6 73`, `21`). It loads with the DM41X profile and round-trips identically after normalising whitespace.
+
+- **The existing encoding formulas hold for XROMs 25 and 26:** `byte1 = 0xA0 + xrom÷4` and `byte2 = (xrom mod 4)<<6 | fn` give `A6 B0` for LKAOFF (26,48), `A6 B1` for LKAON (26,49) and `A6 73` for ED$ (25,51), and the key bytes follow the usual `16*(N-1) + M`. The new XROMs need no special handling in the key-assignment code, only their entries in `functions.py` (phase 1).
+- **KEYFLAGS:** the bits for keys 11, 12 and 13 are set in register R, and register e (shifted) is clear.
+- **An empty entry sits at the front of the buffer:** the first slot of the register at 0xC0 is `000000`, probably a fourth assignment that was later cleared. The decoder skips it and the round trip preserves it, so nothing needs fixing.
+- **Today** `list_assignments()` shows the two new entries as `0xA6 0xB0` and `0xA6 0xB1`. After phase 1 they must show as LKAOFF and LKAON, which is the phase 3 round-trip test (see Phase 1, Tests).
+
+**S8 results (Mike, 2026-10-06).** On the DM41X, EMROOM and EMDIR both report **600** registers free when XM is empty. After loading `dm41x_manyfiles.dm41` (59 files across all three regions), EMROOM reports **5**.
+
+- **Both readings match the DM41L formula applied to the DM41X profile.** Empty: 603 raw registers (127 + 238 + 238) − 1 (FF sentinel) − 2 (next-file reserve) = 600. With the 59 files: the files' `num_registers` sum to 477, plus 2 per file (118) is 595, and 600 − 595 = 5.
+- **So the per-file cost of 2 registers is the same in all three regions.** Files in the upper regions cost no extra, and the gaps between regions are invisible to the count.
+- **Consequence for the Overview tab (phase 3, step 3):** replace the DM41L constants with `profile.xm_raw_registers − 1 − 2`. `dm41x_manyfiles.dm41` becomes the test fixture, expecting 600 total and 5 free. EMDIR was not read with the file loaded, and only EMROOM was; EMDIR matched EMROOM when empty.
+
 **Exit gate:** each sample loads with `Memory.from_string(text, profile=DM41X)`, and the S2/S3 diffs are written down (identical, or the bytes that move).
 
 ## Phase 1 · XROM table
 
 Scope is the first-release decision: the DM41L's 95 plus the DM41X's additions. Nothing from other modules.
 
-- Add the 18 entries (the 17 plus X<I>Y; CRT? only if S5 shows it executes) to `memory/functions.py`. X<I>Y and TRNG are already confirmed by `dm41xn.dm41`; the other 16 get confirmed by S5 before they merge. `mnemonics.py` builds its registry from that table, so import, aliases, "did you mean" and the key-assignment name list follow automatically. At this size, with names and codes also printed in the DM41X manual, it is small enough to type by hand and check against hp41uc; no bulk import of hp41uc's table is needed.
-- Give `DeviceProfile` a way to say which XROMs a model has built in: the DM41L's 95, and the DM41X's 95 plus the additions. Phase 2 needs this. Files open with the DM41X profile everywhere (phase 3), so the registry always includes the additions.
-- Mark the additions as DM41X-only in the Key Assignments dropdown and in the generated mnemonic reference, grouped under their hp41uc section headers ("-DM 41X-").
+- Add the 18 entries (X<I>Y, TRNG and the 16 DM41X-module functions) to `memory/functions.py`. All 18 are confirmed by `dm41xn.dm41` and `xrom.d41`/`xrom.raw` (S5). Add `ED$` as an accepted spelling of 25,51 (the DM41X's name for ED, manual §3.8.4) as a Layer 2 entry in `mnemonic_dialects.py` with that manual as its source; the canonical name stays `ED`. `mnemonics.py` builds its registry from that table, so import, aliases, "did you mean" and the key-assignment name list follow automatically. At this size, with names and codes also printed in the DM41X manual, it is small enough to type by hand and check against hp41uc; no bulk import of hp41uc's table is needed.
+- **One function table, availability in the profile.** The table of names and codes stays in `functions.py` and is not split by model, because every state file opens with the DM41X profile and the registry must always resolve the additions (a text using `LKAOFF` must compile whatever profile is active). Give each entry a "since" flag (original CX modules, or DM41X). `DeviceProfile` then exposes `builtin_xroms`, derived from that flag: the DM41L's 95, and the DM41X's 95 plus the 18 additions. Phase 2 uses it, and the DM41X-only marks below come from the same flag, so nothing is stored twice.
+- Mark the additions as DM41X-only in the Key Assignments dropdown and in the generated mnemonic reference, grouped under their hp41uc section headers ("-DM 41X-"), taken from the same "since" flag.
 - Regenerate `docs/function_table.md` and the mnemonic reference (`mnemonic_doc.py`), and update `docs/mnemonics.md`.
-- **Tests.** `dm41xn.txt` written with names (`X<I>Y`, `TRNG`) compiles to the bytes in `dm41xn.dm41` and decompiles to `XROM 25,63 ;X<I>Y` and `XROM 26,36 ;TRNG` (already checked in a scratch copy; this makes it permanent). The 16 DM41X-module functions compile to the exact bytes in `dm41x_xroms.raw` (S5) and decompile back; every new name resolves by canonical, case and space variants; a key assignment of a new XROM round-trips (S6); a one-off diff of modules 25 and 26 against `hp41ucg.h` shows agreement for every function except the new X<I>Y.
+- **Tests.** `dm41xn.txt` written with names (`X<I>Y`, `TRNG`) compiles to the bytes in `dm41xn.dm41` and decompiles to `XROM 25,63 ;X<I>Y` and `XROM 26,36 ;TRNG` (already checked in a scratch copy; this makes it permanent). The 16 DM41X-module functions compile to the exact bytes in `dm41x_xroms.raw` (S5) and decompile back; every new name resolves by canonical, case and space variants; a key assignment of a new XROM round-trips (S6); a one-off diff of modules 25 and 26 against `hp41ucg.h` shows agreement for every function except the new X<I>Y. `DM41L.builtin_xroms` is exactly the original 95 and `DM41X.builtin_xroms` is those plus the 18.
 
 **Exit gate:** the full suite passes, the S5 program compiles to the exact RAW bytes, and decompiling them gives hp41uc's canonical names.
 
@@ -191,7 +225,7 @@ Scope is the first-release decision: the DM41L's 95 plus the DM41X's additions. 
 - New function in the core, `check_profile_fit(memory, profile)`, returning findings, each with a level (`error`, `warning`), a short message and a location. Pure and synchronous, like the rest of the core.
   - **Error:** any XM data in a region the target profile does not have (for the DM41L, anything from 0x301). Also a `.d41` with more XM than the DM41L can load.
   - **Warning:** any XROM the DM41L does not have built in, found in a program or key assignment: the DM41X's additions (26,36, 26,38–26,53, X<I>Y) and any XROM outside modules 25 and 26, since a DM41L cannot load other modules. List the program and step (via `opcode_scan.iter_instructions`) or the key.
-- Wire it into DM41L_Explorer's **Send Dump** only: an error blocks the upload and says why; warnings show a confirmation that lists what will not run on a DM41L. Open and Save do no checking.
+- Wire it into the app's **Send** action only (today "Send Dump to DM41L"; step 8 of phase 3 renames it). The profile it checks against is the one **declared by the connection driver**, never inferred from the transport: the serial driver declares the DM41L, which is true today. The DM41XN also has a serial interface (later release), so a DM41XN driver would declare its own profile and the check stays as it is. An error blocks the upload and says why; warnings show a confirmation that lists what will not run on a DM41L. Open and Save do no checking.
 - Tests use `dm41x_manyfiles.dm41` (error) and `dm41x_xroms.d41` (warning, program and key assignment), plus a DM41L fixture that must produce no findings.
 
 **Exit gate:** sending `dm41x_manyfiles.dm41` to a DM41L is refused with a clear message; sending `dm41x_xroms.d41` lists the programs affected and proceeds on confirmation.
@@ -200,13 +234,20 @@ Scope is the first-release decision: the DM41L's 95 plus the DM41X's additions. 
 
 Make the existing tabs work, in this order, on `dm41x_manyfiles.dm41` and the S-samples. Each tab gets a test that fails if it still assumes two regions or 0x2EF.
 
-1. Open/Save use `.d41` as well as `.dm41` (until then, `.d41` samples are renamed to `.dm41` by hand, and nothing else about them changes) and keep the file's own extension on Save. Files open with the DM41X profile in every app, since it is a superset of the DM41L's, so a large state opens, displays and saves in DM41L_Explorer without loss. A dump read from a live DM41L over serial still uses the DM41L profile. The phase 2 check applies only at upload.
+1. Open/Save use `.d41` as well as `.dm41` (until then, `.d41` samples are renamed to `.dm41` by hand, and nothing else about them changes) and keep the file's own extension on Save. Files open with the DM41X profile in every app, since it is a superset of the DM41L's, so a large state opens, displays and saves in DM41_Explorer without loss. A memory state read from a live DM41L over serial still uses the DM41L profile (the serial driver declares it, see phase 2). The phase 2 check applies only at upload. Whether a `.dm41` file should also display with the DM41L profile is an open question below.
 2. **XM Files** and **Hex View**: walk three regions and show addresses up to 0x3EF (`profile.display_end`).
 3. **Overview**: free/total XM from the profile instead of the DM41L constants; DM41X numbers confirmed by S8.
 4. **XM file types**: decide from S4 what `XMFile` does with types 4–15 (show them as `@` (the calculator's label) with the numeric type, keep the data untouched, never raise from `list_files()`).
 5. **Programs**, **Data Registers**, **Alarms**, **Key Assignments**, **Flags**: smoke-test each on a DM41X dump (flag 31 shows as DMY in Flags). Fix whatever fails.
 6. **LKAOFF/FAST**: FAST/SLOW are not in the state file, and the calculator reverts to FAST when a state is loaded (S3 and S3b). LKAOFF is: it shows as cleared KEYFLAGS bits for the top two rows of keys while their assignments remain. Show that state in the Key Assignments tab (and document it in `docs/key_assignments.md`), keep the flags untouched on save. S2c–S2h are done, and show nothing else in the state records LKAOFF. Treat register e's low nibbles and the P/Q scratch registers as opaque and round-trip them byte for byte.
 7. Round-trip gate: every `.d41` and `.dm41` sample loads and saves identically after normalising whitespace (`dump_format.md` lists the two normalisations).
+8. **Terminology: "memory state", not "memory dump".** "Dump" comes from the DM41L's serial origins; the DM41X manual says "state file", and the app now handles every model. About 400 lines in about 50 files use the word (counted 2026-10-06, excluding fixtures, PDFs and build output). Do this as a mechanical change in its own commit, before the tag, and go by reading each hit, never by blind search-and-replace: `config.py` calls `json.dump`, which must not change.
+   - **Visible text first:** the menu labels `Open Dump...`, `Save Dump`, `Save Dump As...`, `Get Dump from DM41L` and `Send Dump to DM41L` (`gui/app.py`), the shortcut table in `README.md`, the Help dialog, message boxes and status text (`Memory dump written to ...`, `Could not load dump`, `Send Dump to Calculator`), and the file-dialog type name (`DM41L dump` becomes one entry for `*.dm41` and `*.d41`). Exact labels are an open question below.
+   - **Docs:** `README.md`, `CONTRIBUTING.md`, `resources/dist_readme.txt` and `docs/*.md`. Rename `docs/dump_format.md` to `docs/state_format.md` and fix every link to it (including step 7 above and Sources below). Leave dated records alone (`docs/dm41x_first_look_2026-10-04.md`, the results sections of this plan, git history): they describe what was true when written.
+   - **Code:** docstrings, comments and log messages, then identifiers (`open_dump_file()` and similar, and the test names), updating callers and tests together. The serial protocol and the calculator's own commands stay as they are, since they describe the hardware; the `s` and `l` command docstrings in `engine/commands.py` may be reworded.
+   - **Not here:** the web decoder's "Dump from calc:" window belongs to SwissMicros. Raise it in phase 5 as a UI change in the pull request.
+   - **Check:** the full suite passes after each batch, and `grep -ri dump` over the sources leaves only reviewed exceptions (`json.dump`, hardware command descriptions, dated records), listed in the commit message.
+9. **One executable.** Ship a single app named DM41_Explorer. Check each of these for the old name and rename as needed: `src/dm41l.spec`, `src/dm41lversion.py`, `src/build.sh`, `.github/workflows/release.yml` (and `test.yml`), `resources/dist_readme.txt`, the window title and About box, `README.md` and `CONTRIBUTING.md`. Build once with `build.sh` and run the result to prove the artifact names and version file still work. The connection driver declares its target profile (DM41L for the serial driver) and Send uses it for the phase 2 check; nothing else in the app depends on the model.
 
 ## Phase 4 · License and tag
 
@@ -222,10 +263,10 @@ Follow the decoder's existing sync procedure (`reference/README.md`, `tests/orac
 1. Re-vendor at the tagged release, update `provenance.json`, and exclude the GUI and serial engine.
 2. Add the new fixtures (`dm41x_manyfiles.dm41`, the S-samples) to `tests/oracle/fixtures/` and regenerate every golden.
 3. Port `device_profile.py` to TypeScript. `constants.ts` and `memory.ts` currently hard-code two regions (`XM_REGIONS[0]`, `[1]`).
-4. Add the 17 DM41X XROMs, X<I>Y (and CRT? once confirmed) to `functions.ts`.
+4. Add the 18 DM41X XROMs (the 16, X<I>Y and TRNG) and the `ED$` alias to `functions.ts`.
 5. Port `check_profile_fit`.
 6. `mnemonics.py`, `mnemonic_dialects.py` and `program_text.py` are not ported: the site compiles and decompiles with hp41uc as WebAssembly. Add divergence rows for them.
-7. **hp41uc needs one small C change.** TRNG and the 16 DM41X-module functions are already in `hp41ucg.h` and in the compiled `hp41uc.wasm` (confirm by compiling `dm41x_xroms.txt` through the WASM), but **X<I>Y (25,63) is not**: add it to `hp41ucg.h` as a small, separate pull request (GPL, no obligation upstream), and CRT? too if S5 shows it executes.
+7. **hp41uc needs one small C change.** TRNG and the 16 DM41X-module functions are already in `hp41ucg.h` and in the compiled `hp41uc.wasm` (confirm by compiling `xrom.txt` through the WASM; it also needs `ED$` — check whether hp41uc accepts it), but **X<I>Y (25,63) is not**: add it to `hp41ucg.h` as a small, separate pull request (GPL, no obligation upstream). CRT? is parked.
 
 **W2 · Web UI**
 
@@ -259,12 +300,16 @@ The file-manager work from the earlier plan is not abandoned, just later: DM41X_
 | The two `functions` tables drift (Python, TypeScript, hp41uc) | Wrong names or opcodes on one side | One-off diff of modules 25 and 26 against `hp41ucg.h` in phase 1; goldens in phase 5 |
 | Re-vendoring brings in many unported modules | Divergence log grows | Port only the core listed in W1; add divergence rows for the rest |
 | DM41XN differs from the DM41X | Shared-XROM assumption fails | Partly settled: `dm41xn.dm41` confirms X<I>Y and TRNG on a DM41XN. The 16 DM41X-module functions are untested there |
+| A serial connection is not always a DM41L | A DM41XN over serial would be given DM41L limits | The connection driver declares the target profile; the check never infers it from the transport |
+| Blind search-and-replace of "dump" | `json.dump` in `config.py`, and any other unrelated use, breaks | Step 8 goes by reading each hit; the suite runs after each batch |
 
 ## Open questions
 
-- [ ] The web app has no model selector, but a DM41L `.dm41` dump will show DM41X-sized XM totals. Acceptable, or should the extension pick the display profile (`.d41` → DM41X, `.dm41` → DM41L)?
+- [ ] With one executable and no model selector, a DM41L memory state opened from a `.dm41` file will show DM41X-sized XM totals (600 registers), in the desktop app and in the web app. Acceptable, or should the extension pick the display profile (`.d41` → DM41X, `.dm41` → DM41L), with the DM41L profile also used while connected over serial? Opening and saving would still never be restricted.
+- [ ] Menu labels after the rename: the full "Open Memory State...", "Save Memory State", "Get Memory State from DM41L" and so on, or the shorter "Open State..." (closer to the DM41X manual's "Load State")?
 - [ ] GPLv3 for DM41_Explorer: decided yes or no, and before or after the tag?
-- [ ] Optional: can you run the S5 program on the DM41XN prototype as well, to confirm the 16 DM41X-module functions there? (X<I>Y and TRNG are already confirmed by `dm41xn.dm41`.)
+- [x] `xrom.d41` was made on a DM41X and loads with the same contents on a DM41XN (Mike, 2026-10-05), so the codes are confirmed on both.
+- [x] ED$ vs ED: the canonical name for XROM 25,51 stays `ED` (Mike, 2026-10-05). `ED$` is accepted on import as an alias and the Explorer decompiles to `ED`.
 
 ## Sources
 

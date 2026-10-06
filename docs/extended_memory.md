@@ -52,8 +52,10 @@ DM41L emulator.
 
 The DM41X has the full complement of two Extended Memory modules: 603 usable
 registers across its three regions (127 + 238 + 238), which by the same
-arithmetic is 600 as reported by EMDIR with an empty directory. (Not yet
-checked against EMDIR on a real DM41X.)
+arithmetic is 600 as reported by EMDIR with an empty directory. Confirmed on a real
+DM41X (2026-10-06): EMROOM and EMDIR both report 600 with XM empty, and EMROOM
+reports 5 with `dm41x_manyfiles.dm41` loaded, which is 600 minus (477 file
+registers + 2 for each of its 59 files).
 
 ## 1. Special XM Registers
 
