@@ -1,7 +1,7 @@
 """
 Key Assignments tab: two synchronized keypad-shaped grids ("DM41L" and
-"HP41", docs/key_assignments.md sec 6 item 4), each on its own sub-tab
-(issue #39 -- DM41L first, HP41 second), for viewing and editing
+"DM41X", docs/key_assignments.md sec 6 item 4), each on its own sub-tab
+(issue #39 -- DM41L first, DM41X second), for viewing and editing
 key assignments -- both the built-in/peripheral kind (sec 4.2, stored in
 the Key Assignment Registers) and global-label/program assignments (sec
 4.6, stored inside the program's own header instead). Both grids render
@@ -53,15 +53,15 @@ logger = logging.getLogger(__name__)
 # the same 34 assignable keys -- see the docs section for why they're laid
 # out differently (the DM41L's actual compact keyboard relocates several
 # keys relative to the classic HP-41's row layout).
-HP41_LAYOUT = [
-    [11, 12, 13, 14, 15],
-    [21, 22, 23, 24, 25],
-    ["SHIFT", 32, 33, 34, 35],
-    [41, 41, 42, 43, 44],
-    [51, 52, 53, 54],
-    [61, 62, 63, 64],
-    [71, 72, 73, 74],
-    [81, 82, 83, 84],
+DM41X_LAYOUT = [
+    [11, 12, 13, 14, 15, "ON"],
+    [21, 22, 23, 24, 25, "USR"],
+    ["SHIFT", 32, 33, 34, 35, "ALPHA"],
+    [41, 41, 42, 43, "DSP", 44],
+    [51, 52, 53, 54, "⬆︎"],
+    [61, 62, 63, 64, "⬇︎"],
+    [71, 72, 73, 74, "PGM"],
+    [81, 82, 83, "CST", 84],
 ]
 
 DM41L_LAYOUT = [
@@ -73,7 +73,7 @@ DM41L_LAYOUT = [
 
 # Sub-tab names for the two layouts (issue #39), in display order.
 DM41L_TAB = "DM41L"
-HP41_TAB = "HP41"
+DM41X_TAB = "DM41X"
 
 UNASSIGNED_TEXT = "gray50"
 UNASSIGNED_FG = ("gray85", "gray24")
@@ -104,6 +104,10 @@ STATIC_CELL_BG_COLORS = {
     "ON": NON_ASSIGNABLE_BG_COLOR,
     "USR": NON_ASSIGNABLE_BG_COLOR,
     "PGM": NON_ASSIGNABLE_BG_COLOR,
+    "DSP": NON_ASSIGNABLE_BG_COLOR,
+    "CST": NON_ASSIGNABLE_BG_COLOR,
+    "⬆︎": NON_ASSIGNABLE_BG_COLOR,
+    "⬇︎": NON_ASSIGNABLE_BG_COLOR,
 }
 
 # Label text colors to match each background above -- dark text reads on
@@ -116,6 +120,10 @@ STATIC_CELL_TEXT_COLORS = {
     "ON": ("gray90", "gray10"),
     "USR": ("gray90", "gray10"),
     "PGM": ("gray90", "gray10"),
+    "DSP": ("gray90", "gray10"),
+    "CST": ("gray90", "gray10"),
+    "⬆︎": ("gray90", "gray10"),
+    "⬇︎": ("gray90", "gray10"),
 }
 
 # Sized for the actual function-name lengths in memory/functions.py (median
@@ -151,7 +159,7 @@ def _count_all_assignments(memory: Memory) -> int:
 
 
 class KeyAssignmentsTab(ctk.CTkFrame):
-    """Renders the HP41/DM41L key-assignment grids for a Memory object.
+    """Renders the DM41X/DM41L key-assignment grids for a Memory object.
     Call `render(memory)` whenever the buffer changes."""
 
     def __init__(self, master, on_change=None, **kwargs):
@@ -161,11 +169,11 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         self._grids_built = False
         # (key_number, shifted) -> list of CTkButton, populated once by
         # _build_grid() and reused by _refresh_buttons() from then on. A
-        # list, not a single button, because the DM41L and HP41 layouts
+        # list, not a single button, because the DM41L and DM41X layouts
         # both reference the same 34 key numbers (just arranged
         # differently) -- each key number maps to one button per grid, and
         # both need to stay in sync. Order within each list follows grid
-        # build order in render(): DM41L button first, HP41 second.
+        # build order in render(): DM41L button first, DM41X second.
         self._key_buttons = {}
 
         _, self._header_label = build_tab_header(self)
@@ -183,13 +191,13 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         # Issue #39: one sub-tab per keyboard layout, instead of both
         # grids stacked in a single scrolling frame. The DM41L layout comes
         # first since it's the keyboard actually in the user's hand; the
-        # classic HP41 layout is second. CTkTabview keeps whichever sub-tab
+        # classic DM41X layout is second. CTkTabview keeps whichever sub-tab
         # was last selected across render() calls, since render() never
         # rebuilds the tabview itself (see the module docstring).
         self._layout_tabs = ctk.CTkTabview(self)
         self._layout_tabs.pack(fill="both", expand=True, padx=8, pady=(0, 8))
         self._dm41l_frame = self._build_layout_tab(DM41L_TAB)
-        self._hp41_frame = self._build_layout_tab(HP41_TAB)
+        self._hp41_frame = self._build_layout_tab(DM41X_TAB)
 
         # A throwaway button, never packed/gridded, just to read back
         # CustomTkinter's own theme defaults for fg_color/text_color --
@@ -205,7 +213,7 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         """Adds one sub-tab to self._layout_tabs and returns the empty
         frame its keypad grid will be built into (by _build_grid(), on the
         first render()). Each sub-tab gets its own scrollable frame -- the
-        8-row HP41 grid can be taller than a small window. Having one
+        8-row DM41X grid can be taller than a small window. Having one
         bind_touchpad_scroll() per frame is safe: its handler skips any
         frame that isn't currently mapped, and CTkTabview unmaps every
         sub-tab except the selected one."""
@@ -241,7 +249,7 @@ class KeyAssignmentsTab(ctk.CTkFrame):
 
         if not self._grids_built:
             self._build_grid(self._dm41l_frame, DM41L_LAYOUT)
-            self._build_grid(self._hp41_frame, HP41_LAYOUT)
+            self._build_grid(self._hp41_frame, DM41X_LAYOUT)
             self._grids_built = True
 
         self._refresh_buttons()
