@@ -31,92 +31,111 @@ serial console.
 
 ## Using DM41_Explorer
 
-### Launching the app for the first time
+DM41_Explorer supports two modes of operation: Serially connected (for the
+DM41L) or disk-based (for the DM41X or for editing saved state files). 
 
-DM41_Explorer starts offline: it never touches a serial port until you ask it
-to. You can work on memory state files without a calculator at all, or connect
-to your DM41L whenever you like.
+## Connecting to a DM41L
 
-To prepare your DM41L for connection, you must enable the serial console, which
-is activated by turning the calculator off, then pressing \<ON\> and "C" at the
-same time, then releasing them. 
+A serial connection is necessary only for data transfer to or from the DM41L.
+To configure the device for connectivity, power the calculator off and then
+press and release the “ON” and “C” keys simultaneously to enable the serial
+console. 
 
-Once your calculator is in SERIAL CONSOLE mode and connected to your computer
-with a USB cable, choose Connect > Connect / Reconnect... (Ctrl+K, or Cmd+K on
-a Mac). You will see a dialog box similar to this one:
+Once the calculator is set to SERIAL CONSOLE mode and a USB connection is
+established with your computer, choose “Connect / Reconnect…” from the
+“Connect” menu (Ctrl+K or Cmd+K on macOS). A dialog box resembling the
+following will be displayed:
 
 ![Connection](resources/screenshots/connection.png)
 
-Select the appropriate serial port and click connect. Once connected, the
-calculator's memory is read in (unless you already have a state loaded or
-modified) and you will see it in the Overview tab.
+Choose the appropriate serial port and press the Connect button. Upon
+connection, the calculator’s memory is retrieved—provided no state has been
+previously loaded or modified—and displayed in the Overview tab.  
+
+When connecting to the DM41L, DM41_Explorer loads the current memory contents
+if no state has been opened or altered. To reload a state from the calculator
+at a later time, use the Connect menu.
 
 #### Which serial port do I use? 
 
-Good question. You may have to do some trial-and-error to figure this out. If
-you're not sure if the correct serial port is even listed, try clicking the
-"Rescan" button. Once you've successfully connected, however, DM41_Explorer
-will save the port you used and preselect it in this dialog the next time.
+If you are unsure which serial port to select, follow these steps to identify
+the correct one:
 
-#### Launching without the DM41L
+1. Disconnect the calculator.
+2. Click the "Rescan" button.
+3. Note the available serial ports.
+4. Reconnect the calculator.
+5. Click "Rescan" again.
+6. Identify the newly listed serial port.
 
-If you want to work on an existing memory state file (or create a new one),
-just open it from the File menu; there is nothing to cancel. If, later, you
-decide to connect to the DM41L, go to the Connect menu and select
-Connect / Reconnect...
+Once a successful connection is established, DM41_Explorer will automatically
+save and preselect this port for future sessions.
 
-#### Loading and saving memory state files
 
-When you connect to the DM41L, DM41_Explorer loads the current contents of the
-calculator's memory if you have not already opened or changed a state. To load
-a state from the calculator again later, use the Connect menu.
+## Working in Disk-Based Mode
 
-To write a memory state to the calculator, the Connect menu has you covered
-there, too.
+The DM41X uses a disk-based USB interface and supports the storage of multiple
+state files. To generate a state file on the DM41X, press SETUP, select “File,”
+and choose “Save DM41 state file.” This procedure must be completed before
+DM41_Explorer can load the calculator’s state.  
 
-The File menu contains options to load an existing memory file from disk, to
-save the currently loaded state, and for creating a blank one to work on.
+Once a state file is stored on the device, connect the DM41X to your computer,
+press CST, and select “USB Disk” from the calculator menu; the unit will appear
+as a removable drive.  
+
+To load a state file into DM41_Explorer, select “Load State” from the “File”
+menu. To transfer a state file back to the calculator, use the “Save State”
+command. Eject the disk from the computer when you are finished.
+
+The DM41X can store multiple state files. To load a particular state file onto
+the calculator, eject the device from the computer, press SETUP, select “File,”
+and choose “Load DM41 State File.”  
+
+Additionally, the “File” menu may be used to load and save state files from
+other directories on your computer.
 
 ### Overview Tab
 
 ![Overview](resources/screenshots/overview.png)
 
-The Overview tab shows a quick summary of either the state of the DM41L or the
-currently loaded memory state. It is almost entirely read-only, except for the
-address of the R00 register, which you can adjust if you want to experiment
-with synthetic programming.
+The Overview tab shows a quick summary of either the state of the currently
+loaded memory state. It is almost entirely read-only, except for the address of
+the R00 register, which you can adjust if you want to experiment with synthetic
+programming.
 
 ### Flags Tab
 
 ![Flags](resources/screenshots/flags_view.png)
 
 A complete list of the all the user and system flags and their current values.
-Please note that many of the system flags are used by the DM41L itself during
-normal operation, while others pertain to peripherals and will have no effect on the
-DM41L. Your Mileage May Vary.
+Some of the flags are available for use by HP41 applications, some control
+system behavior, and others pertain to peripherals and will have no effect on
+the DM41L. Some flags are automatically reset each time the calculator is
+turned on.
 
 ### Programs Tab
 
 ![Programs](resources/screenshots/program_view.png) 
 
-The programs tab shows a list of the apps currently loaded into the DM41L's
-program memory. From this view you can export and remove loaded programs, and
-import new ones.
+The programs tab shows a list of the apps currently loaded into the program
+memory portion of the loaded state file. From this view you can export and
+remove loaded programs, and import new ones. Programs can be imported or
+exported in RAW, TXT, or DAT format. DM41 Explorer also supports "PPC" format
+which is the same as DAT format but with line breaks.
 
 ### Key Assignments Tab
 
 ![Key Assigns - DM41L layout](resources/screenshots/key_assigns_dm41l.png)
 
-![Key Assigns - HP41 layout](resources/screenshots/key_assigns_hp41.png)
+![Key Assigns - DM41X layout](resources/screenshots/key_assigns_hp41.png)
 
 The Key Assignments tab allows you to view and edit the user key assignments in
 the loaded state. It has two sub-tabs: the first shows the keys in the DM41L
-layout, and the second in the original HP41 layout. Both show the same
-assignments, so an edit made on either one appears on the other. Clicking on a
-key will let you edit that key's current assignment - you can either select
-one of the built-in HP41CX functions, or one of the currently loaded programs,
-or enter in two hexadecimal bytes if you want to experiment with synthetic
-programming.
+layout, and the second in the DM41X layout. Both show the same assignments, so
+an edit made on either one appears on the other. Clicking on a key will let you
+edit that key's current assignment - you can either select one of the built-in
+HP41CX functions, or one of the currently loaded programs, or enter in two
+hexadecimal bytes if you want to experiment with synthetic programming.
 
 ### Data Registers Tab
 
@@ -145,9 +164,9 @@ region. It is useful for studying how HP41 memory is organized.
 
 ## Keyboard Shortcuts
 
-DM41_Explorer is menu-driven, and every shortcut below mirrors a menu item
-(or, for Export/Import, a tab's header button). `Ctrl` is used on Windows and
-Linux; macOS uses `Cmd` for the same shortcuts.
+DM41_Explorer is menu-driven, and every shortcut below mirrors a menu item (or,
+for Export/Import, a tab's header button). `Ctrl` is used on Windows and Linux;
+macOS uses `Cmd` for the same shortcuts.
 
 | Action | Windows / Linux | macOS |
 | --- | --- | --- |
@@ -173,7 +192,7 @@ a no-op.
 
 There are many markdown files in the [`docs`](https://github.com/mwheinz/DM41_Explorer/tree/main/docs) directory. These represent my
 research notes from developing this project. Hopefully they will be useful to
-you if you are curious about the internals of the HP41 and the DM41L emulator.
+you if you are curious about the internals of the HP41 and the DM41L/X emulator.
 
 Most of my notes are derived from 40 year old memories and classic HP41 texts
 like *Synthetic Programming* by Jonathan Wickes, supplemented by
@@ -246,15 +265,8 @@ these.
 ## Contributing
 
 Bug reports, feature requests, and pull requests are welcome — see
-[`CONTRIBUTING.md`](CONTRIBUTING.md) for how to get set up, run the
-tests, and what makes a good bug report or PR.
-
-## Known limitations
-
-- Alarms aren't decoded and cannot be altered yet.
-- Program memory is listed (names, END markers, raw chain distances) but
-  not decoded into actual instructions, and can't be created or edited
-  from this tool yet.
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for how to get set up, run the tests, and
+what makes a good bug report or PR.
 
 ## Running the tests
 
