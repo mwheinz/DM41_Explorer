@@ -1,234 +1,273 @@
-# DM41_Explorer Project Plan
+# DM41X Support Plan
 
-2026-09-28 · Michael Heinz
+2026-10-05 · Michael Heinz (drafted with Claude)
 
-Grow DM41_Explorer (formerly DM41L_Explorer) into one repository that builds three apps, DM41L_Explorer, DM41X_Explorer and DM41XN_Explorer, on a shared core, then port DM41X support to the SwissMicros web decoder (`~/Work/dm41decoder`). The immediate work is DM41X_Explorer: a desktop file manager for the DM41X's USB FAT disk.
+Replaces the 2026-09-28 file-manager-first plan (still in git history, last committed in `ad66d8d`). That plan started from the DM41X's FAT disk. This one starts from the memory module, because everything else depends on it.
 
-## Goal and scope
+## Goal
 
-**Decided:** the repository is **DM41_Explorer** (`~/Work/DM41_Explorer`, github.com/mwheinz/DM41_Explorer), and each model gets its own app named DM41$_Explorer, where $ is L, X or XN: **DM41L_Explorer**, **DM41X_Explorer** and **DM41XN_Explorer**.
+1. Extend the memory module so it handles everything a DM41X can put in a state file: the larger XM (already done), the XROM instructions the DM41X adds (its own module, plus X<I>Y and TRNG), and any DM41X state that turns out to live in `.d41` files.
+2. Make every existing DM41L_Explorer feature work on a `.d41` state file.
+3. Port the result to `~/Work/dm41decoder`, web UI included, as pull requests to SwissMicros.
 
-The core difference is the transport. DM41L_Explorer talks to live memory over a serial console; the DM41X has no serial console and instead exposes 6 MB of internal flash as a FAT USB disk (File › Activate USB Disk). So DM41X_Explorer is a file manager: it opens either the mounted DM41X volume or any local folder holding a copy of its contents (like `DM41X/DM41X_Data`), shows one tab per special folder, and imports, exports and converts files.
+## Decisions (2026-10-05)
 
-**In scope**
+| Topic | Decision |
+| --- | --- |
+| Models | DM41X and DM41XN are treated identically. The extra XROMs are the same on both. |
+| Model detection | None. A `.d41` and a `.dm41` are the same text format, and nothing in the file says which model wrote it except the extension. No auto-detect, no manual override, no model selector in the web app. |
+| Protecting the DM41L | The check runs only when **uploading** a state/dump to a DM41L (Send Dump). XM data that does not fit a DM41L is an **error**. Any XROM the DM41L does not have built in (the DM41X's additions, or an XROM from another module) is a **warning**, because the user may mean to edit the program on the DM41L and replace it. Opening and saving files, including large states, is never restricted. |
+| Revisit | If LKAOFF or FAST turn out to change what is stored in a state file, model detection and the checks above get revisited. |
+| Round trip | `.d41` writes only have to match the calculator's own output after normalising whitespace (trailing spaces, the two-space gap between special-register pairs). |
+| XROM encodings | Look in existing sources first; use calculator test programs only for what they do not cover. |
+| XROM coverage | **First release:** only the XROMs built into the two calculators. The DM41L has just the original HP-41CX modules (Extended Functions/Memory and Time) and cannot load others. The DM41X has those, plus the DM41X module, plus extensions to the CX modules (X<I>Y, TRNG), and can also load ROM modules. Support for additional ROM modules is a **later release** (see the section near the end). |
+| Delivery | Change and test locally, then open pull requests to `dm41decoder`. The first web release has no model selector but must be able to **save modified state files**. |
+| License | Possibly moving DM41_Explorer to GPLv3. No existing license obliges us to push changes back to hp41uc. |
 
-- Browse, copy in/out, rename and delete files in each special folder.
-- Decode and edit the formats that matter most: `.d41` state files, `.raw` programs, `.cst` custom keys.
-- Convert programs between RAW, DAT, TXT (and PPC) using the code already in DM41L_Explorer.
-- Read-only inspection of `.mod`, `.m41`, `.b41` and `.ram` files.
-- Prepare OFF-images (any picture → 400×240 1-bit BMP) and preview screenshots.
-- Safe-write habits for flash: minimal writes, backup-before-change, eject reminder.
-- Port DM41X support to the web decoder: `.d41` and `.cst` reading and editing, and the 600-register XM map, through the decoder's existing pin-and-golden sync.
+## Where things stand
 
-**Out of scope for v1**
+Checked against the repository on 2026-10-05.
 
-- Firmware flashing (dm_tool / dfu-util already cover it).
-- Building `.mod` files from ROM images.
-- Live emulation or talking to the calculator while it is running.
-- A FAT-disk file manager in the browser. The website works on files the user uploads; the desktop app stays the tool for managing the calculator's disk.
+**Already done**
 
-## Supported models
+- `memory/device_profile.py` has a `DM41X` profile with three XM regions (0x40–0xBF, 0x201–0x2EF, 0x301–0x3EF). `Memory.from_string(text, profile=DM41X)` loads `dm41x_manyfiles.dm41`, a real dump whose files span all three regions (`tests/test_xm_three_regions.py`).
+- `tests/data/dm41xn.dm41` (a DM41XN state file saved as `.d41` and renamed `.dm41` so DM41L_Explorer will open it: 331 bytes, header `DM41`) loads unchanged with both the DM41L and DM41X profiles and holds one program, `LBL "AAA"`, X<I>Y, TRNG, END. `dm41xn.txt` is its text listing, `XROM 25,63` and `XROM 26,36`. In a scratch copy, adding all 18 names to `XROM_FUNCTIONS` builds the mnemonic registry without collisions, and `X<I>Y` / `TRNG` as names compile to exactly the bytes in the dump.
+- `memory/mnemonics.py` is the single registry of instruction spellings. It generates the character variants itself, so hp41uc's `SREG?` and `X#NN?` already resolve to the same XROMs as `ΣREG?` and `X≠NN?` (also `SIGMAREG?`, `X!=NN?`, `X<>NN?`). The canonical (export) name of every existing XROM already equals hp41uc's. **The Σ/≠ spellings need no change.**
 
-Three models share one HP-41CX memory model but differ in how they connect, so the code separates the **device profile** (memory map) from the **transport** (serial or disk).
+**Gaps found**
 
-| Model | App | USB transport | Extended memory | Status |
-| --- | --- | --- | --- | --- |
-| DM41L | DM41L_Explorer | Serial console | 1 module, 362 registers | Shipping today; supported by the web decoder |
-| DM41X | DM41X_Explorer | FAT USB disk | 2 modules, 600 registers | The main subject of this plan |
-| DM41XN (tentative name) | DM41XN_Explorer | FAT USB disk and serial | Assumed same as DM41X | Not released; protocol, memory map and file formats unconfirmed |
+1. **The DM41X's XROM additions are missing from `functions.py`.** It has the 95 functions of the two HP-41CX modules (25 and 26), and all 95 agree with hp41uc's names and codes. Missing are 17 functions in module 26 that hp41uc's table (`dm41decoder/Source/hp41ucg.h`) and the DM41X manual (§3.8.5) both list:
 
-Until a DM41XN or its documentation is available, the plan assumes it is a DM41X plus a serial port. Nothing DM41XN-specific gets built on that assumption; the design only makes room for it.
+   | XROM | Functions |
+   | --- | --- |
+   | 26,36 | TRNG (an extension of the CX Time module) |
+   | 26,38–26,53 | ABSP, AINT, ASWAP, CLAC, CLEM, FAST, FILL, FLCOPY, FLHD, FLTYPE, LKAOFF, LKAON, RENMFL, RETPFL, SLOW, WORKFL (the DM41X module) |
 
-## FAT disk and file formats
+   Because both tables already exist, the 16 DM41X-module functions need no reverse engineering, only a sample to confirm them (S5). **Confirmed 2026-10-05** from a real DM41XN dump (`tests/data/dm41xn.dm41` and `dm41xn.txt`, one program calling both): **X<I>Y is XROM 25,63** (bytes `A6 7F`) and **TRNG is XROM 26,36** (`A6 A4`), matching hp41uc for TRNG. hp41uc has no entry for X<I>Y, so one has to be added there too. **CRT?** (stealth header, XROM 25,00) is documented but still needs a sample.
+2. **Nothing stops an oversized state from being sent to a DM41L.** Nothing in the code checks a dump against a profile before upload, so a DM41X state with a third XM region would go out as-is. (Loading and saving such a file is fine and stays unrestricted; `Memory.from_string(text, profile=DM41L)` keeps the third-region registers and writes them back out.)
+3. **XM file types.** `XMFile` only accepts program, data and ASCII headers and raises on anything else. RETPFL can set types 1–15, so a retyped file may make `list_files()` fail.
+4. **Overview totals are DM41L-only.** `gui/overview_tab.py` derives its free-XM number from constants calibrated on a real DM41L (362 registers by EMDIR). The DM41X value is untested.
+5. **The web decoder is two XM regions only.** `src/dm41/constants.ts` hard-codes two regions, and uploads accept only `.txt`, `.dm41` and `.raw`.
 
-Eleven file types live in nine special folders; four are already understood, and `.d41` and `.cst` are the two that must be reverse-engineered before the tool is useful. Each format gets its own `docs/<format>.md`, in the same style as the DM41L docs (`alarms.md`, `key_assignments.md`).
+## Phase 0 · Calculator samples (you)
 
-| Folder | File type | What it holds | Format status | Priority |
-| --- | --- | --- | --- | --- |
-| `/STATE` | `.d41` | Full calculator state: main memory, XM, CPU registers | Known: the same text format as the DM41L `.dm41` dump (`dm41x_first_look_2026-10-04.md`) | 1 |
-| `/PROG` | `.raw` | One program, same as GETP/SAVEP | Known (hp41uc; DM41L_Explorer import/export) | 1 |
-| `/KEYS` | `.cst` | CST menu: 16 keys A–P plus Shift-▲, Shift-▼, Shift-α, each a command name | Decoded from samples: `cst.md` (limits and special characters still untested) | 1 |
-| `/MODS` | `.mod` | Plug-in module ROMs | Known: public MOD1 format; samples confirm 729-byte header + 5,188 bytes per page | 2 |
-| `/STATE` | `.m41` | Module list: filenames + active/inactive flag | Decoded from samples and the manual: `backup_set.md` | 2 |
-| `/BACKUP` | `.b41` | Backup manifest naming its `.cst` `.d41` `.m41` `.ram` siblings | Decoded from samples and the manual: `backup_set.md` | 2 |
-| `/RAM` | `.ram` | Up to 8 RAM Area pages used by modules | Partial: 40,960 bytes, all zero in both samples; layout with real contents unknown (`backup_set.md`) | 3 |
-| `/OFFIMG` | `.bmp` | Images shown while off | Known: 400×240, 1-bit BMP | 2 |
-| `/SCREENS` | `.bmp` | LCD screenshots | Known: BMP | 3 |
-| `/HELP` | `.html` | Built-in help (`41x.html`) | Known: HTML | 3 |
-| root | `param.cfg`, `rtccalib.cfg` | Settings export; RTC correction integer C (−511 to 512) | Partial | 3 |
+These produce the evidence for phases 1–3. Save each into `src/tests/data/` with the name shown. The calculator writes `.d41`; until phase 3 step 1 teaches DM41L_Explorer that extension, copy each state file in with the same name and **`.dm41`** instead (as was done for `dm41xn.dm41`), and the tests refer to the renamed file. The content is identical.
 
-As of 2026-10-04 the samples on hand are `/MODS` (20 files), `/OFFIMG` (25) and `/HELP` (4) in `DM41X/DM41X_Data`, plus in `src/tests/data` a full backup set (`backuptest.*`), `CSTtest.cst` and the real DM41X dump `dm41x_manyfiles.dm41`. Still missing: a `.ram` with real contents, `/PROG` and `/SCREENS` files, and a `.cst` that tests limits and special characters. One **Setup › Settings › Create Full Backup** on the calculator produces a `.b41`, `.cst`, `.d41`, `.m41` and `.ram` together, which is the fastest way to get the rest.
-
-Reverse-engineering follows the method that worked for DM41L alarms and key assignments: change one thing on the calculator, save, diff the bytes, write it down, and confirm against a second sample.
-
-## Architecture
-
-**Decided: share one HP-41 core.** It has three users: DM41L_Explorer, DM41X_Explorer, and the SwissMicros web decoder (`~/Work/dm41decoder`), which is a TypeScript port of DM41L_Explorer's `memory/` package.
-
-**How the web decoder uses the Python today**
-
-- `reference/dm41l-explorer/` is a byte-identical copy of DM41L_Explorer, pinned to one commit (`55ed479`, 2026-09-11) in `tests/oracle/provenance.json`.
-- `tests/oracle/generate.py` imports `memory.*` from that copy and writes expected-output (golden) files for 29 `.dm41` fixtures; `src/dm41/*.ts` must reproduce them exactly.
-- A sync is deliberate: move the pin, regenerate the goldens, port the diff, and log any intended difference in `docs/dm41-divergences.md`.
-- `program_text.py` is not ported; the site uses hp41uc compiled to WebAssembly instead.
-
-So the Python core is the reference implementation and the website is its port. Every DM41X format feature lands in Python first, with fixtures and goldens, and then moves to `dm41decoder` through that sync as a planned phase of this project.
-
-**Rules that keep the core portable** (taken from the decoder's divergence log)
-
-- Pure and synchronous: bytes or text in, objects out. No file paths, tkinter or threads; `from_file`/`to_file` were left unported for exactly this reason.
-- No shared mutable module-level objects; the port had to turn `ZERO_REGISTER`/`EOM_REGISTER` into functions.
-- Exact, stable error messages; the TypeScript tests compare them word for word.
-- Integer arithmetic for byte, address and time values; avoid output that depends on Python's float `repr` or `%g` rounding.
-- Every new format ships with real sample files and a JSON dump view, so `generate.py` can produce goldens for it.
-
-**Where the code lives: decided.** One repository, DM41_Explorer, holds the shared core, the transports, the shared GUI tabs and three thin apps. A suggested layout, to settle in phase 0:
-
-| Directory | Holds | Used by |
+| # | Sample | Answers |
 | --- | --- | --- |
-| `src/memory/` (the core) | Registers, regions, programs, XM, key assignments, alarms, device profiles, `.d41`/`.cst` formats | All three apps; vendored by the web decoder |
-| `src/engine/` | Serial transport | DM41L_Explorer, DM41XN_Explorer |
-| `src/fs/` | Disk transport | DM41X_Explorer, DM41XN_Explorer |
-| `src/gui/` | Shared tabs and dialogs | All three apps |
-| `src/apps/dm41l/`, `dm41x/`, `dm41xn/` | Each app's entry point, device profile choice, model-specific tabs, PyInstaller spec | One app each |
+| S1 | `dm41x_base.d41`: a state saved from a known starting point (for example right after CLEM), with nothing else changed | Baseline for the diffs below |
+| S2 | `dm41x_lkaoff.d41`: S1 plus LKAOFF, saved. Also `dm41x_lkaon.d41` after LKAON | Does LKAOFF change the state file? |
+| S3 | `dm41x_fast.d41`, `dm41x_slow.d41`: S1 saved after FAST, then after SLOW | Does the speed setting change the state file? |
+| S4 | `dm41x_retpfl_before.d41`, `dm41x_retpfl_after.d41`: one XM file saved before and after RETPFL (try a program file retyped as data, and a type above 3) | File type codes 4–15, and whether the header changes |
+| S5 | `dm41x_xroms.d41` and `dm41x_xroms.raw`: one short program using the 16 DM41X-module functions (ABSP … WORKFL) and CRT?, saved as a state and exported as RAW. (X<I>Y and TRNG are already confirmed by `dm41xn.dm41`.) | Confirms 26,38–53, and shows whether CRT? is executable and its code |
+| S6 | `dm41x_xrom_keys.d41`: LKAOFF and one more new function assigned to keys | Key-assignment encoding of the new XROMs |
+| S7 | `dm41x_settings.d41`: S1 resaved with DMY/MDY, CLK24 and flag 26 changed, one at a time | What the manual's "stored in `.d41`" settings look like |
+| S8 | `dm41x_emroom.txt`: the EMROOM and EMDIR readings on a freshly cleared XM (CLEM), and with one known file | The DM41X value for the Overview tab's free-XM number |
 
-For the web decoder, the pinned copy becomes a copy of DM41_Explorer: `provenance.json`'s URL moves to the renamed repo, and `generate.py` keeps importing `memory.*` from `src/`. The app, GUI and transport directories can go on its `excluded_paths` list, since the site ports only the core.
+**Results so far (2026-10-05).** S1–S3 arrived as `dm41x_base.d41`, `dm41x_lkaoff.d41`, `dm41x_lkan.d41` (LKAON), `dm41x_fast.d41` and `dm41x_slow.d41`. All five, and `dm41xn.dm41`, load with the DM41X profile and round-trip identically after normalising whitespace. Compared with each other:
 
-**Transports.** Two transports cover all three models:
-
-- **Serial**: DM41L_Explorer's `engine/` (`SerialManager`, `CommandEngine`, get/send memory dump). The web decoder already has a WebSerial port of it in `src/serial/`. If the DM41XN uses the DM41L's serial protocol, both reuse it unchanged.
-- **Disk**: the new `fs/` layer, reading and writing the FAT volume or a local copy of it.
-
-Each app is then a device profile plus its transports: DM41L_Explorer uses serial, DM41X_Explorer uses disk, and DM41XN_Explorer offers both for one calculator. Tabs that don't depend on the transport (Programs, Data Registers, XM Files, Key Assignments, Alarms, Flags, Hex View) live once in `src/gui/`.
-
-**Memory map changes.** The DM41X is an HP-41CX with two extended memory modules, so XM grows from 362 to 600 registers. Today `constants.py` hard-codes `XM_REGIONS = [(0x40, 0xBF), (0x201, 0x2EF)]` and the display range stops at 0x2EF. The core needs:
-
-- A device profile (DM41L: 1 module; DM41X: 2 modules) that adds the region 0x301–0x3EF and extends the address range to 0x3EF.
-- XM directory and file-chain code checked for the jump across the second module boundary.
-- Test fixtures with XM files that span all three XM blocks.
-
-The web decoder mirrors this: `src/dm41/constants.ts` copies `XM_REGIONS`, and `src/dm41/memory.ts` indexes `XM_REGIONS[0]` and `XM_REGIONS[1]` directly. Make the Python version loop over any number of regions first, so the port is a straight translation.
-
-**App layers** (desktop only; the website has its own UI in `src/ui/`). `engine/` stays as the serial transport.
-
-- `fs/` — volume detection (macOS `/Volumes/...`, Windows drive letter, Linux mount), folder model, safe copy/write helpers.
-- `formats/` — one reader/writer per file type, each with round-trip tests against real samples.
-- `gui/` — customtkinter app shell and one tab per folder, reusing DM41L's `dialog_common`, `scroll_support`, Treeview lists and Help dialog.
-- State-file views reuse DM41L's Overview, Programs, Data Registers, XM Files, Key Assignments, Alarms and Flags tabs, fed from a decoded `.d41` instead of a serial dump.
-
-## Key assignments: ASN and CST
-
-ASN and CST are separate systems stored in separate files, so the tool handles them in two editors with a shared keyboard view.
-
-| | ASN (HP-41 key assignments) | CST (DM41X Custom menu) |
+| Difference | Where | Reading |
 | --- | --- | --- |
-| Where stored | Key-assignment registers in main memory, so inside the `.d41` state file | Separate `.cst` file in `/KEYS` (also written by Full Backup) |
-| Slots | Any key, shifted or unshifted, in USER mode | 16 keys A–P plus Shift-▲, Shift-▼, Shift-α |
-| Value | Function (prefix/postfix bytes) or global label | A command name as text: function, global label, or any label even if it does not exist |
-| Format | Fully decoded for the DM41L (`docs/key_assignments.md`) | Unknown — reverse-engineer from `.cst` samples |
-| Reuse | DM41L key-assignment tab and editor, pointed at a `.d41` | New editor |
+| Name of the last function run | Register Q (0x09), ASCII, last character first: `LKAOFF`, `LKAON`, `FAST`, `SLOW`, and `TRNG` in `dm41xn.dm41`. Register P (0x08) also holds a stray `4B` in all six files and is zero in the base | Side effect of running a function; docs/memory.md lists Q as scratch |
+| Low bytes of register e (0x0f) | `0x7000` after LKAOFF and in `dm41xn`, `0x016000` after FAST and after SLOW, zero after LKAON and in the base | Outside the 36 key-flag bits (all key flags are clear in every file). docs/memory.md puts the line number and a scratch byte there. Not understood |
+| Flag 50 | Set in the base only; flag 52 set in `dm41xn` only | Incidental display and program-mode state |
+| CPU registers C and S | The base differs from the other four; `dm41xn` differs again in C | Incidental, as in the first-look notes |
 
-**Plan**
+What it says about the open questions:
 
-- ASN: reuse the DM41L editor unchanged once `.d41` decoding works. Confirm the DM41X's `LKAOFF`/`LKAON` (local key assignments off/on) do not change the stored format.
-- CST: a 4×4 A–P grid plus three special slots. Validate each name against the function table and the global labels in a chosen `.d41`, but warn rather than block, since CST accepts labels that do not exist yet.
-- A combined keyboard view shows, per key, its ASN assignment and its CST letter, so both layers are visible at once.
+- **FAST vs SLOW:** the two files differ only in register Q's name. The speed setting is **not** stored in the state file.
+- **LKAOFF vs LKAON:** they differ in Q and in e. Whether e carries the LKAOFF setting or just a line number or scratch value is **not settled**: FAST and SLOW also set e, and `dm41xn` has the same e as LKAOFF after TRNG.
+- **Model detection:** nothing here distinguishes a DM41XN file from a DM41X one, so that decision stands. Nothing in S1–S3 forces the "revisit" clause.
+- **ASN key flags:** LKAOFF and LKAON do not touch the key-assignment bitmaps in R and e.
 
-## Program editor
+To settle LKAOFF (and confirm FAST), two **load tests** on the calculator are cleaner than more diffs:
 
-Yes, include an editor, but as a later phase: tkinter can do everything on the list, and DM41L_Explorer already has the encoder that produces the errors to jump to.
+| # | Test | Answers |
+| --- | --- | --- |
+| S2b | Run LKAOFF and save a state. Run LKAON. Load the saved state. Does a local label key assignment (top two rows, USER mode) behave as off again? | Whether the state file carries LKAOFF at all |
+| S3b | Run SLOW and save a state. Run FAST. Load the saved state. Is the calculator slow again? | Confirms speed is not in the state file. **Done: no, it reverts to FAST on load.** |
 
-- **Line numbers:** a narrow Canvas gutter beside a `tk.Text` widget, redrawn on scroll and edit. This is a well-known tkinter pattern, a few hundred lines.
-- **Syntax colouring:** Text tags for labels, functions, numbers and strings, driven by the existing mnemonic tables and dialects.
-- **Jump to error:** `program_text.decode_program_txt()` already rejects bad lines. Have it report a line number; the editor then calls `see()` on that line and tags it red.
-- **Save targets:** `.raw` into `/PROG` (via the existing encoder), `.txt` locally, or straight into a program slot of a `.d41`.
+**S2b result (Mike, 2026-10-05): the state file carries LKAOFF.** With `lkaoff.d41` and `lkaon.d41` (each holds the test program `LKATST`, with `LBL A` and `LBL B`), loading one or the other repeatedly changed how the upper-left key behaved. So the "revisit" clause in the decisions table fires in a limited way: a state saved with LKAOFF behaves differently on a DM41L. It does not change the decision to have no detection, but Phase 3 must round-trip the bits and the docs must say they exist.
 
-**Shared with the website.** The two editors can't share UI code (tkinter vs. the site's React), but they can share a contract: compile errors are reported as line number plus message. The site's hp41uc WebAssembly compiler already tracks the source line (`source_line` in `Source/compile.c`), so a web editor could offer the same jump-to-error. Write the desktop editor's behaviour down as a short spec, so the website can follow it.
+**Explanation (Mike, 2026-10-05, confirmed by the files).** Both files contain the global label `LKATST` with key byte 1 (key 11, the upper-left key) in its header, so it is *assigned* to key 11 in both. LBL A is also in the program. The only R difference is bit 35, the KEYFLAGS bit for key 11 unshifted: set in `lkaon.d41`, clear in `lkaoff.d41`. That is the whole effect:
 
-The hardest part is not tkinter but HP-41 characters (Σ, →, ≠, append-mark) and dialect choice on paste; the planned mnemonic-dialect work covers both, so do it before the editor.
+- LKAON: the flag is set, the OS finds the global-label assignment and runs `LKATST` when key 11 is pressed.
+- LKAOFF: the flag is cleared, so the OS treats key 11 as unassigned and falls back to the auto-assigned local label (`LBL A`). The assignment itself is untouched.
+- Key 12 (`LBL B`) has no manual assignment, so it runs `LBL B` either way and its flag is never set. This is also why `lkaoff.d41` and `lkaon.d41` otherwise differ only in key 11.
 
-## Web decoder port
+So LKAOFF is stored as **cleared KEYFLAGS bits for the top two rows of keys** (keys 11–15 and 21–25: bits 35, 27, 19, 11, 3 and 34, 26, 18, 10, 2, in R for unshifted and e for shifted), while the assignments themselves remain. No separate LKAOFF bit exists in R or e: S2h shows the low nibbles of e that move with LKAOFF also move with FAST and SLOW, so they are not LKAOFF's. Q is scratch.
 
-The website gains DM41X support in two steps: first the domain code, then the UI. It follows the sync process `dm41decoder` already uses, so every ported line is checked against the Python.
+Consequences for the Explorer:
 
-**W1. Core port** (`src/dm41/`)
+- A state is **LKAOFF-like** when a top-two-row key has an assignment (a Key Assignment Register entry or a global label's key byte) but its KEYFLAGS bit is clear. The Key Assignments tab should show the assignment anyway and flag the mismatch (for example "assigned, but the key flag is clear: local key assignments are off"), instead of treating it as corruption. Today `list_assignments()` reads only Key Assignment Registers, so it shows neither file's key-11 assignment, and global-label assignments are reached through the program chain.
+- The Explorer only sets or clears one key's flag when that key's assignment changes (`set_key_flag` via `set_assignment`/`delete_assignment` and the global-label paths in `program_memory.py`). It never recomputes flags from the assignments, so saving an edited LKAOFF state keeps it LKAOFF. Keep it that way, and add a test.
+- ASN on a top-two-row key while LKAOFF is active sets that key's flag (S2f, below). The Explorer does the same when it creates an assignment, so it matches the calculator.
 
-1. Tag a DM41_Explorer release. Re-vendor it into `reference/`, point `provenance.json` at the renamed repo, and add the app, GUI and transport directories to `excluded_paths`.
-2. Add the new fixtures (`.d41`, `.cst`, 600-register XM dumps) to `tests/oracle/fixtures/` and regenerate every golden.
-3. Port the device profile to `constants.ts`, and the generalised region handling to `memory.ts` and `regions.ts`.
-4. Port the `.d41` and `.cst` readers and writers as new modules, pure and synchronous like the rest of `src/dm41/`.
-5. Record any intended difference in `docs/dm41-divergences.md`; anything unrecorded counts as a bug.
+| # | Test | Answers |
+| --- | --- | --- |
+| S2c | From `lkaon.d41`, run LKAOFF and save; then LKAON and save, with no program runs or key presses in between. | The clean toggle: only Q and the key-11 flag should differ. **Done, see below.** |
+| S2h | From `lkaon2.d41`, run FAST and save; then run SLOW and save. | Whether FAST/SLOW alone move the e nibbles while the key-11 flag stays set. **Done: yes, see below.** |
+| S2f | Run LKAOFF. Then ASN a function to a top-two-row key, press it, and save. | Whether ASN under LKAOFF sets the flag. **Done, see below.** |
+| S2g | A global label assigned to a shifted top-two-row key; save with LKAON, then LKAOFF and save. | Whether the shifted flags in e clear the same way. **Done, see below.** |
 
-**W2. Web UI** (`src/ui/`)
+**S2c result (Mike, 2026-10-05).** `lkaoff2.d41` (loaded `lkaon.d41`, ran LKAOFF) and `lkaon2.d41` (then ran LKAON). Both round-trip identically after normalising whitespace.
 
-- Accept `.d41` and `.cst` uploads. `App.ts` already reads uploads as text or `ArrayBuffer`, so this is file-type dispatch, not new I/O.
-- Make the dump panel and tabs device-aware; the panel is labelled "DM41L Memory Dump" today.
-- Show the larger XM in Overview, XM Files and Hex View.
-- Add a CST view to the Key Assignments tab, alongside ASN.
-- Offer the edited file for download, with the same filename rules the calculator uses.
+| Comparison | Differences |
+| --- | --- |
+| `lkaoff.d41` vs `lkaoff2.d41` | **None.** Byte for byte identical, although the first was saved after pressing keys 11 and 12 and the second was not. |
+| `lkaon.d41` vs `lkaoff2.d41` | Q, R (bit 35, key 11 unshifted: set → clear), e (`00000000000fff` → `00000000016fff`) |
+| `lkaoff2.d41` vs `lkaon2.d41` | Q, R (bit 35 restored), e (back to `00000000000fff`) |
+| `lkaon.d41` vs `lkaon2.d41` | Q only |
 
-**DM41XN on the web.** The site already connects over WebSerial (`src/serial/webSerialTransport.ts`), so a DM41XN that speaks the DM41L protocol needs only its device profile there. Its disk side works through uploads, like the DM41X.
+So:
 
-**Not ported:** the FAT-disk file manager (browsers can't see the mounted volume; uploads replace it) and, for now, the program editor UI. The editor's error contract is still written down in phase 5 so a web editor can follow later.
+- Toggling LKAOFF then LKAON restores R and e exactly, and the only trace left is Q. The state is fully reversible, and key presses leave no trace beyond Q (so S2e is not needed and has been dropped).
+- The key-11 flag is cleared by LKAOFF and restored by LKAON. The restoring must come from the assignment data (the global label's key byte), since LKAOFF does not remove it.
+- In this clean test, e also toggles with LKA: `000fff` (on) ⇄ `016fff` (off). Earlier pairs fit the same pattern (`dm41x_lkan` `000000` vs `dm41x_lkaoff` `007000`). But after a reset FAST and SLOW also give `016000` with LKA at its default, so those nibbles are not a pure LKAOFF flag. S2h (below) settles it: they are not an LKAOFF bit at all.
+- Q is not always the plain ASCII name of the last function: in `lkaon2.d41` it is `07014c4b41c19b`, not `LKAON`. Treat Q as opaque scratch.
 
-## Phases and milestones
+**S2f result (Mike, 2026-10-05).** ASN on a top-two-row key while LKAOFF is active sets that key's flag, so the new assignment works. Switching to LKAON left it unchanged. Running LKAOFF again hid it. That is consistent with the model: LKAOFF clears the flags of all ten top-two-row keys, LKAON sets the flag of every key that has an assignment. Mike's view is that the ASN-under-LKAOFF behaviour may be an emulator bug and is not relevant to the Explorer, and the Explorer already behaves the same way.
 
-Seven desktop phases, two web phases and a DM41XN phase that waits for hardware, each ending in a gate you can check on the real calculator or the website; phases 1 and 2 carry the risk, so they come before any GUI work. Sizes are relative (S/M/L), not dates.
+**S2g result.** `lkaoff3.d41` and `lkaon3.d41` have the global label `LKATST` on key 11 (key byte 1) and the new global label `BBB` assigned to shifted key 12 (key byte 25, which the Explorer decodes as key 12 shifted). Both round-trip identically after normalising whitespace.
 
-| Phase | Deliverables | Exit gate | Size |
+| File | Key flags set | R | e |
 | --- | --- | --- | --- |
-| 0. Repo layout and setup | Monorepo layout (core, transports, shared GUI, three app entry points); DM41L_Explorer moved to `src/apps/dm41l/` unchanged in behaviour; CI builds and tests each app on macOS, Windows, Linux | DM41L_Explorer passes its full suite and builds from the new layout; empty DM41X_Explorer launches | S |
-| 1. Samples and format research | Sample set for every folder (Full Backup, RAW saves, CST variants, RAM pages, screenshots); `docs/` for `.d41`, `.cst`, `.m41`, `.b41`, `.ram`, `param.cfg` | `.d41` and `.cst` documented; every field explained by at least two samples | L |
-| 2. Core library | Device profiles for DM41L and DM41X (600 XM registers) with N-region handling; transport interface separating serial from disk; `.d41` and `.cst` readers/writers following the portability rules; JSON dump views | Full suite passes; round trip on every sample (byte-identical for `.cst`, `.m41` and `.b41`; for dump-format `.d41`/`.dm41` files, identical after normalising whitespace: trailing spaces on each line and the gap between special-register pairs, see `dump_format.md`); DM41_Explorer release tagged | L |
-| 3. DM41X_Explorer shell | Disk transport: volume detection, Open Folder, one Treeview tab per folder; copy in/out, rename, delete; backup-before-write; eject reminder | Files managed on the real DM41X with no stray macOS `._*` files left behind | M |
-| 4. Format tabs | PROG (RAW↔TXT↔DAT↔PPC), STATE (shared views and edits on a `.d41`), KEYS (CST editor + keyboard view), MODS (`.mod` header info, `.m41` view), OFFIMG (image → 400×240 1-bit BMP), BACKUP (manifest view, trim for sharing) | Each file edited by the tool loads correctly on the calculator | L |
-| 5. Program editor | Line-numbered editor in the shared GUI (so all three apps get it), syntax colouring, jump-to-error, save to `.raw` / `.txt` / `.d41`; short editor spec for the website | Program written in the editor runs on the calculator; a bad line opens at that line | M |
-| 6. Release | Help menu, README with screenshots, PyInstaller builds of DM41L_Explorer and DM41X_Explorer (macOS `.app` first), GitHub release | Fresh install of each app on a second Mac works with its calculator | S |
-| W1. Web core port | Re-vendor DM41_Explorer, new fixtures and goldens, port device profiles, regions, `.d41` and `.cst` to `src/dm41/` | `npm test` oracle suite passes on the new pin; divergences logged | M |
-| W2. Web UI | `.d41`/`.cst` upload, device-aware panel and tabs, larger XM views, CST view, download of edited files | A `.d41` edited on the website loads on the calculator; `dist/` rebuilt and CI green | M |
-| N. DM41XN_Explorer | Serial and disk samples from a real unit; DM41XN device profile; app combining both transports; same support on the web | Memory read and written over serial, and files managed over disk, on a real DM41XN, desktop and web | M (unknown until the protocol is known) |
+| `lkaon3.d41` | key 11 unshifted, key 12 shifted | `0000000010e000` | `00000010004000` |
+| `lkaoff3.d41` | none | `0000000000e000` | `00000000016fff` |
 
-**Dependencies**
+- LKAOFF clears the shifted flag in e exactly as it clears the unshifted one in R, and both assignments stay in the program chain (`key_assignment` 1 and 25 in both files). No Key Assignment Register entries are involved.
+- The low nibbles of e vary with history in LKAON states (`000fff` in `lkaon.d41`, `004000` here) but are the same `016fff` in every LKAOFF state with a program present. See S2h below.
 
-- Phase 2 needs phase 1's `.d41` findings; phase 4's STATE and KEYS tabs need phase 2.
-- Phase 5 needs the mnemonic-dialect work planned for DM41L_Explorer.
-- PROG, MODS and OFFIMG tabs use known formats, so they can start right after phase 3 if research stalls.
-- W1 starts once phase 2 is tagged and runs alongside phases 3–6; W2 needs W1. Neither blocks the desktop release.
-- Phase N waits for a DM41XN unit or its documentation. It depends on phase 2's transport interface; if it arrives after phase 6, it ships as a point release.
+**S2h result (Mike, 2026-10-05).** `lkaon2_fast.d41` (FAST run from `lkaon2.d41`) and `lkaon2_slow.d41` (then SLOW). All round-trip identically after normalising whitespace.
+
+| File | Key flags set | R | e | Q |
+| --- | --- | --- | --- | --- |
+| `lkaon2.d41` | key 11 unshifted | `0000000010e000` | `00000000000fff` | `07014c4b41c19b` |
+| `lkaon2_fast.d41` | key 11 unshifted | `0000000010e000` | `00000000016fff` | `FAST` |
+| `lkaon2_slow.d41` | key 11 unshifted | `0000000010e000` | `00000000016fff` | `SLOW` |
+
+FAST and SLOW move the low nibbles of e to `016fff` while LKAON stays in force and the key-11 flag stays set. So those nibbles are **not** the LKAOFF setting. They change when a DM41X-module function runs (LKAOFF, FAST, SLOW), and LKAON puts them back, so they look like per-function scratch. The final model: **LKAOFF is represented only by the cleared top-two-row key flags in R and e; nothing else in the state file records it.** The Explorer treats the low nibbles of e, and Q, as opaque scratch and round-trips them byte for byte. A state saved with LKAOFF on but no assignments on the top two rows cannot be distinguished from LKAON, which is harmless because the flags are all that the calculator uses.
+
+**S3b result (Mike, 2026-10-05): FAST/SLOW is not saved in the state file.** After SLOW, saving and reloading the state, the calculator ran at full speed; Mike confirmed that it reverts to FAST mode whenever a state file is loaded. S3 and S3b together settle it: the speed setting is not part of the state, and loading a state always gives FAST.
+
+**S3 repeated (Mike, 2026-10-05):** after a reset, `fast.d41` (FAST) and `slow.d41` (SLOW after that) are byte-for-byte identical to `dm41x_fast.d41` and `dm41x_slow.d41`, so the S3 result reproduces exactly. They differ only in Q (`FAST` vs `SLOW`). Register e is `016000` in both, but `000000` after a reset with LKAON and `007000` after LKAOFF, so e's low nibbles also move with FAST/SLOW and are not a pure LKAOFF flag.
+
+
+**S4 results (2026-10-05).** `dm41x_retpfl_before.d41` and `dm41x_retpfl_after.d41` are `manyfiles` variants: 22 XM files, ten of them 8-register data files XM0–XM9. In the after file XM0 is type 4, XM1 type 5 and XM2 type 6. Both load with the DM41X profile and round-trip identically after normalising whitespace. Findings:
+
+- RETPFL changes only the type nibble of the header: `20aa…`→`60aa…` (XM2, header 0xaa), `20b4…`→`50b4…` (XM1, 0xb4), `20be…`→`40be…` (XM0, 0xbe). AAA, the reserved zeros, RRR/SSS (`0000008008`), the name register and the data registers are untouched. Types 4–6 keep the Data header layout.
+- The region 0 pointer register 0x040 also changed: `000160162ef0bf` (WW = 0x16, PPP = 0x016, 22 files) before, `000030022ef0bf` (WW = 3, PPP = 2) after. All 22 files are still present, so the doc's "PPP in region 0 = number of files" does not hold after a RETPFL. S4b (below) shows RETPFL itself disturbs these fields.
+- `ExtendedMemory.list_files()` raises `DM41MemoryError` ("Detected invalid XM file header. 0xbe") on the after file. The error is all-or-nothing, so one retyped file hides the whole XM directory.
+- The stack, Alpha, Q and e registers also differ between the two files. These are incidental calculator state.
+- The calculator labels program files `P`, data files `D` and ASCII files `A`, and every type above 3 `@` (S4c, answered by Mike). The Explorer should show the same `@` label for those files, with the numeric type alongside.
+
+**S4b results.** `dm41x_s4b1.d41` is the before state with only XM0 retyped to 4. `dm41x_s4b2.d41` is the same file after retyping XM0 back to 2. In `s4b2` the header at 0xbe is `20be…` again and all 22 files list normally. Register 0x040 across the whole S4 series:
+
+| File | XM0 type | WW | PPP |
+| --- | --- | --- | --- |
+| `dm41x_retpfl_before` | 2 | 0x16 | 0x016 |
+| `dm41x_s4b1` | 4 | 0x01 | 0x016 |
+| `dm41x_s4b2` | 2 | 0x07 | 0x001 |
+| `dm41x_retpfl_after` (XM0, XM1, XM2 → 4, 5, 6) | 4 | 0x03 | 0x002 |
+
+So RETPFL does disturb WW and PPP, and retyping a file back does not restore them. The file count did not change (22 each time), so neither field is a file count after a RETPFL. Treat both as opaque calculator working values: round-trip them byte for byte, never recompute them from the file list, and soften the "PPP = number of files" sentence in `docs/extended_memory.md`. The Q register's last byte also tracks the type just passed to RETPFL (04, 02, 06), which is consistent with the X value at the time.
+
+**Exit gate:** each sample loads with `Memory.from_string(text, profile=DM41X)`, and the S2/S3 diffs are written down (identical, or the bytes that move).
+
+## Phase 1 · XROM table
+
+Scope is the first-release decision: the DM41L's 95 plus the DM41X's additions. Nothing from other modules.
+
+- Add the 18 entries (the 17 plus X<I>Y; CRT? only if S5 shows it executes) to `memory/functions.py`. X<I>Y and TRNG are already confirmed by `dm41xn.dm41`; the other 16 get confirmed by S5 before they merge. `mnemonics.py` builds its registry from that table, so import, aliases, "did you mean" and the key-assignment name list follow automatically. At this size, with names and codes also printed in the DM41X manual, it is small enough to type by hand and check against hp41uc; no bulk import of hp41uc's table is needed.
+- Give `DeviceProfile` a way to say which XROMs a model has built in: the DM41L's 95, and the DM41X's 95 plus the additions. Phase 2 needs this. Files open with the DM41X profile everywhere (phase 3), so the registry always includes the additions.
+- Mark the additions as DM41X-only in the Key Assignments dropdown and in the generated mnemonic reference, grouped under their hp41uc section headers ("-DM 41X-").
+- Regenerate `docs/function_table.md` and the mnemonic reference (`mnemonic_doc.py`), and update `docs/mnemonics.md`.
+- **Tests.** `dm41xn.txt` written with names (`X<I>Y`, `TRNG`) compiles to the bytes in `dm41xn.dm41` and decompiles to `XROM 25,63 ;X<I>Y` and `XROM 26,36 ;TRNG` (already checked in a scratch copy; this makes it permanent). The 16 DM41X-module functions compile to the exact bytes in `dm41x_xroms.raw` (S5) and decompile back; every new name resolves by canonical, case and space variants; a key assignment of a new XROM round-trips (S6); a one-off diff of modules 25 and 26 against `hp41ucg.h` shows agreement for every function except the new X<I>Y.
+
+**Exit gate:** the full suite passes, the S5 program compiles to the exact RAW bytes, and decompiling them gives hp41uc's canonical names.
+
+## Phase 2 · Protecting the DM41L
+
+- New function in the core, `check_profile_fit(memory, profile)`, returning findings, each with a level (`error`, `warning`), a short message and a location. Pure and synchronous, like the rest of the core.
+  - **Error:** any XM data in a region the target profile does not have (for the DM41L, anything from 0x301). Also a `.d41` with more XM than the DM41L can load.
+  - **Warning:** any XROM the DM41L does not have built in, found in a program or key assignment: the DM41X's additions (26,36, 26,38–26,53, X<I>Y) and any XROM outside modules 25 and 26, since a DM41L cannot load other modules. List the program and step (via `opcode_scan.iter_instructions`) or the key.
+- Wire it into DM41L_Explorer's **Send Dump** only: an error blocks the upload and says why; warnings show a confirmation that lists what will not run on a DM41L. Open and Save do no checking.
+- Tests use `dm41x_manyfiles.dm41` (error) and `dm41x_xroms.d41` (warning, program and key assignment), plus a DM41L fixture that must produce no findings.
+
+**Exit gate:** sending `dm41x_manyfiles.dm41` to a DM41L is refused with a clear message; sending `dm41x_xroms.d41` lists the programs affected and proceeds on confirmation.
+
+## Phase 3 · State files in the desktop app
+
+Make the existing tabs work, in this order, on `dm41x_manyfiles.dm41` and the S-samples. Each tab gets a test that fails if it still assumes two regions or 0x2EF.
+
+1. Open/Save use `.d41` as well as `.dm41` (until then, `.d41` samples are renamed to `.dm41` by hand, and nothing else about them changes) and keep the file's own extension on Save. Files open with the DM41X profile in every app, since it is a superset of the DM41L's, so a large state opens, displays and saves in DM41L_Explorer without loss. A dump read from a live DM41L over serial still uses the DM41L profile. The phase 2 check applies only at upload.
+2. **XM Files** and **Hex View**: walk three regions and show addresses up to 0x3EF (`profile.display_end`).
+3. **Overview**: free/total XM from the profile instead of the DM41L constants; DM41X numbers confirmed by S8.
+4. **XM file types**: decide from S4 what `XMFile` does with types 4–15 (show them as `@` (the calculator's label) with the numeric type, keep the data untouched, never raise from `list_files()`).
+5. **Programs**, **Data Registers**, **Alarms**, **Key Assignments**, **Flags**: smoke-test each on a DM41X dump (flag 31 shows as DMY in Flags). Fix whatever fails.
+6. **LKAOFF/FAST**: FAST/SLOW are not in the state file, and the calculator reverts to FAST when a state is loaded (S3 and S3b). LKAOFF is: it shows as cleared KEYFLAGS bits for the top two rows of keys while their assignments remain. Show that state in the Key Assignments tab (and document it in `docs/key_assignments.md`), keep the flags untouched on save. S2c–S2h are done, and show nothing else in the state records LKAOFF. Treat register e's low nibbles and the P/Q scratch registers as opaque and round-trip them byte for byte.
+7. Round-trip gate: every `.d41` and `.dm41` sample loads and saves identically after normalising whitespace (`dump_format.md` lists the two normalisations).
+
+## Phase 4 · License and tag
+
+- Decide on GPLv3 (still open). If yes: replace `LICENSE` (currently BSD-style), update `pyproject.toml`, `README.md`, `CONTRIBUTING.md` and the file headers, and say so in the release notes. As the sole author you can relicense on your own; any outside contributor's commit would need their agreement.
+- Tag a DM41_Explorer release once phases 1–3 pass. The web port pins to that tag.
+
+## Phase 5 · Port to dm41decoder
+
+Follow the decoder's existing sync procedure (`reference/README.md`, `tests/oracle/provenance.json`, `docs/dm41-divergences.md`). It is **vendored, not a submodule**: there is no `.gitmodules`, and `reference/dm41l-explorer/` is a byte-identical copy that `tests/oracle/generate.py` imports to build the golden files. It is pinned to commit `55ed479` (2026-09-11); this repository has moved well beyond it. Whether to keep that arrangement is a question for SwissMicros, and it does not block the port.
+
+**W1 · Core**
+
+1. Re-vendor at the tagged release, update `provenance.json`, and exclude the GUI and serial engine.
+2. Add the new fixtures (`dm41x_manyfiles.dm41`, the S-samples) to `tests/oracle/fixtures/` and regenerate every golden.
+3. Port `device_profile.py` to TypeScript. `constants.ts` and `memory.ts` currently hard-code two regions (`XM_REGIONS[0]`, `[1]`).
+4. Add the 17 DM41X XROMs, X<I>Y (and CRT? once confirmed) to `functions.ts`.
+5. Port `check_profile_fit`.
+6. `mnemonics.py`, `mnemonic_dialects.py` and `program_text.py` are not ported: the site compiles and decompiles with hp41uc as WebAssembly. Add divergence rows for them.
+7. **hp41uc needs one small C change.** TRNG and the 16 DM41X-module functions are already in `hp41ucg.h` and in the compiled `hp41uc.wasm` (confirm by compiling `dm41x_xroms.txt` through the WASM), but **X<I>Y (25,63) is not**: add it to `hp41ucg.h` as a small, separate pull request (GPL, no obligation upstream), and CRT? too if S5 shows it executes.
+
+**W2 · Web UI**
+
+- Accept `.d41` uploads (`fileDispatch.ts` accepts only `.txt`, `.dm41`, `.raw` today).
+- **Save modified state files**: the shell's Download writes the edited dump with the right extension.
+- XM views (Overview, XM Files, Hex View) use the profile's regions.
+- Write-to-calculator (WebSerial) runs the phase 2 check before sending.
+- No model selector and no DM41X-specific tabs in the first release.
+
+**Exit gate:** `npm test` passes on the new pin, a `.d41` uploaded, edited and downloaded loads on the DM41X, and `dist/` is rebuilt.
+
+## Later release: additional ROM modules (not in this plan)
+
+The DM41X can load ROM modules, so a later release will need XROMs beyond the built-in ones. What was found so far, so it is not lost:
+
+- **hp41uc covers HP's own modules:** 411 functions in 11 modules (17, 18, 22–30). Loaded into the mnemonic registry as they stand, eight names collide: `SST` (22,52 vs the built-in SST), `DDL`, `DDT`, `LAD`, `TAD`, `UNL`, `UNT` (modules 22 and 23) and `FLTYPE` (23,04 vs the DM41X's 26,47). hp41uc settles these by checking its built-in tables first, then its XROM table in file order.
+- **The Programmer's Handbook v2.07** (XROM section, from p. 51) tabulates roughly 2,200 function entries in 56 module tables (approximate: heuristic parse of a multi-column PDF), including third-party ROMs such as PPC ROM, Advantage, ZENROM, PANAME, CCD and HEPAX. These share the 31 XROM IDs (ID 5 is STANDARD, PANAME and ZENROM 1; ID 10 is PPC ROM, GAMES, FORECAST 1 and FORECASTER 2), so `(mm, ff)` alone does not identify a function.
+- **Approach to evaluate:** since hardware allows one module per XROM ID at a time, a chosen **module set** is a conflict-free namespace. Other modules would be data files (ID, name, function names), names resolve only within the chosen set, and decompile keeps writing `XROM mm,ff` with a name comment. PPC ROM (IDs 10 and 20) is the likely first candidate.
+- **Data sources and licensing:** hp41uc's table is GPL-3.0-or-later (bulk-copying it into a BSD-licensed repo is a licensing question, so settle GPLv3 first); the Handbook is © Ángel M. Martin. The Handbook text extracts badly, so any transcription needs coordinate-aware extraction and a check against a second source; `.mod` ROM images carry their own function-name tables and could provide that check.
+
+## Parked (not in this plan)
+
+The file-manager work from the earlier plan is not abandoned, just later: DM41X_Explorer as a FAT-disk file manager, `.m41` module-list and `.cst` custom-key files, `.b41` backups, `.mod` files, RAM images, OFF-images, the program editor with line numbers and jump-to-error, and everything specific to the DM41XN's serial interface. The format research already done (`cst.md`, `backup_set.md`, `dm41x_first_look_2026-10-04.md`) stays in `docs/`.
 
 ## Risks
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| `.d41` is binary and holds CPU/firmware state that is hard to decode | STATE tab and ASN editing slip | Decode only memory regions first; copy unknown bytes through untouched; check SwissMicros' online decoder for clues |
-| Firmware updates change `.d41` or `.cst` layout | Files written by the tool fail to load | Record firmware version with every sample; refuse to write unknown versions without a warning |
-| Writing a bad file corrupts calculator state | Lost programs and data | Always write a new file or a `.bak` copy; never overwrite a `.d41` in place by default |
-| macOS writes `._*` and `.DS_Store` onto the FAT disk | Junk entries in calculator file lists; extra flash wear | Copy with metadata stripped; offer a Clean Volume command |
-| Flash wear from many small writes | Shorter flash life | Batch changes; write once on Save, not on every edit |
-| Unplugging without eject corrupts the FAT | Disk needs reformat | Eject button in the app and a reminder on every write |
-| Scope creep from 20+ module formats and RAM pages | Core tabs never finish | `.mod`, `.m41`, `.ram` stay read-only in v1 |
-| Core changes the TypeScript port can't mirror cheaply (float formatting, I/O, async) | Website falls behind; divergence log grows | Follow the portability rules; review each core PR with the question "how would this port?" |
-| Moving the core breaks the decoder's pinned-copy workflow | Goldens can't be regenerated | Update `provenance.json` and `generate.py`'s import path in the same sync that first vendors DM41_Explorer, and point the verify URL at the renamed repo (GitHub redirects the old name, but only until something reuses it) |
-| DM41XN differs from the assumptions (new serial protocol, different memory map or file formats) | Phase N grows; parts of phases 2–4 need rework | Keep transport and device profile behind interfaces now; write no DM41XN code until real samples exist; ask SwissMicros early for protocol notes |
+| LKAOFF/FAST change state files | "Identical models" decision breaks | S2/S3 first; decision table says to revisit |
+| Retyped XM files break `list_files()` | A DM41X state fails to load | S4 before phase 3.4; never raise from listing |
+| The two `functions` tables drift (Python, TypeScript, hp41uc) | Wrong names or opcodes on one side | One-off diff of modules 25 and 26 against `hp41ucg.h` in phase 1; goldens in phase 5 |
+| Re-vendoring brings in many unported modules | Divergence log grows | Port only the core listed in W1; add divergence rows for the rest |
+| DM41XN differs from the DM41X | Shared-XROM assumption fails | Partly settled: `dm41xn.dm41` confirms X<I>Y and TRNG on a DM41XN. The 16 DM41X-module functions are untested there |
 
 ## Open questions
 
-- [ ] Should DM41X_Explorer also open DM41L `.dm41` dumps, making it a superset, or stay DM41X-only?
-- [x] Is `.d41` a binary file, or the same text layout as a DM41L `.dm41` dump? **Resolved 2026-10-04:** same text layout; the existing loader reads it unchanged.
-- [ ] Is CST stored inside `.d41` as well, or only in `.cst` files? Open: Create Full Backup writes `.cst` as its own file and nothing in the sample `.d41` has been identified as CST, but it has not been tested by changing only the CST and comparing two `.d41` files.
-- [ ] Program editor: confirm it belongs in v1 (phase 5) or moves to v2.
-- [ ] Which sample-generating sessions on the calculator are you willing to run (Full Backup, CST variants, RAM pages)?
-- [ ] `dm41decoder` lives under the swissmicros GitHub organisation: will the port go in as pull requests for SwissMicros to review, or do you merge directly?
-- [ ] Should the website's first DM41X release be read-only (view `.d41`/`.cst`), with editing in a later release?
-- [ ] DM41XN: does its serial side use the DM41L's console protocol (get/send memory dump), and is its memory map and file set the same as the DM41X?
-- [ ] DM41XN: can you get a pre-release unit or protocol notes from SwissMicros, and roughly when?
-- [ ] Do the three apps release together from DM41_Explorer with one version number, or each on its own schedule?
+- [ ] The web app has no model selector, but a DM41L `.dm41` dump will show DM41X-sized XM totals. Acceptable, or should the extension pick the display profile (`.d41` → DM41X, `.dm41` → DM41L)?
+- [ ] GPLv3 for DM41_Explorer: decided yes or no, and before or after the tag?
+- [ ] Optional: can you run the S5 program on the DM41XN prototype as well, to confirm the 16 DM41X-module functions there? (X<I>Y and TRNG are already confirmed by `dm41xn.dm41`.)
 
 ## Sources
 
-- `DM41X/notes.md` — project notes (9 points).
-- `DM41X/DM41X_Data/dm41x_user_manual.pdf` — DM41X User Manual v1.34, 2026-09-24 ([online copy](https://technical.swissmicros.com/dm41x/doc/dm41x_user_manual.pdf)).
-- `DM41X/DM41X_Data/` — sample `/MODS`, `/OFFIMG`, `/HELP` folders.
-- `docs/dm41x_first_look_2026-10-04.md`, `docs/cst.md`, `docs/backup_set.md`, `docs/dump_format.md` — findings from the first hands-on samples; `src/tests/data/CSTtest.cst`, `backuptest.*` and `dm41x_manyfiles.dm41` are the samples.
-- `DM41_Explorer/` (formerly DM41L_Explorer) — `src/memory/`, `src/gui/`, `docs/`, `README.md`.
-- `dm41decoder/` — `README.md`, `reference/README.md`, `tests/oracle/provenance.json`, `tests/oracle/generate.py`, `docs/dm41-divergences.md`, `Source/compile.c`, `src/dm41/constants.ts`, `src/dm41/memory.ts`, `src/ui/shell/tabs.tsx`, `src/classes/App.ts`.
+- DM41X User Manual v1.34 (`DM41X/DM41X_Data/dm41x_user_manual.pdf`), §3.4, §3.8.5, §4.7.3, §6.2.1.
+- `dm41decoder/Source/hp41ucg.h` (hp41uc XROM table, GPL-3.0-or-later), `LICENSING-NOTE.md`, `reference/README.md`, `tests/oracle/provenance.json`, `docs/dm41-divergences.md`.
+- This repository: `src/memory/device_profile.py`, `functions.py`, `mnemonics.py`, `mnemonic_dialects.py`, `xm_file.py`, `src/gui/overview_tab.py`, `src/tests/test_xm_three_regions.py`, `docs/dm41x_first_look_2026-10-04.md`, `docs/dump_format.md`.
