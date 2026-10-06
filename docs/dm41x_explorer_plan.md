@@ -280,6 +280,17 @@ Make the existing tabs work, in this order, on `dm41x_manyfiles.dm41` and the S-
 
 Tests: 12 new in `test_app.py` plus a seven-sample tab smoke test; full suite 1253 passed, 13 skipped. Five mutations (open without the profile, fixed Overview total, fixed Hex View end, fixed Save extension, Open without `*.d41`) each fail a test.
 
+**Progress 2026-10-06 (steps 6–9).**
+
+- **Step 6 (XM file types 4–15):** `XMFile` reads types 4–15 with the Data header layout, shows them as `@ (type N)` and never decodes them. `list_files()` no longer raises on `dm41x_retpfl_*`, so the rest of the directory is visible. The XM Files tab shows "type N: M registers (not decoded)" and allows Remove. Removing a file keeps its type nibble. Type 0 still raises. The phase 2 profile check therefore reads `dm41x_retpfl_after.d41` as warnings (stale data above 0x300 that belongs to no file, plus any XROM key assignment), not an error.
+- **Step 7 (behaviour, not just smoke):** a data file in the third region can be edited without disturbing any other file (5/600 free is unchanged); flag 31 shows as `31 timer MDY / DMY` and toggling it changes only that flag.
+- **Step 8 (LKAOFF):** the Key Assignments tab marks every assigned top-two-row key whose flag is clear with `⚠` and amber text; the header counts them; the edit dialog explains the mark. Nothing recomputes the flags, so saving an LKAOFF state keeps it LKAOFF (tests cover the save and the ASN-sets-flag case). Documented in `docs/key_assignments.md` under "LKAOFF (DM41X)".
+- **Step 9 (round-trip gate):** `tests/test_state_roundtrip.py` loads every `.dm41` and `.d41` fixture (50) with the DM41X profile, saves it, and compares after the writer's whitespace normalisation. **It found a loader bug:** `Memory.from_string()` kept the "Memory Lost" defaults of a new `Memory()` in registers the file leaves out, so `lander.dm41` and `targ.dm41` (no row 08, no `S:` line) loaded with `4b000000000000` in register 08 and a made-up `S`. A file's omitted registers now load as zero and a file without `S` stays without. This is a change in what those two files contain after loading; every other fixture is unaffected.
+
+Tests: 1359 expected (the full suite was 1357 passed, 13 skipped before the two loader tests were added).
+
+Still to do in phase 3: steps 2, 3, 10 and 11 (the rename, one executable), as a separate commit.
+
 ## Phase 4 · License and tag
 
 - Decide on GPLv3 (still open). If yes: replace `LICENSE` (currently BSD-style), update `pyproject.toml`, `README.md`, `CONTRIBUTING.md` and the file headers, and say so in the release notes. As the sole author you can relicense on your own; any outside contributor's commit would need their agreement.

@@ -78,6 +78,12 @@ HP41_TAB = "HP41"
 UNASSIGNED_TEXT = "gray50"
 UNASSIGNED_FG = ("gray85", "gray24")
 
+# An assignment whose key flag is clear (what LKAOFF leaves behind): shown
+# like any other assignment, but in amber and marked with a warning sign,
+# since the calculator treats the key as unassigned.
+FLAG_CLEAR_TEXT = ("#a35b00", "#e6a23c")
+FLAG_CLEAR_MARK = "⚠"
+
 # Background colors for the fixed non-assignable physical-key cells
 # rendered by _build_static_cell() (issue #24): the color is the CELL's
 # fg_color (the CTkFrame tile itself), not the label's text -- CTkLabel's
@@ -168,7 +174,9 @@ class KeyAssignmentsTab(ctk.CTkFrame):
             self,
             "Click a key's unshifted or shifted function to assign, "
             "reassign, or delete it -- a built-in/peripheral function "
-            "or a global program (marked ▸). Import/export of key "
+            "or a global program (marked ▸). An assignment marked ⚠ has "
+            "its key flag clear, so the calculator treats the key as "
+            "unassigned, as after LKAOFF. Import/export of key "
             "assignments isn't handled here yet.",
         )
 
@@ -229,7 +237,7 @@ class KeyAssignmentsTab(ctk.CTkFrame):
             self._header_label.configure(text=f"Could not list key assignments: {e}")
             return
 
-        self._header_label.configure(text=f"Key assignments: {count}")
+        self._header_label.configure(text=self._header_text(count))
 
         if not self._grids_built:
             self._build_grid(self._dm41l_frame, DM41L_LAYOUT)
@@ -237,6 +245,15 @@ class KeyAssignmentsTab(ctk.CTkFrame):
             self._grids_built = True
 
         self._refresh_buttons()
+
+    def _header_text(self, count: int) -> str:
+        """"Key assignments: N", plus how many of them have their key flag
+        clear (see KeyAssignments.flag_clear_assignments()) when any do."""
+        text = f"Key assignments: {count}"
+        clear = len(self._memory.key_assignments.flag_clear_assignments())
+        if clear:
+            text += f" -- {clear} with the key flag clear (LKAOFF)"
+        return text
 
     def _teardown_grids(self):
         for widget in self._dm41l_frame.winfo_children():
@@ -319,19 +336,22 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         return None, self._memory.programs.get_program_for_key(key_number, shifted)
 
     def _refresh_buttons(self):
+        flag_clear = set(self._memory.key_assignments.flag_clear_assignments())
         for (key_number, shifted), btns in self._key_buttons.items():
             assignment, program = self._resolve_key(key_number, shifted)
             prefix = "⇧" if shifted else ""
-            if assignment:
-                text = f"{prefix}{assignment['name']}"
+            if assignment or program:
                 fg_color = self._default_fg_color
                 text_color = self._default_text_color
-            elif program:
-                # "▸" marks a global-program assignment, distinct from a
-                # built-in/peripheral function -- see the tab caption.
-                text = f"{prefix}▸{program.name}"
-                fg_color = self._default_fg_color
-                text_color = self._default_text_color
+                if (key_number, shifted) in flag_clear:
+                    prefix = FLAG_CLEAR_MARK + prefix
+                    text_color = FLAG_CLEAR_TEXT
+                if assignment:
+                    text = f"{prefix}{assignment['name']}"
+                else:
+                    # "▸" marks a global-program assignment, distinct from
+                    # a built-in/peripheral function -- see the tab caption.
+                    text = f"{prefix}▸{program.name}"
             else:
                 text = f"{prefix}--"
                 fg_color = UNASSIGNED_FG
@@ -347,7 +367,7 @@ class KeyAssignmentsTab(ctk.CTkFrame):
 
         def update_header():
             self._header_label.configure(
-                text=f"Key assignments: {_count_all_assignments(self._memory)}"
+                text=self._header_text(_count_all_assignments(self._memory))
             )
 
         def save(kind, value):
@@ -397,5 +417,14 @@ class KeyAssignmentsTab(ctk.CTkFrame):
                 logger.error("Failed to delete key assignment: %s", str(e))
 
         KeyAssignmentEditDialog(
-            self, key_number, shifted, assignment, program, program_names, save, delete
+            self,
+            key_number,
+            shifted,
+            assignment,
+            program,
+            program_names,
+            save,
+            delete,
+            flag_clear=(key_number, shifted)
+            in self._memory.key_assignments.flag_clear_assignments(),
         )

@@ -342,3 +342,14 @@ def test_format_findings_cuts_a_long_list_and_counts_the_rest():
     ]
     assert format_findings(findings, limit=5).count("\n") == 4  # nothing cut
     assert format_findings([]) == ""
+
+
+def test_retyped_xm_files_no_longer_hide_the_directory():
+    """dm41x_retpfl_after.d41 (XM files of types 4-6) used to make the
+    directory unreadable. Now it reads, and gets the same two warnings as
+    the before file: stale data above 0x300 and CLEM on a key."""
+    findings = check_profile_fit(_load("dm41x_retpfl_after.d41"), DM41L)
+
+    assert _levels(findings) == [WARNING, WARNING]
+    assert findings[0].location == "Registers 0x301-0x3EF"
+    assert str(findings[1]) == "Key 13 (unshifted): CLEM is not built into a DM41L"

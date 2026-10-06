@@ -53,7 +53,7 @@ _TREE_STYLE = "XMFiles.Treeview"
 
 _TREE_COLUMNS = [
     ("name", "Name", 90, False),
-    ("type", "Type", 90, False),
+    ("type", "Type", 105, False),
     ("header", "Header", 90, False),
     ("registers", "Size", 70, False),
     ("preview", "Preview", 180, True),
@@ -263,6 +263,8 @@ class XMFilesTab(ctk.CTkFrame):
                     else "INVALID" if checksum is False else "unknown"
                 )
                 return f"{f.byte_length} instruction bytes, checksum {status}"
+            if f.is_other_type:
+                return f"type {f.file_type}: {f.num_registers} registers (not decoded)"
         except Exception as e:
             # Expected for a file whose content doesn't fit the shape its
             # own type nibble claims (e.g. a corrupt or hand-edited dump)

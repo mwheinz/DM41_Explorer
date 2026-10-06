@@ -470,3 +470,77 @@ def test_every_tab_renders_every_dm41x_sample(app, name):
         app.alarms_tab,
     ):
         tab.render(app.memory)
+
+
+def test_xm_tab_shows_retyped_files_as_at_with_their_type(app):
+    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_retpfl_after.d41"))
+    app.xm_files_tab.render(app.memory)
+
+    rows = {row[0]: row for row in _tree_rows(app.xm_files_tab._tree)}
+
+    assert len(rows) == 22
+    assert rows["XM0"][1] == "@ (type 4)"
+    assert rows["XM2"][1] == "@ (type 6)"
+    assert rows["XM0"][4] == "type 4: 8 registers (not decoded)"
+    assert rows["XM3"][1] == "Data"
+
+
+# -- Tabs behave on DM41X data (plan, phase 3 step 7) ------------------------
+
+
+def test_editing_a_data_file_in_the_third_region_keeps_every_other_file(app):
+    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    app.xm_files_tab.render(app.memory)  # tabs render lazily, when shown
+    xm = app.memory.extended_memory
+
+    def contents():
+        out = {}
+        for f in xm.list_files():
+            if f.file_type == f.TYPE_DATA:
+                out[f.name] = f.get_data_lines()
+            elif f.file_type == f.TYPE_ASCII:
+                out[f.name] = f.get_records()
+            else:
+                out[f.name] = f.get_instruction_bytes()
+        return out
+
+    before = contents()
+    target = next(f for f in xm.list_files() if f.name == "XM20.  ")
+    assert target.segments[0][0] > 0x300  # entirely in the third region
+
+    app.xm_files_tab._save_new_or_edited_file(
+        "XM20.",
+        target.TYPE_DATA,
+        {"data_lines": ["1", "2", "3", "4", "5", "6", "7", "8"]},
+        replacing_addr=target.header_addr,
+        replacing_file=target,
+    )
+
+    after = contents()
+    assert len(after) == 59
+    assert after["XM20.  "] == ["1.0", "2.0", "3.0", "4.0", "5.0", "6.0", "7.0", "8.0"]
+    assert {k: v for k, v in after.items() if k != "XM20.  "} == {
+        k: v for k, v in before.items() if k != "XM20.  "
+    }
+    assert app.overview_tab._xm_summary_texts()[2] == "5/600 registers (1%)"
+
+
+def test_flags_tab_shows_and_toggles_flag_31_on_a_dm41x_state(app):
+    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_base.d41"))
+    flags = app.memory.status_registers
+    app.flags_tab.render(app.memory)
+    assert flags_label(app, 31) == "31 timer MDY / DMY"
+    before = [flags.get_flag(n) for n in range(56)]
+    assert app.flags_tab._flag_vars[31].get() == before[31]
+
+    app.flags_tab._flag_vars[31].set(not before[31])  # DMY / MDY
+    app.flags_tab._on_flag_toggled(31)
+
+    after = [flags.get_flag(n) for n in range(56)]
+    assert after[31] == (not before[31])
+    assert [n for n in range(56) if after[n] != before[n]] == [31]
+    assert app.memory.modified
+
+
+def flags_label(app, n):
+    return app.flags_tab._body.winfo_children()[n].cget("text")

@@ -25,8 +25,9 @@ pytest.importorskip("customtkinter")
 
 import customtkinter as ctk
 
-from memory import Memory
-from gui.key_assignments_tab import KeyAssignmentsTab
+from memory import DM41X, Memory
+from memory.mnemonics import key_bytes_for, resolve
+from gui.key_assignments_tab import FLAG_CLEAR_TEXT, KeyAssignmentsTab
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -195,3 +196,44 @@ def root_children_dialog(tab):
     ]
     assert len(dialogs) == 1, "expected exactly one open KeyAssignmentEditDialog"
     return dialogs[0]
+
+
+# -- LKAOFF: an assignment whose key flag is clear (plan, phase 3 step 8) --
+
+
+def test_flag_clear_assignment_is_shown_with_a_warning_mark(tab):
+    tab.render(Memory.from_file(DATA_DIR / "lkaoff3.d41", profile=DM41X))
+
+    assert _button_text(tab, 11, False) == "⚠▸LKATST"
+    assert _button_text(tab, 12, True) == "⚠⇧▸BBB"
+    button = tab._key_buttons[(11, False)][0]
+    assert button.cget("text_color") == FLAG_CLEAR_TEXT
+
+
+def test_lkaon_state_shows_the_same_assignments_unmarked(tab):
+    tab.render(Memory.from_file(DATA_DIR / "lkaon3.d41", profile=DM41X))
+
+    assert _button_text(tab, 11, False) == "▸LKATST"
+    assert _button_text(tab, 12, True) == "⇧▸BBB"
+    assert tab._key_buttons[(11, False)][0].cget("text_color") != FLAG_CLEAR_TEXT
+
+
+def test_header_counts_the_flag_clear_keys(tab):
+    tab.render(Memory.from_file(DATA_DIR / "lkaoff3.d41", profile=DM41X))
+    assert tab._header_label.cget("text") == (
+        "Key assignments: 2 -- 2 with the key flag clear (LKAOFF)"
+    )
+
+    tab.render(Memory.from_file(DATA_DIR / "lkaon3.d41", profile=DM41X))
+    assert tab._header_label.cget("text") == "Key assignments: 2"
+
+
+def test_assigning_a_marked_key_clears_the_mark(tab):
+    memory = Memory.from_file(DATA_DIR / "lkaoff3.d41", profile=DM41X)
+    tab.render(memory)
+
+    memory.key_assignments.set_assignment(11, False, key_bytes_for(resolve("COS")))
+    tab._refresh_buttons()
+
+    assert _button_text(tab, 11, False) == "COS"
+    assert _button_text(tab, 12, True) == "⚠⇧▸BBB"

@@ -215,6 +215,44 @@ class KeyAssignments(MemoryRegion):
             self._keyflags_bit(key_number), shifted
         )
 
+    def flag_clear_assignments(self) -> list:
+        '''`(key_number, shifted)` for every key that has an assignment of
+        either kind (a Key Assignment Register entry, or a global label's
+        key byte) while its KEYFLAGS bit is clear, in key-number order.
+
+        The OS looks an assignment up only when the flag is set, so such a
+        key behaves as unassigned. This is how LKAOFF is stored in a state
+        file on a DM41X: it clears the flags of the top two rows of keys and
+        leaves the assignments alone (docs/key_assignments.md, "LKAOFF (DM41X)").
+        Nothing here changes the flags, and the app never recomputes them
+        from the assignments; the one-key set/clear in set_assignment() and
+        the global-label paths is all that ever touches them.'''
+        assigned = set()
+        for entry in self.list_assignments():
+            if entry["key_number"] is not None:
+                assigned.add((entry["key_number"], entry["shifted"]))
+        for label in self._memory.programs.list_global_chain():
+            if label.is_named and label.key_assignment:
+                try:
+                    assigned.add(self.key_number_for_byte(label.key_assignment))
+                except ValueError:
+                    pass  # not a real key position; nothing to report
+        return sorted(
+            (key_number, shifted)
+            for key_number, shifted in assigned
+            if not self.get_key_flag(key_number, shifted)
+        )
+
+    def is_lkaoff_like(self) -> bool:
+        '''True if any assigned key in the top two rows (keys 11-15 and
+        21-25, the ones local-label auto assignment and LKAOFF act on) has
+        its KEYFLAGS bit clear -- what a state saved after LKAOFF looks
+        like.'''
+        return any(
+            key_number // 10 in (1, 2)
+            for key_number, _shifted in self.flag_clear_assignments()
+        )
+
     def set_key_flag(self, key_number: int, shifted: bool, value: bool):
         '''Sets or clears the KEYFLAGS existence bit for `key_number`
         (docs sec 4.5). Callers writing an actual assignment should use

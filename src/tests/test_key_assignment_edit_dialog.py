@@ -43,6 +43,7 @@ def _make_dialog(
     assignment=None,
     program_assignment=None,
     program_names=(),
+    flag_clear=False,
 ):
     return KeyAssignmentEditDialog(
         root,
@@ -53,6 +54,7 @@ def _make_dialog(
         program_names=list(program_names),
         on_save=on_save or mock.Mock(),
         on_delete=on_delete or mock.Mock(),
+        flag_clear=flag_clear,
     )
 
 
@@ -262,3 +264,15 @@ def test_function_assignment_takes_display_priority_over_program(root):
 
     assert dlg._tabs.get() == "Function"
     assert "Currently assigned: +" in dlg.winfo_children()[0].cget("text")
+
+
+def test_flag_clear_note_is_shown_only_when_the_flag_is_clear(root):
+    def note_shown(dlg):
+        return any(
+            "flag is clear" in str(w.cget("text"))
+            for w in dlg.winfo_children()
+            if isinstance(w, ctk.CTkLabel)
+        )
+
+    assert note_shown(_make_dialog(root, flag_clear=True))
+    assert not note_shown(_make_dialog(root))

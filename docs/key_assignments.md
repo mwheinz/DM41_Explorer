@@ -115,6 +115,31 @@ same convention `StatusRegisters.get_flag()`/`set_flag()` use for register d's
 
     bit = 36 - M - 8*(N-1)
 
+#### LKAOFF (DM41X)
+
+The DM41X's `LKAOFF` function turns off the auto-assignment of local labels A-J to
+the top two rows of keys, and a state file saved afterwards records it in these flags
+and nowhere else: the bits for keys 11-15 and 21-25 (bits 35, 27, 19, 11, 3 and 34,
+26, 18, 10, 2, in R for unshifted and e for shifted) are **cleared**, while every
+assignment, whether a Key Assignment Register entry or a global label's key byte,
+stays where it was. Since the flags are consulted first, a key whose flag is clear
+is treated as unassigned and falls back to the auto-assigned local label; `LKAON`
+sets the flags again. Confirmed on a DM41X with `lkaoff3.d41` and `lkaon3.d41`,
+which differ in exactly these bits (plan, S2b-S2g). `FAST` and `SLOW` are not in the
+state file at all, and the low nibbles of e that move with them are not LKAOFF's.
+
+How the Explorer treats it:
+
+- `KeyAssignments.flag_clear_assignments()` lists the assigned keys whose flag is
+  clear, and `is_lkaoff_like()` says whether any of them is in the top two rows. The
+  Key Assignments tab shows those assignments as usual, marked ⚠ with a note in the
+  header and in the edit dialog, rather than as corruption.
+- The flags are never recomputed from the assignments. Only `set_assignment()`,
+  `delete_assignment()` and the global-label paths in `program_memory.py` touch
+  one key's flag, so loading, editing another key and saving keeps a state LKAOFF.
+- Assigning a key whose flag is clear sets the flag, as `ASN` does on the calculator
+  (S2f).
+
 ### Global Label (User Program) Key Assignments
 
 Assigning a key to a user program (`ASN "PROGLABEL" [key]`) does **not** create

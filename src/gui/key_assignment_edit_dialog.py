@@ -40,6 +40,13 @@ PLATFORM_SYSTEM = platform.system()
 # added to the HP-41CX set. Assigning it is allowed on any model's state.
 _DM41X_ONLY_HINT = "DM41X only: a DM41L does not have this function."
 
+# Shown under the title when the key is assigned but its key flag is clear,
+# as LKAOFF leaves the top two rows of keys. Saving here sets the flag.
+_FLAG_CLEAR_NOTE = (
+    "This key's flag is clear, so the calculator treats it as unassigned "
+    "(as after LKAOFF). Saving an assignment sets the flag."
+)
+
 # Every assignable function's HP-41 display name, alphabetically --
 # single-byte and XROM/peripheral functions merged into one list, since
 # the picker doesn't need to distinguish them; memory/mnemonics.py
@@ -80,6 +87,8 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
     `program_assignment` otherwise, matching the real lookup order.
     `program_names` lists every assignable global label (from
     list_global_chain()) for the Program tab's picker, alphabetical.
+    `flag_clear` is True when the key is assigned but its KEYFLAGS bit is
+    clear (KeyAssignments.flag_clear_assignments()): the dialog says so.
     """
 
     def __init__(
@@ -92,6 +101,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         program_names,
         on_save,
         on_delete,
+        flag_clear=False,
     ):
         super().__init__(master)
         shift_label = "shifted" if shifted else "unshifted"
@@ -122,6 +132,14 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
             wraplength=340,
             justify="left",
         ).pack(padx=16, pady=(16, 4), anchor="w")
+        if flag_clear:
+            ctk.CTkLabel(
+                self,
+                text=_FLAG_CLEAR_NOTE,
+                text_color="gray50",
+                wraplength=340,
+                justify="left",
+            ).pack(padx=16, pady=(0, 4), anchor="w")
 
         tabs = ctk.CTkTabview(self, width=360)
         tabs.pack(padx=16, pady=8, fill="both", expand=True)

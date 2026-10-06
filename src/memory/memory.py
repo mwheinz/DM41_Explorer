@@ -122,6 +122,15 @@ class Memory:
         if not lines:
             return memory
 
+        # A dump omits all-zero rows, so a register it does not mention is
+        # zero. Drop the "Memory Lost" defaults a new Memory starts with, or
+        # they would show through where the file has a zero (lander.dm41 and
+        # targ.dm41 have no row 08).
+        memory._core_memory.clear()
+        # Likewise S is optional in a dump (targ.dm41 and lander.dm41 have
+        # none), and to_string() leaves it out when there is none.
+        memory._special_registers.pop("S", None)
+
         header = lines[0]
         if header != "DM41":
             raise ValueError(f"Invalid header: {header}")

@@ -35,6 +35,12 @@ class XMFile:
     TYPE_DATA = 2
     TYPE_ASCII = 3
     TYPE_LABELS = {TYPE_PROGRAM: "Program", TYPE_DATA: "Data", TYPE_ASCII: "ASCII"}
+    # RETPFL on a DM41X can set the type nibble of a file's header to any
+    # value (plan, S4). Types 4-15 keep the Data header layout, and the
+    # calculator itself labels them "@" (S4c). They are read as raw
+    # registers and are never decoded.
+    TYPE_OTHER_FIRST = 4
+    TYPE_OTHER_LAST = 15
 
     def __init__(
         self,
@@ -91,7 +97,17 @@ class XMFile:
         return self.segments[-1][0]
 
     @property
+    def is_other_type(self) -> bool:
+        """True for a file whose type nibble is 4-15 (see TYPE_OTHER_FIRST):
+        not a Program, Data or ASCII file, so its content is not decoded."""
+        return self.TYPE_OTHER_FIRST <= self.file_type <= self.TYPE_OTHER_LAST
+
+    @property
     def type_label(self) -> str:
+        """"Program", "Data" or "ASCII"; "@ (type N)" for types 4-15, the
+        calculator's own "@" plus the number it hides."""
+        if self.is_other_type:
+            return f"@ (type {self.file_type})"
         return self.TYPE_LABELS.get(self.file_type, f"Unknown(0x{self.file_type:x})")
 
     @property
@@ -262,7 +278,9 @@ class ExtendedMemory(MemoryRegion):
     Header register layout, reverse-engineered from several known-content
     dumps (not from a documented spec -- see docs/memory.md for the sample
     data this is based on):
-      nibble 0      file type: 1 = Program, 2 = Data, 3 = ASCII.
+      nibble 0      file type: 1 = Program, 2 = Data, 3 = ASCII; 4-15 (set
+                    by RETPFL on a DM41X) keep the Data layout and are shown
+                    as "@" (see XMFile.TYPE_OTHER_FIRST).
       nibble 1-3    (Data/ASCII only) AAA, the header's own address in
                     every undisturbed real dump seen so far -- but NOT
                     relied on by list_files() to identify a header: a real
@@ -353,7 +371,9 @@ class ExtendedMemory(MemoryRegion):
             raise ValueError("Not a 7-byte register.")
 
         file_type = raw[0] >> 4
-        if file_type not in (cls.TYPE_PROGRAM, cls.TYPE_DATA, cls.TYPE_ASCII):
+        if file_type not in (cls.TYPE_PROGRAM, cls.TYPE_DATA, cls.TYPE_ASCII) and not (
+            XMFile.TYPE_OTHER_FIRST <= file_type <= XMFile.TYPE_OTHER_LAST
+        ):
             raise ValueError("Header does not have a valid file type.")
 
         register_length = ((raw[5] & 0x0F) << 8) | raw[6]
@@ -400,7 +420,8 @@ class ExtendedMemory(MemoryRegion):
         # reserved-zero check already carries the false-positive-rejection
         # weight on its own (see above), requiring AAA == addr here would
         # just reject real, undamaged files like this one.
-        if file_type == cls.TYPE_DATA:
+        if file_type == cls.TYPE_DATA or file_type >= XMFile.TYPE_OTHER_FIRST:
+            # Types 4-15 (a RETPFL'd file) keep the Data layout.
             if raw[2:4] != b"\x00\x00":
                 raise ValueError("Invalid DATA file header.")
         else:  # TYPE_ASCII -- nibble 4-5 is byte 2 in full; nibble 6-7

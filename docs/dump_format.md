@@ -99,6 +99,7 @@ Two spaces between pairs is the reliable marker of calculator-style output here.
 - More than four registers on one row raises an error ("Line too long"), after the row has been read.
 - A special-register line is read as pairs of `<letter>: <hex>`. A token that is not `<letter>:` where a label is expected raises "Malformed line", and an odd number of tokens fails with an `IndexError` rather than a clear message. Any single character is accepted as a register label, not only `A` to `N`; `to_string()` writes only the named ones.
 - The first line (after the whole file is stripped) must be exactly `DM41`.
+- A register that no row mentions is zero, and an `S` line is optional: a file with no `S:` loads with none (`lander.dm41` and `targ.dm41` have neither a row 08 nor an `S:` line). The defaults a new `Memory()` starts with ("Memory Lost" values in registers 08, 0c, 0d, 0e and in the special registers) are replaced by the file's content. Before 2026-10-06 they showed through where a file had none.
 - The reader does not check that an address is inside the memory map of the chosen `DeviceProfile`; a row at 0x500 loads without error (checked).
 
 ## 6. Where the Writer Differs
@@ -109,7 +110,7 @@ Changes in the text of a file that has been loaded and saved again with `Memory.
 - Two-space gaps between special-register pairs become single spaces.
 - All-zero register rows are omitted (the calculator already omits them, so this normally changes nothing).
 
-The register contents themselves are unchanged. Loading a file, saving it and loading it again gives a `Memory` that compares equal (checked on `backuptest.d41`). For `.d41` and `.dm41` files a byte-identical round trip is therefore **not** expected; the project's round-trip test should compare the files after the whitespace above is normalised (see `dm41x_explorer_plan.md`, phase 2).
+The register contents themselves are unchanged. Loading a file, saving it and loading it again gives a `Memory` that compares equal (checked on `backuptest.d41`). For `.d41` and `.dm41` files a byte-identical round trip is therefore **not** expected; the project's round-trip test should compare the files after the whitespace above is normalised (`src/tests/test_state_roundtrip.py` does this for every fixture).
 
 ## 7. Open Questions
 
