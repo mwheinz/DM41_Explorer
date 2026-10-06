@@ -1,12 +1,12 @@
 # DM41_Explorer
 
 A Windows, MacOS, and Linux desktop GUI for reading, writing, and editing the
-memory of a [DM41L](https://www.swissmicros.com/) (HP‑41CX emulator) over its
-serial console.
+memory of a [DM41L/X](https://www.swissmicros.com/) (HP‑41CX emulator) over its
+serial console or USB disk interface.
 
 ## Features
 
-- **Overview** — A quick summary view of the contents of the DM41L's memory,
+- **Overview** — A quick summary view of the contents of the DM41L/X's memory,
   including the stack & alpha registers, main memory, and extended memory. Also
   shows the current values of R00, .END., ΣREG, and a memory-usage summary at a
   glance.
