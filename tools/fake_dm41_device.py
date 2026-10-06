@@ -4,7 +4,7 @@ import serial
 
 PORT = sys.argv[1] if len(sys.argv) > 1 else "/tmp/ttyB"
 
-DUMP_BODY = (
+STATE_BODY = (
     "DM41\n"
     "00  01234567890123  09876543210987  00000000000000  00000000000000\n"
     "A: 00000000c00020 B: f000002c0480fd C: f000002c0480fd\n"
@@ -14,7 +14,7 @@ DUMP_BODY = (
 RESPONSES = {
     "b": "BAT: 3200mV",
     "t": "2026-07-29 22:40:00 WED",
-    "s": DUMP_BODY.strip(),
+    "s": STATE_BODY.strip(),
 }
 
 
@@ -32,7 +32,7 @@ def main():
                 line = line.strip()
 
                 if loading:
-                    # Swallow the streamed dump silently until the final
+                    # Swallow the streamed state silently until the final
                     # "M: ... N: ... G: ..." line, matching Memory.to_string()'s
                     # fixed line order.
                     print(f"[fake device] (loading) received: {line!r}", flush=True)

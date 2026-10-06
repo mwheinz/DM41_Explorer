@@ -25,4 +25,17 @@ so it's fine to browse, copy files out of, or delete.
 Full usage instructions, known limitations, and how to get past the
 Windows SmartScreen "unknown publisher" warning on this unsigned build
 are in the project's README on GitHub:
-https://github.com/mwheinz/DM41L_Explorer
+https://github.com/mwheinz/DM41_Explorer
+
+License
+-------
+
+DM41_Explorer is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License, version 3, as published by
+the Free Software Foundation. It is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+Public License for more details.
+
+The full license text is in the LICENSE file next to this one. The source code
+for this build is at the GitHub address above.

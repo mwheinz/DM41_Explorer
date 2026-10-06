@@ -45,7 +45,7 @@ class FlagsTab(ctk.CTkFrame):
         self._flag_vars = {}
 
         if memory is None:
-            self._header_label.configure(text="(no memory dump loaded)")
+            self._header_label.configure(text="(no memory state loaded)")
             return
 
         try:

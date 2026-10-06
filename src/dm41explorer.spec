@@ -48,7 +48,7 @@ exe = EXE(
     a.scripts,
     [("O", None, "OPTION"), ("O", None, "OPTION")],
     exclude_binaries=True,
-    name="dm41lexplorer",
+    name="dm41explorer",
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -68,18 +68,18 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name="dm41lexplorer",
+    name="dm41explorer",
 )
 app = BUNDLE(
     coll,
-    name="DM41L Explorer.app",
+    name="DM41_Explorer.app",
     icon=icon,
     bundle_identifier=None,
     info_plist={
         "CFBundleDocumentTypes": [{
-            "CFBundleTypeName": "DM41L Memory Dump",
+            "CFBundleTypeName": "DM41 Memory State",
             # "Editor", not "Viewer" (unlike AtomDataExtractor's adv.spec):
-            # File > Save Dump/Save Dump As... actually write .dm41 files,
+            # File > Save State/Save State As... actually write .dm41 files,
             # this isn't a read-only viewer.
             "CFBundleTypeRole": "Editor",
             "LSHandlerRank": "Owner",

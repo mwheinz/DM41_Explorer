@@ -1101,7 +1101,7 @@ def _encode_instruction(tokens: List[str]) -> Tuple[bytes, bool]:
         # real calculator) -- but that linking is exactly what this
         # project's own existing pack()/_forward_scan_programs() repair
         # mechanism (docs/program.md sec 5.4) already exists to fix up
-        # for "a dump written by a tool other than a real HP-41/DM41L (or
+        # for "a state written by a tool other than a real HP-41/DM41L (or
         # this app)", so this compiler doesn't need to track any
         # cross-instruction chain position itself -- it just needs to
         # match what hp41uc's own compiler actually emits.

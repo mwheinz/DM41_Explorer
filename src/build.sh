@@ -33,6 +33,8 @@ pyinstaller dm41explorer.spec
 if [ "$(uname)" = "Darwin" ]; then
     codesign --force --deep --sign - "dist/DM41_Explorer.app"
     cp -r ../README.md "dist/README.md"
+    # The GPL asks that every binary distribution carry the license text.
+    cp ../LICENSE "dist/LICENSE"
 else
     # Drop a short README into that output directory so anyone
     # who unzips a release and sees an unfamiliar _internal folder next
@@ -45,4 +47,5 @@ else
     fi
 
     cp -r ../README.md "dist/dm41explorer/README.md"
+    cp ../LICENSE "dist/dm41explorer/LICENSE"
 fi

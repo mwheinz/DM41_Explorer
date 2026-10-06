@@ -1,6 +1,6 @@
 """
 Tests that Memory.pack() produces what a REAL PACK on real hardware
-produces, using before/after dump pairs captured from a real DM41L/DM41X
+produces, using before/after state pairs captured from a real DM41L/DM41X
 (tests/data):
 
     manyfiles.dm41              -> manyfiles-packed.dm41
@@ -254,8 +254,8 @@ def test_twolabels_costs_one_register_exactly_like_the_real_pack_did():
 
 
 # Explorer-produced output (Tools > Pack Memory) that was then loaded on a
-# real DM41L and checked: the programs still run. The "before" dumps are
-# calculator captures (packed-test.dm41 is the dump of a calculator right
+# real DM41L and checked: the programs still run. The "before" states are
+# calculator captures (packed-test.dm41 is the state of a calculator right
 # after it ran the program, so its GTO/XEQ jump caches are real).
 EXPLORER_PACKED_AND_VERIFIED = [
     ("packed-test.dm41", "repacked-test.dm41"),

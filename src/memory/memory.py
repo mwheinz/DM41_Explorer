@@ -1,9 +1,9 @@
 '''
-Memory: a representation of a DM41-series (DM41L, DM41X, ...) memory dump
+Memory: a representation of a DM41-series (DM41L, DM41X, ...) memory state
 and tools for manipulating it. See the memory package's __init__.py docstring
-for the on-disk dump format overview.
+for the on-disk state format overview.
 
-Memory itself owns only what is genuinely dump-wide: parsing and
+Memory itself owns only what is genuinely state-wide: parsing and
 serialization, raw register storage, the partition sanity check every region
 agrees on, and the set of regions. Everything that is specific to one kind of
 memory lives on that kind's own region class (regions.py's module docstring
@@ -33,7 +33,7 @@ from .xm_file import ExtendedMemory
 
 
 class Memory:
-    '''A complete DM41-series memory dump (a DM41L `.dm41` dump or a DM41X
+    '''A complete DM41-series memory state (a DM41L `.dm41` state or a DM41X
     `.d41` state file -- the text format is identical).'''
 
     # Pattern to capture a capital letter followed by any hex string of 1
@@ -42,7 +42,7 @@ class Memory:
 
     def __init__(self, header: str = "DM41", profile: DeviceProfile = DM41L):
         self._header = header
-        # Which DM41 model's memory map this dump uses. The dump text
+        # Which DM41 model's memory map this state uses. The state text
         # doesn't say, so the caller chooses -- see device_profile.py.
         self._profile = profile
         self._core_memory: Dict[int, Register] = {}  # Keyed by register index
@@ -51,7 +51,7 @@ class Memory:
         )  # Keyed by label order preservation
 
         # Default values for some status registers. Taken from a memory
-        # dump in the "Memory Lost" state. Registers not initialized
+        # state in the "Memory Lost" state. Registers not initialized
         # are all zeroes.
         self._core_memory[8] = Register.from_hex("4b000000000000")
         self._core_memory[12] = Register.from_hex("1000000000019c")
@@ -59,7 +59,7 @@ class Memory:
         self._core_memory[14] = Register.from_hex("0000002c048000")
 
         # Default values for special registers. Taken from a
-        # memory dump in the "Memory Lost" state.
+        # memory state in the "Memory Lost" state.
         self._special_registers["A"] = Register.from_hex("00000000c00020")
         self._special_registers["B"] = Register.from_hex("f000002c0480fd")
         self._special_registers["C"] = Register.from_hex("f000002c0480fd")
@@ -71,7 +71,7 @@ class Memory:
         # The regions. Each is a live view -- its boundaries are computed
         # from this Memory every time they're read (see regions.py), so
         # these instances are built once here and stay correct for the
-        # life of the dump no matter how much moves around inside it.
+        # life of the state no matter how much moves around inside it.
         self._regions = {}
         for region in (
             StatusRegisters(self),
@@ -97,7 +97,7 @@ class Memory:
             return False
 
         # Compare *effective* register values via get_register() rather than
-        # the raw _core_memory dicts: memory dumps are sparse, but
+        # the raw _core_memory dicts: memory states are sparse, but
         # get_register() already treats an address with no matching entry as
         # an implicit zero register, so two Memory objects that agree on every
         # address's effective value are equal even if one of them happens to
@@ -112,7 +112,7 @@ class Memory:
     def from_string(cls, buffer: str, profile: DeviceProfile = DM41L) -> "Memory":
         '''
         Creates a new Memory object from a string that contains a DM41
-        memory dump. `profile` says which model's memory map to use (the
+        memory state. `profile` says which model's memory map to use (the
         text format is identical for every model).
         '''
 
@@ -122,12 +122,12 @@ class Memory:
         if not lines:
             return memory
 
-        # A dump omits all-zero rows, so a register it does not mention is
+        # A state omits all-zero rows, so a register it does not mention is
         # zero. Drop the "Memory Lost" defaults a new Memory starts with, or
         # they would show through where the file has a zero (lander.dm41 and
         # targ.dm41 have no row 08).
         memory._core_memory.clear()
-        # Likewise S is optional in a dump (targ.dm41 and lander.dm41 have
+        # Likewise S is optional in a state (targ.dm41 and lander.dm41 have
         # none), and to_string() leaves it out when there is none.
         memory._special_registers.pop("S", None)
 
@@ -149,7 +149,7 @@ class Memory:
                         "Memory registers cannot follow special registers: "
                         f"{line}"
                     )
-                # We're expecting a well-formed memory dump.
+                # We're expecting a well-formed memory state.
                 # First token should be a hex base-addr.
                 try:
                     base = int(token[0], 16)
@@ -160,7 +160,7 @@ class Memory:
                     ) from e
                 if base < next_base:
                     raise ValueError(
-                        "Memory dump is not well-formed:"
+                        "Memory state is not well-formed:"
                         f"{base} < {next_base}. {line}"
                     )
 
@@ -209,14 +209,14 @@ class Memory:
     def from_file(
         cls, path: Union[str, Path], profile: DeviceProfile = DM41L
     ) -> "Memory":
-        '''Load a memory dump from disk. A convenience wrapper: the pure,
+        '''Load a memory state from disk. A convenience wrapper: the pure,
         filesystem-free API is from_string(), which is what portable code
         (and the web decoder's port) uses.'''
         with open(path, "r", encoding="utf-8") as f:
             return cls.from_string(f.read(), profile=profile)
 
     def to_string(self) -> str:
-        ''' Create a string representation of the memory dump. '''
+        ''' Create a string representation of the memory state. '''
 
         # Section I: "DM41"
         lines = [self._header]
@@ -229,11 +229,11 @@ class Memory:
 
         # Remember, _core_memory is a sparse structure. Addresses that are omitted are
         # assumed to be zero. sorted_indices is strictly a list of addresses
-        # that were either present in the original representation this dump
+        # that were either present in the original representation this state
         # was created from or else were set during operation.
         sorted_indices = sorted(self._core_memory.keys())
         if sorted_indices:
-            # Dump files group core memory in rows of 4 registers.
+            # State files group core memory in rows of 4 registers.
             # Generate a list of rows for the final output.
             rows = sorted({idx - (idx % 4) for idx in sorted_indices})
             for base_idx in rows:
@@ -249,9 +249,9 @@ class Memory:
 
         # Section III: Special Registers
         # These appear to be representations of the HP41's CPU registers. Note
-        # that right now the DM41L_Explorer never alters their values.
+        # that right now the DM41_Explorer never alters their values.
         # TODO: Consider just making these constants based on their values in
-        # a dump taken in memory lost state.
+        # a state taken in memory lost state.
         if self._special_registers:
             # These need to be emitted in the same order they first appeared.
             A = self._special_registers["A"].get_hex()
@@ -270,7 +270,7 @@ class Memory:
         return "\n".join(lines) + "\n"
 
     def to_file(self, path: Union[str, Path]):
-        '''Write the dump to disk (convenience wrapper over to_string())
+        '''Write the state to disk (convenience wrapper over to_string())
         and clear the modified flag.'''
         with open(path, "w", encoding="utf-8") as f:
             f.write(self.to_string())
@@ -302,7 +302,7 @@ class Memory:
 
     @property
     def profile(self) -> DeviceProfile:
-        '''This dump's model profile (memory map).'''
+        '''This state's model profile (memory map).'''
         return self._profile
 
     @property
@@ -355,7 +355,7 @@ class Memory:
 
     def has_program_partition(self) -> bool:
         '''True when R00/`.END.` describe a program/data partition worth
-        trusting. False for a corrupt or never-loaded dump, where the
+        trusting. False for a corrupt or never-loaded state, where the
         pointers decode to values that mean nothing -- ProgramMemory and
         DataMemory both report themselves empty in that case, and
         FreeSpace runs the whole way up to PRIMARY_DATA_END, rather than
@@ -363,7 +363,7 @@ class Memory:
 
         Note that even a default, empty Memory object
         starts with these set; but it is always possible that we read a
-        corrupt dump file that omitted the status registers. About the only
+        corrupt state file that omitted the status registers. About the only
         other way to create this situation is for the user to set the value
         of R00 to an illegal value.
         '''
@@ -419,7 +419,7 @@ class Memory:
                 return span
         return None
 
-    # -- Whole-dump operations -------------------------------------------
+    # -- Whole-state operations -------------------------------------------
 
     def pack(self) -> int:
         '''
@@ -431,8 +431,8 @@ class Memory:
         already usually perfectly packed as a side effect of every
         KeyAssignments edit -- but in the actual calculator packing is a
         manual operation. This means deleting key assignments can create gaps
-        in a dump file on disk if the user did not manually pack memory before
-        saving the dump file.
+        in a state file on disk if the user did not manually pack memory before
+        saving the state file.
 
         Program memory (docs/program.md sec 5) gets more than a repack --
         see `ProgramMemory.repack()`, which rebuilds the global chain
@@ -442,7 +442,7 @@ class Memory:
         plus an empty `.END.` (which can cost one register -- the return
         value is then -1).
 
-        Meant to be run explicitly after loading a dump file or before an
+        Meant to be run explicitly after loading a state file or before an
         Import to guarantee the maximum possible free space is available for
         the program to be imported, and to make sure every label actually
         present is visible for assignment -- this project deliberately doesn't

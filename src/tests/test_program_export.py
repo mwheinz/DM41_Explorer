@@ -89,7 +89,7 @@ def test_find_program_end_stops_at_first_plain_end_not_at_embedded_label():
 def test_get_program_bytes_apptest_matches_docs_program_md():
     # simple.dm41 has exactly ONE program (APPTEST) under the corrected,
     # END-delimited model -- see test_list_programs_simple_is_one_program_not_two()
-    # in test_memory.py for why an earlier reading of this dump wrongly
+    # in test_memory.py for why an earlier reading of this state wrongly
     # believed there was a second, "nameless" one.
     memory = Memory.from_file(DATA_DIR / "simple.dm41")
     programs = memory.programs.list_programs()
@@ -160,10 +160,10 @@ def test_get_program_bytes_finds_a_real_unnamed_program_mid_chain():
     assert find_program_end(data) == len(data)
 
 
-def test_get_program_bytes_terminates_on_every_sample_dump():
+def test_get_program_bytes_terminates_on_every_sample_state():
     """Defensive/regression coverage, matching
-    test_list_programs_terminates_on_every_sample_dump(): exporting every
-    program in every sample dump should never raise DM41MemoryError (a
+    test_list_programs_terminates_on_every_sample_state(): exporting every
+    program in every sample state should never raise DM41MemoryError (a
     corrupt-data signal) or hang, and every program's own bytes must form
     exactly one well-formed program (find_program_end() agrees on where
     it ends)."""
@@ -208,9 +208,9 @@ def test_encode_program_dat_rejects_oversized_program():
 # global label to export a program at all; see
 # test_get_program_bytes_recovers_a_program_with_no_label_at_all() and
 # test_get_program_bytes_finds_a_real_unnamed_program_mid_chain() above,
-# which exercise that fix directly against real .dm41 dumps.
+# which exercise that fix directly against real .dm41 states.
 #
-# tower.{raw,dat} aren't themselves loaded into any .dm41 dump fixture,
+# tower.{raw,dat} aren't themselves loaded into any .dm41 state fixture,
 # so they can't drive Memory.get_program_bytes() end to end -- but they're
 # an excellent real-world check on the lower-level pieces that fix relies
 # on: decoding both files must recover identical instruction bytes,
@@ -274,7 +274,7 @@ def test_decode_program_dat_rejects_truncated_file():
 # (0x0A) inserted every 50 characters, plus one trailing newline -- i.e.
 # PPC is just DAT's own hex text, word-wrapped for display/printing, not
 # a distinct binary layout. See program_files.py's module docstring for
-# the full story (including why DM41L_Explorer's own DAT import was
+# the full story (including why DM41_Explorer's own DAT import was
 # choking on these files when tried under a renamed .dat/.raw
 # extension: decode_program_dat()'s fixed-byte-offset slicing and
 # decode_program_raw()'s opcode scan both assume no embedded whitespace).

@@ -221,7 +221,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
             self._program_var = None
             ctk.CTkLabel(
                 tabs.tab("Program"),
-                text="This dump has no global programs to assign.",
+                text="This state has no global programs to assign.",
                 text_color="gray50",
                 wraplength=320,
                 justify="left",
@@ -287,7 +287,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
                     raise ValueError(f"Expected 2 or 4 hex digits, got {len(text)}.")
             else:  # Program
                 if not self._program_names:
-                    raise ValueError("This dump has no global programs to assign.")
+                    raise ValueError("This state has no global programs to assign.")
                 name = self._program_var.get().strip()
                 if not name or name not in self._program_names:
                     raise ValueError("Choose a program.")

@@ -194,8 +194,8 @@ def test_remove_rejects_on_a_buffer_with_no_valid_partition():
 # -- Regression sweep ---------------------------------------------------------
 
 
-def test_remove_every_program_in_every_sample_dump_one_at_a_time():
-    """For every real program in every sample dump, removing it should
+def test_remove_every_program_in_every_sample_state_one_at_a_time():
+    """For every real program in every sample state, removing it should
     never raise, should reduce the program count by exactly one, and
     should leave every other program's own name/length exactly as it
     was."""

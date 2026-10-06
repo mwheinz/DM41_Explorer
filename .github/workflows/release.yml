@@ -5,7 +5,7 @@ name: Release
 #   git push origin v0.1.0
 #
 # Builds a standalone binary on Linux (x86_64 and arm64), macOS, and
-# Windows (x86_64 and arm64) via build.sh / dm41l.spec, zips each one up
+# Windows (x86_64 and arm64) via build.sh / dm41explorer.spec, zips each one up
 # with a checksum, and publishes them all to a GitHub Release named after
 # the tag.
 #
@@ -80,9 +80,9 @@ jobs:
             *) ARCH="$(uname -m)" ;;
           esac
           cd src/dist
-          zip -r "../../DM41L-Explorer-${{ github.ref_name }}-linux-${ARCH}.zip" dm41lexplorer
+          zip -r "../../DM41_Explorer-${{ github.ref_name }}-linux-${ARCH}.zip" dm41explorer
           cd ../..
-          sha256sum "DM41L-Explorer-${{ github.ref_name }}-linux-${ARCH}.zip" > "DM41L-Explorer-${{ github.ref_name }}-linux-${ARCH}.zip.sha256"
+          sha256sum "DM41_Explorer-${{ github.ref_name }}-linux-${ARCH}.zip" > "DM41_Explorer-${{ github.ref_name }}-linux-${ARCH}.zip.sha256"
 
       - name: Package (Windows)
         if: runner.os == 'Windows'
@@ -97,8 +97,8 @@ jobs:
           # naturally architecture-agnostic.
           $arch = $env:PROCESSOR_ARCHITECTURE.ToLower()
           if ($arch -eq "amd64") { $arch = "x86_64" }
-          $zipName = "DM41L-Explorer-${{ github.ref_name }}-windows-$arch.zip"
-          Compress-Archive -Path "src/dist/dm41lexplorer" -DestinationPath $zipName
+          $zipName = "DM41_Explorer-${{ github.ref_name }}-windows-$arch.zip"
+          Compress-Archive -Path "src/dist/dm41explorer" -DestinationPath $zipName
           $hash = (Get-FileHash -Algorithm SHA256 $zipName).Hash.ToLower()
           # Match `sha256sum`'s output format ("<hash>  <filename>") so the
           # checksum files stay consistent across every platform leg.
@@ -115,18 +115,18 @@ jobs:
           # tool that zips a signed .app bundle without mangling its
           # resource forks / code-signing metadata, so the .app has to be
           # its own ditto call.
-          ditto -c -k --sequesterRsrc --keepParent "DM41L Explorer.app" "../../DM41L-Explorer-${{ github.ref_name }}-macos.zip"
-          zip -r "../../DM41L-Explorer-${{ github.ref_name }}-macos.zip" README.md
+          ditto -c -k --sequesterRsrc --keepParent "DM41_Explorer.app" "../../DM41_Explorer-${{ github.ref_name }}-macos.zip"
+          zip -r "../../DM41_Explorer-${{ github.ref_name }}-macos.zip" README.md LICENSE
           cd ../..
-          shasum -a 256 "DM41L-Explorer-${{ github.ref_name }}-macos.zip" > "DM41L-Explorer-${{ github.ref_name }}-macos.zip.sha256"
+          shasum -a 256 "DM41_Explorer-${{ github.ref_name }}-macos.zip" > "DM41_Explorer-${{ github.ref_name }}-macos.zip.sha256"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
-          name: dm41l-explorer-${{ matrix.os }}
+          name: dm41-explorer-${{ matrix.os }}
           path: |
-            DM41L-Explorer-*.zip
-            DM41L-Explorer-*.zip.sha256
+            DM41_Explorer-*.zip
+            DM41_Explorer-*.zip.sha256
           if-no-files-found: error
 
   publish:
@@ -148,5 +148,5 @@ jobs:
         run: |
           gh release create "${{ github.ref_name }}" artifacts/* \
             --repo "${{ github.repository }}" \
-            --title "DM41L Explorer ${{ github.ref_name }}" \
+            --title "DM41_Explorer ${{ github.ref_name }}" \
             --generate-notes

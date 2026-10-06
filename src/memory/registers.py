@@ -3,7 +3,7 @@ Register and AlphaRegister: fixed-length byte buffers representing HP41/
 DM41L hardware registers, plus the BCD/ASCII encode/decode logic for them.
 
 NOTE: The HP41C and DM41L are "little endian" - the LSB is considered to by
-"byte 0" and the MSB is considered "byte 6" - but DM41L dump files print hex
+"byte 0" and the MSB is considered "byte 6" - but DM41L state files print hex
 data from MSB to LSB. That is, _data[0] contains the MSB of the register. and
 _data[6] contains the LSB. Care must be taken to remember this difference when
 comparing HP41 documentation with the implementation of the Register and
@@ -19,7 +19,7 @@ from .trigraphs import encode_trigraphs, decode_trigraphs
 
 class DM41MemoryError(ValueError):
     '''
-    Raised when a register in the data dump contains an illegal value.
+    Raised when a register in the data state contains an illegal value.
 
     Shared by every DM41 model's memory code (DM41L, DM41X, ...). It was
     originally named DM41LMemoryError; that name is kept below as an alias

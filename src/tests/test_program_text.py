@@ -232,9 +232,9 @@ def test_encode_program_txt_decodes_global_name_references():
 
 def test_encode_program_txt_never_raises_on_every_sample_program():
     '''Defensive/regression coverage, matching the style of
-    test_get_program_bytes_terminates_on_every_sample_dump() in
+    test_get_program_bytes_terminates_on_every_sample_state() in
     test_program_export.py: decompiling every real program in every
-    sample dump should never raise, and should always end in a line
+    sample state should never raise, and should always end in a line
     starting with "END ;" (whether the underlying marker is a plain END
     or the permanent .END. sentinel -- both are rendered the same way,
     see this module's own encode_program_txt() docstring).'''
@@ -304,11 +304,11 @@ def _normalize_memory_state_fields(data: bytes) -> bytes:
         fields. Confirmed (this module's own decode_program_txt()
         docstring) that hp41uc's own compiler always emits these as
         zero/unlinked, even mid-buffer -- but a real hardware capture
-        (or any dump copied out of live memory, e.g. via
+        (or any state copied out of live memory, e.g. via
         ProgramMemory.get_program_bytes()) carries whatever *real*
         links happened to exist in that memory layout, which
         decode_program_txt() has no way to reconstruct (nor should it
-        try to -- linking a dump's own chain to memory it's about to be
+        try to -- linking a state's own chain to memory it's about to be
         spliced into is exactly what Memory.import_program()'s own
         pack()/_forward_scan_programs() repair mechanism already
         handles, per docs/program.md sec 5.4, and belongs there, not in
@@ -380,7 +380,7 @@ def _zero_cached_jump_bytes(data: bytes, out: bytearray) -> None:
 
 def _dm41_sample_programs():
     '''Yields (filename, program, instruction_bytes) for every real
-    program in every .dm41 sample dump -- the same fixture set
+    program in every .dm41 sample state -- the same fixture set
     test_encode_program_txt_never_raises_on_every_sample_program()
     already exercises for decompile-only coverage.'''
     from memory import Memory
@@ -395,7 +395,7 @@ def _dm41_sample_programs():
 
 def test_decode_program_txt_round_trips_every_sample_program_modulo_memory_state():
     '''Broader coverage than the tower fixture alone: every real program
-    in every .dm41 sample dump, decompiled and recompiled, should
+    in every .dm41 sample state, decompiled and recompiled, should
     reproduce the original bytes exactly once the memory-state-only
     fields _normalize_memory_state_fields() describes are normalized
     away on both sides. The one further exception, "twolabels.dm41"'s
@@ -1050,7 +1050,7 @@ def test_encode_program_txt_manyfiles_xmbcd_has_no_unknown_opcodes():
 
 
 def test_encode_program_txt_no_unknown_goto_xeq_in_any_fixture():
-    '''Sweep: no real sample dump has a GTO/XEQ left undecoded.'''
+    '''Sweep: no real sample state has a GTO/XEQ left undecoded.'''
     import os
 
     from memory import Memory

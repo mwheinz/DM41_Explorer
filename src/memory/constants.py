@@ -18,12 +18,12 @@ MIN_SANE_R00 = 0xC1
 
 # Every hardware register (HP41/DM41L) is exactly 7 bytes long -- see
 # docs/memory.md Sec.2 ("Word Size"). Memory.from_string() uses this to
-# reject a dump whose register field is the wrong length instead of
+# reject a state whose register field is the wrong length instead of
 # silently loading a corrupt/truncated Register.
 REGISTER_SIZE_BYTES = 7
 
 # The "G" special register is a documented exception: it's a single status
-# byte tacked onto the dump format, not a full 7-byte hardware register
+# byte tacked onto the state format, not a full 7-byte hardware register
 # (see Memory.__init__'s special-register defaults).
 SPECIAL_REGISTER_SIZE_OVERRIDES = {"G": 1}
 

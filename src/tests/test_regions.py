@@ -37,7 +37,7 @@ def unpartitioned_memory() -> Memory:
     """A Memory with no meaningful R00/.END. partition at all.
 
     Note this is NOT what a bare `Memory()` is: the constructor seeds
-    register c from a real "Memory Lost" dump, which already carries a
+    register c from a real "Memory Lost" state, which already carries a
     sane R00 (0x19c) and `.END.` (0x19b). Zeroing register c is what
     actually produces the corrupt/never-loaded state the program and data
     regions are supposed to report themselves empty for.
@@ -198,7 +198,7 @@ def test_free_space_shrinks_as_programs_grow():
 
 
 def test_program_and_data_regions_are_empty_without_a_partition():
-    """A dump whose register c decodes to nonsense has no partition;
+    """A state whose register c decodes to nonsense has no partition;
     rather than inventing a span from it, both regions report themselves
     empty and no address matches them."""
     memory = unpartitioned_memory()

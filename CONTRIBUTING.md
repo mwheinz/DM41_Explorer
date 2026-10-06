@@ -7,8 +7,8 @@ issues and pull requests easy to act on.
 ## Getting set up
 
 ```sh
-git clone https://github.com/mwheinz/DM41L_Explorer.git
-cd DM41L_Explorer
+git clone https://github.com/mwheinz/DM41_Explorer.git
+cd DM41_Explorer
 python3 -m venv dm41l-venv
 source dm41l-venv/bin/activate   # on Windows: venv\Scripts\activate
 pip install -r requirements-dev.txt
@@ -117,7 +117,7 @@ before a `raise` — let the catching code log it instead.
 
 ## Reporting bugs / requesting features
 
-Open a [GitHub issue](https://github.com/mwheinz/DM41L_Explorer/issues)
+Open a [GitHub issue](https://github.com/mwheinz/DM41_Explorer/issues)
 with:
 
 - What you did, what you expected, and what actually happened.
@@ -133,5 +133,5 @@ program editing) are already tracked there rather than as open issues.
 ## License
 
 By contributing, you agree your changes are licensed under this
-project's [Simplified BSD license](LICENSE), same as the rest of the
-codebase.
+project's [GNU General Public License, version 3](LICENSE), same as the rest
+of the codebase.

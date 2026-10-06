@@ -64,7 +64,7 @@ class RegionSpan:
     @property
     def count(self) -> int:
         '''Number of registers this span covers -- 0 (not negative) for an
-        empty span, e.g. "key" in a dump with no key assignments at all.'''
+        empty span, e.g. "key" in a state with no key assignments at all.'''
         return max(0, self.end - self.start + 1)
 
     def __contains__(self, addr: int) -> bool:
@@ -227,7 +227,7 @@ class FreeSpace(MemoryRegion):
     for a program import or for more key assignments/alarms to grow into.
 
     Purely derived: it owns no data of its own and has no behavior beyond
-    reporting how much room there currently is. When the dump has no sane
+    reporting how much room there currently is. When the state has no sane
     R00/`.END.` partition to bound it -- a corrupt or never-loaded one,
     see `Memory.has_program_partition()` -- it runs all the way up to
     `PRIMARY_DATA_END`, since there is no meaningful program/data split to

@@ -347,13 +347,13 @@ def test_memory_initialization(empty_memory):
 
 
 def test_memory_from_string(empty_memory):
-    """Test parsing a memory dump string."""
-    dump = """DM41
+    """Test parsing a memory state string."""
+    state = """DM41
 00  01020304050607  08090a0b0c0d0e  0f101112131415 
 A: c000f50046494c B: 8000000000c196 C: 0000002c0480fd S: 00101100100000 M: 00011cd5ff73cb N: 00000000000000 G: 00"""
     # Note: In my earlier analysis I saw A was c0..., which I'll assume is valid for test parsing,
     # even if get_bcd_number() would fail later. We are testing the parser here.
-    mem = Memory.from_string(dump)
+    mem = Memory.from_string(state)
     assert mem._header == "DM41"
     assert mem.get_register(0).get_hex() == "01020304050607"
     assert mem.get_register("A").get_hex() == "c000f50046494c"
@@ -378,20 +378,20 @@ def test_memory_get_set_register(empty_memory):
 
 
 def test_memory_to_string(empty_memory):
-    """Test reconstructing dump string from Memory object."""
+    """Test reconstructing state string from Memory object."""
     # Add some data to core memory
     empty_memory.set_register(0, Register.from_hex("01020304050607"))
-    dump_str = empty_memory.to_string()
-    assert "DM41" in dump_str
-    assert "00  01020304050607" in dump_str
-    assert "A:" in dump_str
+    state_str = empty_memory.to_string()
+    assert "DM41" in state_str
+    assert "00  01020304050607" in state_str
+    assert "A:" in state_str
 
 
 def test_memory_equality():
     """Test that two identical memories are equal."""
-    dump = "DM41\n00 01020304050607\nA: 00000000000000 B: 00000000000000 C: 00000000000000 S: 00000000000000 M: 00000000000000 N: 00000000000000 G: 00"
-    mem1 = Memory.from_string(dump)
-    mem2 = Memory.from_string(dump)
+    state = "DM41\n00 01020304050607\nA: 00000000000000 B: 00000000000000 C: 00000000000000 S: 00000000000000 M: 00000000000000 N: 00000000000000 G: 00"
+    mem1 = Memory.from_string(state)
+    mem2 = Memory.from_string(state)
     assert mem1 == mem2
 
     # Modify one
@@ -399,8 +399,8 @@ def test_memory_equality():
     assert mem1 != mem2
 
 
-def test_memory_malformed_dump():
-    """Test error handling for invalid dump formats."""
+def test_memory_malformed_state():
+    """Test error handling for invalid state formats."""
     with pytest.raises(ValueError, match="Invalid header"):
         Memory.from_string("WRONG\n00 01020304050607")
 
@@ -410,7 +410,7 @@ def test_memory_malformed_dump():
 
 def test_memory_from_string_rejects_short_core_register():
     """A core-memory register field that is fewer than 7 bytes is a
-    corrupt/truncated dump and must be rejected, not silently loaded as
+    corrupt/truncated state and must be rejected, not silently loaded as
     an under-sized Register."""
     with pytest.raises(ValueError, match="6 bytes, expected 7"):
         Memory.from_string("DM41\n00 010203040506")
@@ -427,25 +427,25 @@ def test_memory_from_string_rejects_wrong_length_special_register():
     """The A/B/C/S/M/N special registers are full 7-byte hardware
     registers too, so a short one is just as corrupt as a short core
     register and must be rejected the same way."""
-    dump = (
+    state = (
         "DM41\n"
         "A: c000f50046494c B: 8000000000c196 C: 0000002c0480fd "
         "S: 00101100100000 M: 00011cd5ff73cb N: 0000 G: 00"
     )
     with pytest.raises(ValueError, match="Special register N is 2 bytes, expected 7"):
-        Memory.from_string(dump)
+        Memory.from_string(state)
 
 
 def test_memory_from_string_accepts_one_byte_g_register():
     """G is a documented exception -- a single status byte, not a full
     hardware register -- so it must stay accepted at its real 1-byte
     size instead of being forced to 7."""
-    dump = (
+    state = (
         "DM41\n"
         "A: c000f50046494c B: 8000000000c196 C: 0000002c0480fd "
         "S: 00101100100000 M: 00011cd5ff73cb N: 00000000000000 G: 00"
     )
-    mem = Memory.from_string(dump)
+    mem = Memory.from_string(state)
     assert mem.get_register("G").get_hex() == "00"
 
 
@@ -651,7 +651,7 @@ def test_xm_program_header_rejects_non_signature_type1_nibble():
 
 def test_xm_header_does_not_require_aaa_match_own_address():
     """A Data/ASCII header's AAA field (nibble 1-3) equals its own address
-    in every undisturbed real dump seen -- but _parse_header() must NOT
+    in every undisturbed real state seen -- but _parse_header() must NOT
     enforce that: a real DM41L PURFL delete can relocate a surviving
     file's header without refreshing AAA to match (see
     test_xm_delfl_purfl_delete_relocates_file_with_stale_aaa below), so a
@@ -747,7 +747,7 @@ def test_xm_get_program_bytes_wrong_type_raises():
 #
 # Each test round-trips through list_files() rather than asserting on raw
 # register bytes -- that's the strongest available check, since list_files()
-# is independently tested against real captured dumps above.
+# is independently tested against real captured states above.
 
 
 def test_xm_add_file_bootstraps_empty_extended_memory():
@@ -848,9 +848,9 @@ def test_xm_list_files_preserves_raw_name_bytes_even_when_display_collides():
     }
 
 
-def test_xm_edit_file_with_colliding_display_name_does_not_corrupt_dump():
+def test_xm_edit_file_with_colliding_display_name_does_not_corrupt_state():
     """Regression (user-reported, manyfiles.dm41): several XM files in
-    this dump have raw names that differ only in an unprintable byte, so
+    this state have raw names that differ only in an unprintable byte, so
     they all show the same '.'-sanitized display name (see
     test_xm_list_files_preserves_raw_name_bytes_even_when_display_collides).
     Editing one of them -- remove-then-add, same as the GUI's Edit flow
@@ -1181,18 +1181,18 @@ def test_xm_add_file_rejects_wrong_argument_for_type():
         xm.add_file("NOARGS", xm.TYPE_ASCII)
 
 
-def test_xm_add_file_dump_rows_stay_page_aligned():
+def test_xm_add_file_state_rows_stay_page_aligned():
     """to_string() must only ever emit rows starting on a 4-register-
     aligned address, filling in any untouched register in a partially-
     used page with the zero register -- the DM41L's loader rejects a
-    dump with a misaligned row (confirmed: it rejected one after adding
+    state with a misaligned row (confirmed: it rejected one after adding
     a 6-register ASCII file to empty.dm41, which left a 2-register gap
     at the top of a page before the file's own registers began)."""
     xm = _load_xm("empty.dm41")
     xm.add_file("NOTES", xm.TYPE_ASCII, records=["1", "2", "3", "4", "5", "-16"])
 
-    dump = xm._memory.to_string()
-    for line in dump.splitlines()[1:]:
+    state = xm._memory.to_string()
+    for line in state.splitlines()[1:]:
         line = line.strip()
         if not line or ":" in line.split()[0]:
             continue  # blank line or the special-register section
@@ -1200,7 +1200,7 @@ def test_xm_add_file_dump_rows_stay_page_aligned():
         assert base % 4 == 0, f"row {line!r} doesn't start on a 4-register boundary"
 
     # And it must still round-trip correctly.
-    reloaded = Memory.from_string(dump)
+    reloaded = Memory.from_string(state)
     xm2 = ExtendedMemory(reloaded, address_range=[0x40, 0x2EF])
     files = xm2.list_files()
     assert len(files) == 1
@@ -1229,13 +1229,13 @@ def test_xm_add_file_ascii_matches_real_device_encoding():
 # ---- R00 / .END. / Flags (register c / register d) ----
 #
 # Expected R00/.END. values below were read directly off register c
-# (address 0x0d) in each sample dump and cross-checked two ways: against
+# (address 0x0d) in each sample state and cross-checked two ways: against
 # the old (pre-rewrite) Project Voyager memory.py, which had independently
 # arrived at the same nibble math for R00/.END., and against the filename
 # of empty-128.dm41 (0x200 - 0x180 = 128 data registers).
 
 
-def test_r00_and_dotend_match_known_sample_dumps():
+def test_r00_and_dotend_match_known_sample_states():
     cases = {
         "empty.dm41": (0x19C, 0x19B),
         "empty-128.dm41": (0x180, 0x17F),
@@ -1259,7 +1259,7 @@ def test_r00_and_dotend_match_known_sample_dumps():
 
 def test_cold_start_signature_is_0x169_in_every_sample():
     """The 3-nibble field between 'printer use' and R00 in register c is
-    documented as a fixed cold-start signature; every real sample dump
+    documented as a fixed cold-start signature; every real sample state
     should show the same value (0x169) there. There's no public accessor
     for this (it's not user-actionable), so read it via the same nibble
     math R00()/DotEnd() use."""
@@ -1478,7 +1478,7 @@ def test_xm_remove_file_preserves_mixed_data_file():
 
 def test_xm_remove_unrelated_file_preserves_colliding_display_name_survivors():
     """Same root cause as
-    test_xm_edit_file_with_colliding_display_name_does_not_corrupt_dump,
+    test_xm_edit_file_with_colliding_display_name_does_not_corrupt_state,
     but via a plain Remove (no rename involved): removing a file that has
     nothing to do with the collision must not disturb XM files whose raw
     names happen to collapse to the same '.'-sanitized display name (see
@@ -1538,7 +1538,7 @@ def test_xm_remove_file_then_add_new_file_still_works():
 #
 # list_global_chain() is the raw, per-marker walk: expected names/counts
 # below were derived by walking the chain by hand against the raw hex in
-# each sample dump (see docs/program.md sec 5.1 for simple.dm41 and
+# each sample state (see docs/program.md sec 5.1 for simple.dm41 and
 # 6x-xm.dm41 specifically) and cross-checked against the real device's
 # CAT 1 listing for XMBCD/XMALPHA/PURXM, already recorded in project notes
 # from an earlier session.
@@ -1650,7 +1650,7 @@ def test_list_global_chain_address_label_format():
     assert memory.programs.list_global_chain()[0].address_label == "0x19b:0"
 
 
-def test_list_global_chain_terminates_on_every_sample_dump():
+def test_list_global_chain_terminates_on_every_sample_state():
     """Defensive/regression coverage: list_global_chain() should never
     raise or hang on any real fixture, regardless of whether it has
     programs."""
@@ -1689,7 +1689,7 @@ def test_list_programs_fresh_memory_returns_nothing():
 
 def test_list_programs_simple_is_one_program_not_two():
     """simple.dm41 has exactly one program, APPTEST (26 bytes) -- NOT a
-    second "nameless" program as an earlier (buggy) reading of this dump
+    second "nameless" program as an earlier (buggy) reading of this state
     assumed. The bytes after APPTEST's own explicit END are entirely zero
     padding in front of the permanent `.END.` marker, confirmed by the same
     all-zero-gap check the unlabelled.dm41 fixture below exercises
@@ -1764,7 +1764,7 @@ def test_list_programs_address_label_format():
     assert memory.programs.list_programs()[0].address_label == "0x19b:0"
 
 
-def test_list_programs_terminates_on_every_sample_dump():
+def test_list_programs_terminates_on_every_sample_state():
     """Defensive/regression coverage: list_programs() should never raise
     or hang on any real fixture, regardless of whether it has programs,
     and every program's length should be positive."""
@@ -1781,7 +1781,7 @@ def test_list_programs_terminates_on_every_sample_dump():
 # ---- Key Assignments (docs/key_assignments.md sec 4) ----
 #
 # key_byte_for()/_keyflags_bit() below are confirmed against three real
-# captured dumps (keyassigns.dm41, xrom-keyassignments.dm41,
+# captured states (keyassigns.dm41, xrom-keyassignments.dm41,
 # global-key-assignments.dm41) -- see the key-assignment research notes for
 # the full derivation, including how an earlier (wrong) formula
 # (bit = 37 - M - 8*(N-1)) looked validated against a subset of the data
@@ -2187,7 +2187,7 @@ def test_relocate_alarms_preserves_content_against_real_fixture():
 
 
 def test_key_assignment_round_trip_through_from_string_to_string():
-    """A dump built entirely through set_key_assignment() must reload
+    """A state built entirely through set_key_assignment() must reload
     identically via to_string()/from_string(), same as every other region
     of memory."""
     memory = Memory()
@@ -2268,7 +2268,7 @@ def test_list_key_assignments_matches_all_real_fixtures_key_flags():
 # global-label header rather than a shared buffer, and a label can hold
 # only one key assignment at a time (unlike a physical key's independent
 # unshifted/shifted slots). manyfiles.dm41 mixes both kinds of assignment
-# in one real dump -- three global labels (XMBCD/XMALPHA/PURXM, keys
+# in one real state -- three global labels (XMBCD/XMALPHA/PURXM, keys
 # 11/12/13 unshifted) plus two built-in/peripheral ones (EMROOM/XTOA,
 # keys 14/15 unshifted) -- so it's used below alongside
 # global-key-assignments.dm41 (AAA/BBB, program-only) and simple.dm41
@@ -2283,7 +2283,7 @@ def test_get_program_for_key_decodes_global_key_assignments_dm41():
     assert memory.programs.get_program_for_key(13, False) is None
 
 
-def test_get_program_for_key_decodes_manyfiles_dm41_mixed_dump():
+def test_get_program_for_key_decodes_manyfiles_dm41_mixed_state():
     memory = Memory.from_file(DATA_DIR / "manyfiles.dm41")
     assert memory.programs.get_program_for_key(11, False).name == "XMBCD"
     assert memory.programs.get_program_for_key(12, False).name == "XMALPHA"

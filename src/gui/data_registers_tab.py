@@ -2,7 +2,7 @@
 Data Registers tab: view and edit main data memory (R00 through 0x1ff).
 
 Uses a native ttk.Treeview rather than one CustomTkinter widget per cell.
-A dump can have up to ~319 data registers (if R00 sits right after Key
+A state can have up to ~319 data registers (if R00 sits right after Key
 Assignments at 0xc1); building 4-5 CTk widgets per row for that many rows
 took several seconds just to construct, and CTk widgets don't scale to
 that count the way a native table does -- see the app's startup-speed
@@ -184,18 +184,18 @@ class DataRegistersTab(ctk.CTkFrame):
             tree.delete(*tree.get_children())
 
         if memory is None:
-            self._header_label.configure(text="(no memory dump loaded)")
+            self._header_label.configure(text="(no memory state loaded)")
             return
 
         # The DataMemory region derives its own extent from R00 live, and
-        # reports itself empty when the dump has no sane R00/.END.
+        # reports itself empty when the state has no sane R00/.END.
         # partition at all -- so this doesn't need its own R00/MIN_SANE_R00
         # arithmetic or its own defensive try/except around decoding
         # register c.
         data = memory.data_memory
         if data.is_empty:
             self._header_label.configure(
-                text="No data registers yet -- start a new buffer or load/read a dump first."
+                text="No data registers yet -- start a new buffer or load/read a state first."
             )
             return
 

@@ -163,7 +163,7 @@ class PreferencesDialog(ctk.CTkToplevel):
 
         ctk.CTkLabel(
             tab,
-            text="Font changes take effect after restarting DM41L Explorer.",
+            text="Font changes take effect after restarting DM41_Explorer.",
             text_color="#d9822b",
             font=ctk.CTkFont(size=11),
         ).pack(anchor="w", padx=8, pady=(4, 0))

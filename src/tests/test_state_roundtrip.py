@@ -1,7 +1,7 @@
 """Round-trip gate: every state file in tests/data loads and saves back
 to the same text.
 
-docs/dump_format.md (section 6) lists what the writer changes in the text
+docs/state_format.md (section 6) lists what the writer changes in the text
 of a file: trailing spaces on register rows go, two-space gaps between
 special-register pairs become one space, and all-zero rows are omitted.
 `normalise` applies exactly those, so anything else that differs is a real
@@ -54,7 +54,7 @@ def test_state_file_saves_back_to_the_same_text(path):
 
 
 def test_a_register_the_file_omits_loads_as_zero():
-    """A dump leaves out all-zero rows; the defaults a new Memory() starts
+    """A state leaves out all-zero rows; the defaults a new Memory() starts
     with must not show through where a file has none (lander.dm41)."""
     memory = Memory.from_string(
         (DATA / "lander.dm41").read_text(encoding="utf-8"), profile=DM41X

@@ -6,7 +6,7 @@ Uses a native ttk.Treeview rather than one CustomTkinter widget per row --
 the same performance fix as gui/data_registers_tab.py (see that module's
 docstring for the full story): building 5-8 CTk widgets per row (one per
 column, plus a per-row Export/Edit/Remove button each) got noticeably slow
-once a dump had more than a few dozen XM files, and CTk widgets don't scale
+once a state had more than a few dozen XM files, and CTk widgets don't scale
 to that count the way a native table does -- GitHub issue #21. Per-row
 Export/Edit/Remove buttons are gone; those three actions now live in the
 header (like Add File/Import File already did) and act on whichever row is
@@ -267,7 +267,7 @@ class XMFilesTab(ctk.CTkFrame):
                 return f"type {f.file_type}: {f.num_registers} registers (not decoded)"
         except Exception as e:
             # Expected for a file whose content doesn't fit the shape its
-            # own type nibble claims (e.g. a corrupt or hand-edited dump)
+            # own type nibble claims (e.g. a corrupt or hand-edited state)
             # -- shown inline in the Preview column rather than a popup,
             # so this is a DEBUG detail, not a WARNING-worthy event.
             logger.debug("Could not decode preview for XM file: %s", e)

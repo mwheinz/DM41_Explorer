@@ -27,7 +27,7 @@ class XMFile:
     """
     A single file (directory entry) found inside an ExtendedMemory region.
 
-    Reverse-engineered from sample dumps rather than documented spec, so
+    Reverse-engineered from sample states rather than documented spec, so
     treat the field meanings as well-tested hypotheses, not certainties.
     """
 
@@ -276,13 +276,13 @@ class ExtendedMemory(MemoryRegion):
     any) packed directly below.
 
     Header register layout, reverse-engineered from several known-content
-    dumps (not from a documented spec -- see docs/memory.md for the sample
+    states (not from a documented spec -- see docs/memory.md for the sample
     data this is based on):
       nibble 0      file type: 1 = Program, 2 = Data, 3 = ASCII; 4-15 (set
                     by RETPFL on a DM41X) keep the Data layout and are shown
                     as "@" (see XMFile.TYPE_OTHER_FIRST).
       nibble 1-3    (Data/ASCII only) AAA, the header's own address in
-                    every undisturbed real dump seen so far -- but NOT
+                    every undisturbed real state seen so far -- but NOT
                     relied on by list_files() to identify a header: a real
                     DM41L PURFL delete can relocate a surviving file's
                     header to close the gap left behind, without updating
@@ -297,7 +297,7 @@ class ExtendedMemory(MemoryRegion):
                     Program headers ("10000000BBBSSS") are a special case:
                     bytes 0-3 are a fixed 0x10 00 00 00 signature, and the
                     BBB/SSS fields that follow it check out against real
-                    dumps -- confirmed by validating the trailing checksum
+                    states -- confirmed by validating the trailing checksum
                     byte (see XMFile.checksum_valid) against 6x-xm.dm41 and
                     3x-xm.dm41's saved "PURXM" program.
 
@@ -408,7 +408,7 @@ class ExtendedMemory(MemoryRegion):
         # "Non-normalized data".)
         #
         # AAA itself is read but deliberately NOT enforced against addr.
-        # It equals the header's own address in every undisturbed real dump
+        # It equals the header's own address in every undisturbed real state
         # examined -- but tests/data/delfl-xm.dm41 (6x-xm.dm41 with
         # XM4.000 deleted via the DM41L emulator's own PURFL command, not
         # this tool's remove_file()) confirms it can legitimately go stale:
@@ -464,7 +464,7 @@ class ExtendedMemory(MemoryRegion):
         if region_header == zero_register():
             return []
 
-        # Compare what the memory dump says should be the top of the first
+        # Compare what the memory state says should be the top of the first
         # XM region with what we know it should be...
         addr = (region_header[1] & 0x0F) * 256 + region_header[0]
         if addr != regions[current_region][1]:
@@ -643,7 +643,7 @@ class ExtendedMemory(MemoryRegion):
             # both are documented as runtime cursors for an *open* file
             # (docs/memory.md sec. 4.3); a freshly-written, not-currently-
             # open file uses 0 for both, but this isn't confirmed against
-            # a real freshly-saved dump.
+            # a real freshly-saved state.
             data[0] = (file_type << 4) | ((header_addr >> 8) & 0x0F)
             data[1] = header_addr & 0xFF
             data[5] = (register_length >> 8) & 0x0F
@@ -661,7 +661,7 @@ class ExtendedMemory(MemoryRegion):
         region's ceiling, but only when next_region_active -- **confirmed**
         by comparing real captures: a single, non-spanning file
         (tests/data/helloworld.dm41) leaves NNN at 0 even though region 1
-        exists in hardware, while dumps with an actually-spanning file
+        exists in hardware, while states with an actually-spanning file
         (3x-xm.dm41, 6x-xm.dm41) show NNN as region 1's ceiling. So NNN
         reflects whether the next region is *in use*, not merely whether it
         exists in the profile.
@@ -699,7 +699,7 @@ class ExtendedMemory(MemoryRegion):
         so each must have a pointer register, and each one before the last
         must have its NNN field pointing at the next region's ceiling.
 
-        Missing in the past, and a confirmed real bug: a dump where region 0
+        Missing in the past, and a confirmed real bug: a state where region 0
         was bootstrapped by an earlier, non-spanning file (leaving NNN at 0,
         correctly, at that time) and only a *later* file first spans into
         region 1 left NNN stuck at 0 forever after -- the real DM41L trusts
@@ -809,7 +809,7 @@ class ExtendedMemory(MemoryRegion):
 
         # A real DM41L rejects a duplicate directory entry name -- caught
         # here (rather than left for the emulator to reject later) so a
-        # dump built by this tool can't be created in a state real
+        # state built by this tool can't be created in a state real
         # hardware wouldn't accept. This also naturally allows editing a
         # file "in place" under its own unchanged name: the GUI's Edit
         # flow (and remove_file()'s own rebuild -- see _place_file()) always
@@ -818,7 +818,7 @@ class ExtendedMemory(MemoryRegion):
         #
         # Compared against raw name_bytes, not the lossy `.name` display
         # string: get_ascii() collapses every unprintable byte to '.', so
-        # two files with genuinely different raw names (e.g. a dump with
+        # two files with genuinely different raw names (e.g. a state with
         # non-ASCII/control bytes in its directory entries) could share an
         # identical `.name` without being duplicates at all. Comparing
         # `.name` here would falsely flag them as colliding.

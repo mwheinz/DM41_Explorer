@@ -11,7 +11,7 @@ byte 1 == 0x04) and the real function code second; a two-byte
 XROM/peripheral function uses both bytes for real data, no filler.
 Reverse-engineered from William C. Wickes' "Synthetic Programming on the
 HP-41C" (Section 2E, "The Key Assignment Registers") and confirmed
-byte-for-byte against real dumps -- see docs/key_assignments.md sec 4.2/4.8
+byte-for-byte against real states -- see docs/key_assignments.md sec 4.2/4.8
 for the full derivation.
 
 The Alarms buffer (alarms.py) starts exactly where this region ends, with
@@ -100,13 +100,13 @@ class KeyAssignments(MemoryRegion):
         nibble reads, this is a linear scan) and is kept up to date by
         every edit made through this class. A raw `Memory.set_register()`
         into this span -- e.g. from the hex editor -- will NOT update it
-        until `rescan()` is called or the dump is reloaded.
+        until `rescan()` is called or the state is reloaded.
         '''
         return self._end - 1
 
     def rescan(self):
         '''Re-derives this region's extent from the registers themselves.
-        Called after a dump is loaded, and available to any caller that
+        Called after a state is loaded, and available to any caller that
         has written into this span behind the region's back.'''
         self._end = self._scan_end()
 
@@ -117,10 +117,10 @@ class KeyAssignments(MemoryRegion):
         address one past the last such register -- an exclusive upper
         bound, suitable for e.g. `range(0xC0, end)`. Returns `start`
         itself if register 0xC0 doesn't start a key-assignment register at
-        all (no assignments made, or no real dump loaded).
+        all (no assignments made, or no real state loaded).
 
         Bounded at PRIMARY_DATA_END as a hard backstop against a corrupt
-        dump wandering past this region entirely, rather than trusting
+        state wandering past this region entirely, rather than trusting
         `.END.`/R00 -- both of those are themselves derived values that
         can be nonsense in a fresh or corrupt Memory, so this scan
         deliberately doesn't depend on either.
@@ -178,9 +178,9 @@ class KeyAssignments(MemoryRegion):
         position (_VALID_KEY_NUMBERS) rather than algebraically inverting
         the formula, since the carry behavior for M=8 rows (sec 4.3) makes
         a closed-form inverse easy to get subtly wrong; this is only ever
-        called on the small number of decoded entries in a dump, so the
+        called on the small number of decoded entries in a state, so the
         brute-force cost is immaterial. Raises ValueError if `key_byte`
-        doesn't match any real key (e.g. a corrupt dump, or a hand-crafted
+        doesn't match any real key (e.g. a corrupt state, or a hand-crafted
         test fixture targeting a non-assignable position).'''
         for key_number in cls._VALID_KEY_NUMBERS:
             if cls.key_byte_for(key_number, False) == key_byte:
@@ -346,7 +346,7 @@ class KeyAssignments(MemoryRegion):
 
     def repack(self):
         '''Rewrites the region in canonical, gapless form without changing
-        which assignments it holds. A no-op for a dump this class has only
+        which assignments it holds. A no-op for a state this class has only
         ever edited itself (every edit already leaves it packed); this
         self-heals one loaded from disk with a pre-existing gap. See
         Memory.pack().'''

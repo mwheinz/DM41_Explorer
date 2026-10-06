@@ -1,12 +1,12 @@
 '''
 A representation of the memory of a DM41-series emulator (DM41L, DM41X).
 
-The dump consists of three parts: the header ("DM41") the dump of main
+The state consists of three parts: the header ("DM41") the state of main
 memory, and the "special registers" which I believe represent the emulated
 HP41 CPU registers.
 
 NOTE: The HP41C and DM41L are "little endian" - the LSB is considered to by
-"byte 0" and the MSB is considered "byte 6" - but DM41L dump files print hex
+"byte 0" and the MSB is considered "byte 6" - but DM41L state files print hex
 data from MSB to LSB. That is, _data[0] contains the MSB of the register. and
 _data[6] contains the LSB. Care must be taken to remember this difference when
 comparing HP41 documentation with the implementation of the Register and
@@ -93,8 +93,8 @@ for readability. The current components are:
   profile_fit.py   check_profile_fit() -- what in a memory state will not fit
                     a given model (XM beyond its regions, XROM functions it
                     lacks); the check before Send to a DM41L
-  memory.py        Memory (the top-level dump: parsing, serialization,
-                    raw register access, whole-dump pack(), and the
+  memory.py        Memory (the top-level state: parsing, serialization,
+                    raw register access, whole-state pack(), and the
                     region lookup -- Memory.region(key) plus the named
                     properties .status_registers/.key_assignments/
                     .alarms/.free_space/.programs/.data_memory/

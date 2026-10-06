@@ -2,15 +2,15 @@
 
 There's no broader test_app.py yet covering the GUI end to end (see the
 "Testing notes" entry in project memory) -- these tests are narrowly
-scoped to the Save Dump / Save Dump As bug reported by the user on
-2026-08-13: loading a dump file, then pulling a fresh dump from the
-calculator, then hitting "Save Dump" (not "Save Dump As...") used to
+scoped to the Save State / Save State As bug reported by the user on
+2026-08-13: loading a state file, then pulling a fresh state from the
+calculator, then hitting "Save State" (not "Save State As...") used to
 silently overwrite the originally-loaded file instead of prompting for a
 new filename, because nothing reset `self.memory_source` after the fresh
-calculator dump replaced `self.memory`. `_on_dump_received` (used by both
-the explicit "Get Dump from DM41L" action and the startup auto-connect
+calculator state replaced `self.memory`. `_on_state_received` (used by both
+the explicit "Get State from DM41L" action and the startup auto-connect
 sequence) now unconditionally resets `self.memory_source` to None, which
-makes `save_dump_to_file()` fall through to `save_dump_as()` -- these tests
+makes `save_state_to_file()` fall through to `save_state_as()` -- these tests
 pin that behavior down so a future change can't reintroduce the silent
 overwrite.
 
@@ -29,7 +29,7 @@ from unittest import mock
 
 from config import ProjectConfig
 from memory import DM41L, DM41X, Memory
-from gui.app import DM41LExplorerApp
+from gui.app import DM41ExplorerApp
 from gui.overview_tab import xm_total_registers
 
 
@@ -46,51 +46,48 @@ def prefs_file(tmp_path, monkeypatch):
 
 
 @pytest.fixture
-def app(prefs_file, tmp_path, monkeypatch):
-    """A real DM41LExplorerApp, with auto-connect neutered (it opens a
-    blocking modal port-selection dialog with nothing there to click it
-    away, same gotcha called out in project memory's "Startup performance"
-    testing notes)."""
-    monkeypatch.setattr(DM41LExplorerApp, "attempt_auto_connect", lambda self: None)
-    instance = DM41LExplorerApp()
+def app(prefs_file, tmp_path):
+    """A real DM41ExplorerApp. It starts offline, so nothing here needs a
+    serial port or a modal dialog."""
+    instance = DM41ExplorerApp()
     yield instance
     instance.destroy()
 
 
-def _sample_dump_string():
-    """A minimal, validly-formatted dump string, built the same way the
+def _sample_state_string():
+    """A minimal, validly-formatted state string, built the same way the
     calculator's own MemoryStringCommand response gets turned into a
-    Memory object in _on_dump_received."""
+    Memory object in _on_state_received."""
     return Memory().to_string()
 
 
-def test_save_after_calculator_dump_prompts_instead_of_overwriting(app, tmp_path):
-    """The exact bug report: load a file, pull a new dump from the
-    calculator, hit Save Dump -- must prompt for a filename (via
-    save_dump_as), never silently rewrite the originally-loaded file."""
+def test_save_after_calculator_state_prompts_instead_of_overwriting(app, tmp_path):
+    """The exact bug report: load a file, pull a new state from the
+    calculator, hit Save State -- must prompt for a filename (via
+    save_state_as), never silently rewrite the originally-loaded file."""
     original_path = tmp_path / "x.dm41"
     Memory().to_file(original_path)
     original_bytes = original_path.read_bytes()
 
-    app._load_dump_into_buffer(str(original_path))
+    app._load_state_into_buffer(str(original_path))
     assert app.memory_source == original_path
 
-    # Simulate "Get Dump from DM41L" (or the equivalent auto-connect path)
-    # handing back a fresh dump from the calculator.
-    app._on_dump_received(_sample_dump_string())
+    # Simulate "Get State from DM41L" (or the equivalent auto-connect path)
+    # handing back a fresh state from the calculator.
+    app._on_state_received(_sample_state_string())
     assert app.memory_source is None, (
-        "receiving a calculator dump must clear memory_source so Save "
-        "Dump can't silently target the previously-loaded file"
+        "receiving a calculator state must clear memory_source so Save "
+        "State can't silently target the previously-loaded file"
     )
 
-    with mock.patch.object(app, "save_dump_as") as save_as:
-        app.save_dump_to_file()
+    with mock.patch.object(app, "save_state_as") as save_as:
+        app.save_state_to_file()
     save_as.assert_called_once()
 
     # And, belt-and-suspenders: confirm the original file genuinely wasn't
-    # touched on disk (save_dump_as is mocked above specifically so it
+    # touched on disk (save_state_as is mocked above specifically so it
     # can't write anything; this catches any future change that adds a
-    # write to save_dump_to_file() itself).
+    # write to save_state_to_file() itself).
     assert original_path.read_bytes() == original_bytes
 
 
@@ -98,14 +95,14 @@ def test_save_as_prompt_writes_new_file_and_updates_source(app, tmp_path):
     """Sanity check of the "prompts for a filename" half: once the user
     picks a path in the Save As dialog, it's written there and becomes the
     new memory_source (so a subsequent plain Save writes back to it)."""
-    app._on_dump_received(_sample_dump_string())
+    app._on_state_received(_sample_state_string())
     assert app.memory_source is None
 
     new_path = tmp_path / "renamed.dm41"
     with mock.patch(
         "gui.app.filedialog.asksaveasfilename", return_value=str(new_path)
     ), mock.patch("gui.app.messagebox.showinfo"):
-        app.save_dump_as()
+        app.save_state_as()
 
     assert new_path.exists()
     assert app.memory_source == new_path
@@ -114,7 +111,7 @@ def test_save_as_prompt_writes_new_file_and_updates_source(app, tmp_path):
 
 def test_save_to_already_loaded_file_confirms_then_saves(app, tmp_path):
     """Normal case, for contrast: saving back to a file you just opened
-    (no calculator dump in between) should NOT fall through to Save As --
+    (no calculator state in between) should NOT fall through to Save As --
     it's expected to write straight back to that same file. But per the
     user's 2026-08-18 report (saw a plain overwrite with no prompt at all
     for this exact sequence), it must still confirm with the user before
@@ -122,15 +119,15 @@ def test_save_to_already_loaded_file_confirms_then_saves(app, tmp_path):
     path = tmp_path / "already-open.dm41"
     Memory().to_file(path)
 
-    app._load_dump_into_buffer(str(path))
+    app._load_state_into_buffer(str(path))
     assert app.memory_source == path
 
-    with mock.patch.object(app, "save_dump_as") as save_as, mock.patch(
+    with mock.patch.object(app, "save_state_as") as save_as, mock.patch(
         "gui.app.messagebox.showinfo"
     ), mock.patch(
         "gui.app.messagebox.askyesno", return_value=True
     ) as confirm:
-        app.save_dump_to_file()
+        app.save_state_to_file()
 
     confirm.assert_called_once()
     save_as.assert_not_called()
@@ -144,13 +141,13 @@ def test_save_to_already_loaded_file_declined_does_not_write(app, tmp_path):
     Memory().to_file(path)
     original_bytes = path.read_bytes()
 
-    app._load_dump_into_buffer(str(path))
+    app._load_state_into_buffer(str(path))
     app.memory.status_registers.set_flag(0, True)  # make an in-memory change to try to save
 
-    with mock.patch.object(app, "save_dump_as") as save_as, mock.patch(
+    with mock.patch.object(app, "save_state_as") as save_as, mock.patch(
         "gui.app.messagebox.askyesno", return_value=False
     ):
-        app.save_dump_to_file()
+        app.save_state_to_file()
 
     save_as.assert_not_called()
     assert path.read_bytes() == original_bytes
@@ -158,18 +155,18 @@ def test_save_to_already_loaded_file_declined_does_not_write(app, tmp_path):
 
 def test_new_memory_buffer_also_clears_source(app, tmp_path):
     """Starting a fresh, empty buffer is the same kind of "not tied to any
-    file" state as a calculator dump -- Save should prompt here too."""
+    file" state as a calculator state -- Save should prompt here too."""
     path = tmp_path / "x.dm41"
     Memory().to_file(path)
-    app._load_dump_into_buffer(str(path))
+    app._load_state_into_buffer(str(path))
     assert app.memory_source == path
 
     with mock.patch("gui.app.messagebox.askyesno", return_value=True):
         app.new_memory_buffer()
     assert app.memory_source is None
 
-    with mock.patch.object(app, "save_dump_as") as save_as:
-        app.save_dump_to_file()
+    with mock.patch.object(app, "save_state_as") as save_as:
+        app.save_state_to_file()
     save_as.assert_called_once()
 
 
@@ -181,8 +178,8 @@ def test_on_memory_changed_sets_modified_flag(app):
     calling it (`self.memory.is_modified()`). Memory.is_modified() is the
     ONLY thing that ever sets Memory._modified True, so the missing
     parens silently meant no edit, anywhere in the app, ever marked the
-    dump as modified -- every "Discard unsaved changes?" guard below was
-    permanently dead and a loaded dump could be overwritten with no
+    state as modified -- every "Discard unsaved changes?" guard below was
+    permanently dead and a loaded state could be overwritten with no
     warning at all."""
     assert app.memory.modified is False
     app._on_memory_changed()
@@ -224,7 +221,7 @@ def test_mnemonics_reference_opens_once_and_is_reused(app):
 DATA_DIR = Path(__file__).parent / "data"
 ORIGINAL_CONFIRMATION = (
     "This will overwrite the calculator's current memory with the "
-    "currently loaded dump. Continue?"
+    "currently loaded state. Continue?"
 )
 
 
@@ -241,11 +238,11 @@ def connected_app(app):
 def _send(app, name, *, answer=True):
     """Opens tests/data/<name> and presses Send. Returns the mocks for the
     error box and the confirmation, in that order."""
-    app._load_dump_into_buffer(str(DATA_DIR / name))
+    app._load_state_into_buffer(str(DATA_DIR / name))
     with mock.patch("gui.app.messagebox.showerror") as error, mock.patch(
         "gui.app.messagebox.askyesno", return_value=answer
     ) as confirm:
-        app.send_dump_to_calculator()
+        app.send_state_to_calculator()
     return error, confirm
 
 
@@ -302,7 +299,7 @@ def test_send_of_a_state_that_fits_asks_the_usual_question(connected_app):
     error, confirm = _send(connected_app, "6x-xm.dm41")
 
     error.assert_not_called()
-    confirm.assert_called_once_with("Send Dump to Calculator", ORIGINAL_CONFIRMATION)
+    confirm.assert_called_once_with("Send State to Calculator", ORIGINAL_CONFIRMATION)
     connected_app.sent.assert_called_once()
 
 
@@ -314,16 +311,16 @@ def test_send_checks_against_the_model_the_connection_declares(connected_app):
     error, confirm = _send(connected_app, "dm41x_manyfiles.dm41")
 
     error.assert_not_called()
-    confirm.assert_called_once_with("Send Dump to Calculator", ORIGINAL_CONFIRMATION)
+    confirm.assert_called_once_with("Send State to Calculator", ORIGINAL_CONFIRMATION)
     connected_app.sent.assert_called_once()
 
 
 def test_send_when_not_connected_does_not_check_anything(app):
-    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
     with mock.patch("gui.app.messagebox.showwarning") as warn, mock.patch(
         "gui.app.check_profile_fit"
     ) as check:
-        app.send_dump_to_calculator()
+        app.send_state_to_calculator()
 
     warn.assert_called_once()
     check.assert_not_called()
@@ -337,20 +334,20 @@ def _tree_rows(tree):
 
 
 def test_a_state_file_opens_with_the_dm41x_profile(app):
-    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
 
     assert app.memory.profile is DM41X
 
 
-def test_a_dm41l_dump_from_the_calculator_keeps_the_dm41l_profile(app):
-    app._on_dump_received(Memory().to_string())
+def test_a_dm41l_state_from_the_calculator_keeps_the_dm41l_profile(app):
+    app._on_state_received(Memory().to_string())
 
     assert app.memory.profile is DM41L
 
 
 def test_manyfiles_lists_all_its_files_across_three_regions(app):
     with mock.patch("gui.app.messagebox.showerror") as error:
-        app._load_dump_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+        app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
 
     error.assert_not_called()
     app.xm_files_tab.render(app.memory)  # tabs render lazily, when shown
@@ -361,7 +358,7 @@ def test_manyfiles_lists_all_its_files_across_three_regions(app):
 
 
 def test_overview_reports_five_registers_free_on_manyfiles(app):
-    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
 
     files, used, free = app.overview_tab._xm_summary_texts()
 
@@ -381,7 +378,7 @@ def test_overview_total_follows_the_profile(app):
 
 
 def test_hex_view_runs_to_the_end_of_the_dm41x_map(app):
-    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
     app.hex_view_tab.render(app.memory)
 
     rows = _tree_rows(app.hex_view_tab._tree)
@@ -404,7 +401,7 @@ def test_hex_view_of_a_dm41l_memory_still_ends_at_0x2ef(app):
 
 def test_open_dialog_offers_both_extensions(app):
     with mock.patch("gui.app.filedialog.askopenfilename", return_value="") as ask:
-        app.load_dump_from_file()
+        app.load_state_from_file()
 
     types = dict(ask.call_args.kwargs["filetypes"])
     assert set(types["DM41 memory state"]) == {"*.dm41", "*.d41"}
@@ -414,30 +411,30 @@ def test_open_dialog_offers_both_extensions(app):
     "name, extension", [("xrom.d41", ".d41"), ("6x-xm.dm41", ".dm41")]
 )
 def test_save_as_keeps_the_files_own_extension(app, name, extension):
-    app._load_dump_into_buffer(str(DATA_DIR / name))
+    app._load_state_into_buffer(str(DATA_DIR / name))
 
     with mock.patch("gui.app.filedialog.asksaveasfilename", return_value="") as ask:
-        app.save_dump_as()
+        app.save_state_as()
 
     assert ask.call_args.kwargs["defaultextension"] == extension
 
 
 def test_save_as_of_a_new_buffer_defaults_to_dm41(app):
     with mock.patch("gui.app.filedialog.asksaveasfilename", return_value="") as ask:
-        app.save_dump_as()
+        app.save_state_as()
 
     assert ask.call_args.kwargs["defaultextension"] == ".dm41"
 
 
 def test_a_d41_file_saves_back_identically(app, tmp_path):
     text = (DATA_DIR / "dm41x_xrom_keys.d41").read_text()
-    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_xrom_keys.d41"))
+    app._load_state_into_buffer(str(DATA_DIR / "dm41x_xrom_keys.d41"))
     target = tmp_path / "copy.d41"
 
     with mock.patch(
         "gui.app.filedialog.asksaveasfilename", return_value=str(target)
     ), mock.patch("gui.app.messagebox.showinfo"):
-        app.save_dump_as()
+        app.save_state_as()
 
     assert " ".join(target.read_text().split()) == " ".join(text.split())
 
@@ -457,7 +454,7 @@ def test_a_d41_file_saves_back_identically(app, tmp_path):
 def test_every_tab_renders_every_dm41x_sample(app, name):
     """Smoke test (plan, phase 3 step 7): no tab raises on a state opened
     the way the app now opens every file."""
-    app._load_dump_into_buffer(str(DATA_DIR / name))
+    app._load_state_into_buffer(str(DATA_DIR / name))
 
     for tab in (
         app.overview_tab,
@@ -473,7 +470,7 @@ def test_every_tab_renders_every_dm41x_sample(app, name):
 
 
 def test_xm_tab_shows_retyped_files_as_at_with_their_type(app):
-    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_retpfl_after.d41"))
+    app._load_state_into_buffer(str(DATA_DIR / "dm41x_retpfl_after.d41"))
     app.xm_files_tab.render(app.memory)
 
     rows = {row[0]: row for row in _tree_rows(app.xm_files_tab._tree)}
@@ -489,7 +486,7 @@ def test_xm_tab_shows_retyped_files_as_at_with_their_type(app):
 
 
 def test_editing_a_data_file_in_the_third_region_keeps_every_other_file(app):
-    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
     app.xm_files_tab.render(app.memory)  # tabs render lazily, when shown
     xm = app.memory.extended_memory
 
@@ -526,7 +523,7 @@ def test_editing_a_data_file_in_the_third_region_keeps_every_other_file(app):
 
 
 def test_flags_tab_shows_and_toggles_flag_31_on_a_dm41x_state(app):
-    app._load_dump_into_buffer(str(DATA_DIR / "dm41x_base.d41"))
+    app._load_state_into_buffer(str(DATA_DIR / "dm41x_base.d41"))
     flags = app.memory.status_registers
     app.flags_tab.render(app.memory)
     assert flags_label(app, 31) == "31 timer MDY / DMY"
@@ -544,3 +541,39 @@ def test_flags_tab_shows_and_toggles_flag_31_on_a_dm41x_state(app):
 
 def flags_label(app, n):
     return app.flags_tab._body.winfo_children()[n].cget("text")
+
+
+def test_the_app_starts_offline_and_never_touches_the_serial_port(
+    prefs_file, monkeypatch
+):
+    """Nothing connects at launch: no port is listed, opened or prompted
+    for, however long the window has been up. Connecting is the user's
+    choice (Connect > Connect / Reconnect...)."""
+    import time
+
+    from engine.serial_manager import SerialManager
+    from gui import app as app_module
+
+    calls = []
+    monkeypatch.setattr(
+        SerialManager, "get_available_ports", lambda self: calls.append("ports") or []
+    )
+    monkeypatch.setattr(
+        SerialManager,
+        "connect",
+        lambda self, *a, **k: calls.append("connect") or (False, "no"),
+    )
+    monkeypatch.setattr(
+        app_module,
+        "PortSelectionDialog",
+        lambda *a, **k: calls.append("dialog"),
+    )
+    instance = DM41ExplorerApp()
+    try:
+        time.sleep(0.4)  # longer than the old 100 ms start-up delay
+        instance.update()
+        assert calls == []
+        assert not instance.serial.is_connected
+        assert instance._status_label.cget("text") == "Not connected"
+    finally:
+        instance.destroy()

@@ -274,7 +274,7 @@ def test_import_raises_when_program_memory_is_full_and_leaves_memory_unchanged()
 def test_import_rejects_when_no_valid_partition_is_loaded():
     # A freshly-constructed Memory() actually ships with sane built-in
     # R00/.END. defaults (matching empty.dm41) -- corrupt R00 directly to
-    # simulate a dump with no real partition at all.
+    # simulate a state with no real partition at all.
     dest = Memory()
     dest.status_registers.set_R00(0)
     with pytest.raises(DM41MemoryError):
@@ -295,8 +295,8 @@ def test_import_rejects_stale_program_reference_style_bogus_bytes():
 # -- Regression sweep --------------------------------------------------------
 
 
-def test_import_every_program_in_every_sample_dump_into_a_fresh_empty_memory():
-    """For every real program in every sample dump, exporting it and then
+def test_import_every_program_in_every_sample_state_into_a_fresh_empty_memory():
+    """For every real program in every sample state, exporting it and then
     importing it into a fresh empty buffer should never raise, and the
     result should read back the same length and remain one well-formed
     program (find_program_end() agrees) -- the fields that legitimately
@@ -304,7 +304,7 @@ def test_import_every_program_in_every_sample_dump_into_a_fresh_empty_memory():
     label's key-assignment byte) are covered precisely by the more
     targeted tests above; this sweep is the same defensive/regression
     coverage as get_program_bytes()'s own
-    test_get_program_bytes_terminates_on_every_sample_dump(), just for
+    test_get_program_bytes_terminates_on_every_sample_state(), just for
     the write side."""
     for filename in os.listdir(DATA_DIR):
         if not filename.endswith(".dm41"):

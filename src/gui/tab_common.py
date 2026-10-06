@@ -256,7 +256,7 @@ def clear_tree_for_render(tree: ttk.Treeview, header_label, memory) -> bool:
     trees, not one) -- see that tab's own render() for why."""
     tree.delete(*tree.get_children())
     if memory is None:
-        header_label.configure(text="(no memory dump loaded)")
+        header_label.configure(text="(no memory state loaded)")
         return True
     return False
 
@@ -338,7 +338,7 @@ def build_caption_label(master, text: str) -> ctk.CTkLabel:
 def build_tab_header(master, button_kwargs: dict = None):
     """Builds the standard fixed tab header: a bold status label on the
     left (defaulting to the shared "no memory loaded" text every tab
-    shows before a dump is loaded) and, optionally, a single primary
+    shows before a state is loaded) and, optionally, a single primary
     action button on the right.
 
     Packed into `master` with the same padding every tab uses, so the
@@ -354,7 +354,7 @@ def build_tab_header(master, button_kwargs: dict = None):
     header.pack(fill="x", padx=8, pady=8)
 
     label = ctk.CTkLabel(
-        header, text="(no memory dump loaded)", font=ctk.CTkFont(weight="bold")
+        header, text="(no memory state loaded)", font=ctk.CTkFont(weight="bold")
     )
     label.pack(side="left")
 

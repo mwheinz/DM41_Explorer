@@ -31,7 +31,7 @@ class StatusRegisters(MemoryRegion):
     #   detailed explanation of what each field is for.
     #   nibbles[0:3]   SREG  (SIGMA-REG) absolute address
     #   nibbles[3:5]   printer use (undecoded)
-    #   nibbles[5:8]   cold-start signature -- always 0x169 in real dumps,
+    #   nibbles[5:8]   cold-start signature -- always 0x169 in real states,
     #                  usable as a sanity check
     #   nibbles[8:11]  R00   absolute address of data register 00
     #   nibbles[11:14] .END. absolute address of the end of program memory

@@ -2,8 +2,8 @@
 DeviceProfile: the per-model facts a Memory needs that differ between DM41
 models.
 
-Every DM41-series calculator shares one HP-41CX memory model and one dump
-text format (a DM41L `.dm41` dump and a DM41X `.d41` state file are the same
+Every DM41-series calculator shares one HP-41CX memory model and one state
+text format (a DM41L `.dm41` state and a DM41X `.d41` state file are the same
 format, with the same `DM41` header line), so a file cannot say which model
 wrote it. The caller says: Memory.from_string(text, profile=DM41X).
 
@@ -87,7 +87,7 @@ DM41L = DeviceProfile(
 )
 
 # The DM41X adds a second Extended Memory module at 0x301-0x3EF -- confirmed
-# against tests/data/dm41x_manyfiles.dm41, a real dump whose files span all
+# against tests/data/dm41x_manyfiles.dm41, a real state whose files span all
 # three regions. Its XROMs are the CX set plus its own additions (X<I>Y, TRNG
 # and the DM41X module), which is all of functions.XROM_FUNCTIONS. The
 # DM41XN is treated identically (docs/dm41x_explorer_plan.md).

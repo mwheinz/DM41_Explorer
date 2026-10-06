@@ -31,7 +31,7 @@ from gui.tab_common import (
 # The full addressable range this tab displays: from DISPLAY_START through
 # the memory's profile.display_end (0x2EF for a DM41L, 0x3EF for a DM41X).
 # Memory.regions() names Status Registers, an unused/"void" gap, Extended
-# Memory #0, Main Memory (itself split further, when a dump with a sane
+# Memory #0, Main Memory (itself split further, when a state with a sane
 # R00/.END. is loaded) and each later Extended Memory region. On a DM41X the
 # 16 addresses 0x2F0-0x2FF belong to no region and show as Inaccessible.
 DISPLAY_START = 0x000
@@ -42,7 +42,7 @@ DISPLAY_START = 0x000
 # fight with the selection highlight or make the monospace text hard to
 # read. Order here is also legend display order. This is a color/legend
 # catalog only now (issue #25) -- it lists every region kind that COULD
-# appear (so the legend stays complete even when the current dump doesn't
+# appear (so the legend stays complete even when the current state doesn't
 # have one of them, e.g. "Program"/"Data" while no sane R00/.END. is
 # loaded), not the actual boundaries, which come from Memory.regions().
 REGIONS = [

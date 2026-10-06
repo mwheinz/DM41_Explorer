@@ -3,7 +3,7 @@ Tests for extended memory on a model with more than two XM regions (the
 DM41X's third region, 0x301-0x3EF), and for the DeviceProfile that carries
 each model's region list.
 
-tests/data/dm41x_manyfiles.dm41 is a real DM41X dump with extended memory
+tests/data/dm41x_manyfiles.dm41 is a real DM41X state with extended memory
 almost completely full: 59 files, two of which span a region boundary (one
 from region 0 into 1, one from 1 into 2), leaving only 7 free registers in
 region 2. The walk order, the end-of-directory marker and all three region
@@ -28,7 +28,7 @@ from memory import (
 )
 
 DATA_DIR = Path(__file__).parent / "data"
-DM41X_DUMP = DATA_DIR / "dm41x_manyfiles.dm41"
+DM41X_STATE = DATA_DIR / "dm41x_manyfiles.dm41"
 
 # -- FIXTURE FACTS (decoded from dm41x_manyfiles.dm41) ---------------------
 FILE_COUNT = 59
@@ -50,7 +50,7 @@ MAX_FREE_DATA_REGISTERS = EOM_ADDR - (0x301 + 3)
 
 
 def _x_memory() -> Memory:
-    return Memory.from_file(DM41X_DUMP, profile=DM41X)
+    return Memory.from_file(DM41X_STATE, profile=DM41X)
 
 
 def _hex(memory: Memory, addr: int) -> str:
@@ -107,10 +107,10 @@ def test_profile_is_part_of_memory_equality():
     assert Memory(profile=DM41X) == Memory(profile=DM41X)
 
 
-# -- Reading the real three-region dump --------------------------------------
+# -- Reading the real three-region state --------------------------------------
 
 
-def test_dm41x_dump_lists_all_files():
+def test_dm41x_state_lists_all_files():
     files = _x_memory().extended_memory.list_files()
     assert len(files) == FILE_COUNT
     assert files[0].name == FIRST_FILE
@@ -119,7 +119,7 @@ def test_dm41x_dump_lists_all_files():
     assert len({f.name_bytes for f in files}) == FILE_COUNT
 
 
-def test_dm41x_dump_files_use_all_three_regions():
+def test_dm41x_state_files_use_all_three_regions():
     memory = _x_memory()
     regions = DM41X.xm_regions
     used = set()
@@ -134,7 +134,7 @@ def test_dm41x_dump_files_use_all_three_regions():
     assert used == {0, 1, 2}
 
 
-def test_dm41x_dump_has_exactly_two_spanning_files():
+def test_dm41x_state_has_exactly_two_spanning_files():
     files = _x_memory().extended_memory.list_files()
     spanning = {f.name.strip(): f for f in files if f.spans_regions}
     assert set(spanning) == {"XMA2.", "XMA16."}
@@ -145,7 +145,7 @@ def test_dm41x_dump_has_exactly_two_spanning_files():
         assert f.num_registers == f.declared_length == 8
 
 
-def test_dm41x_dump_directory_ends_at_the_eom_marker():
+def test_dm41x_state_directory_ends_at_the_eom_marker():
     memory = _x_memory()
     files = memory.extended_memory.list_files()
     last = files[-1]
@@ -153,7 +153,7 @@ def test_dm41x_dump_directory_ends_at_the_eom_marker():
     assert last.data_start - 1 == EOM_ADDR
 
 
-def test_dm41x_dump_files_do_not_overlap():
+def test_dm41x_state_files_do_not_overlap():
     files = _x_memory().extended_memory.list_files()
     claimed = {}
     for f in files:
@@ -165,7 +165,7 @@ def test_dm41x_dump_files_do_not_overlap():
             claimed[a] = f.name
 
 
-def test_dm41x_dump_file_contents_decode():
+def test_dm41x_state_file_contents_decode():
     files = _x_memory().extended_memory.list_files()
     by_name = {f.name.strip(): f for f in files}
     # The file that crosses from region 1 into region 2 reads as one
@@ -175,13 +175,13 @@ def test_dm41x_dump_file_contents_decode():
     assert len(by_name["XMA2."].data_registers()) == 8
 
 
-def test_dm41x_dump_loaded_as_a_dm41l_is_a_clean_error_not_an_indexerror():
-    memory = Memory.from_file(DM41X_DUMP)  # default DM41L profile
+def test_dm41x_state_loaded_as_a_dm41l_is_a_clean_error_not_an_indexerror():
+    memory = Memory.from_file(DM41X_STATE)  # default DM41L profile
     with pytest.raises(DM41MemoryError, match="past the last XM region"):
         memory.extended_memory.list_files()
 
 
-def test_dm41x_dump_round_trips_through_text():
+def test_dm41x_state_round_trips_through_text():
     memory = _x_memory()
     again = Memory.from_string(memory.to_string(), profile=DM41X)
     assert again == memory
@@ -191,7 +191,7 @@ def test_dm41x_dump_round_trips_through_text():
 # -- Region pointer registers ------------------------------------------------
 
 
-def test_dm41x_dump_pointer_registers_are_as_decoded():
+def test_dm41x_state_pointer_registers_are_as_decoded():
     memory = _x_memory()
     assert _hex(memory, 0x40) == R40
     assert _hex(memory, 0x201) == R201
@@ -207,7 +207,7 @@ def test_build_region_pointer_reproduces_the_real_registers():
 
 
 def test_build_region_pointer_keeps_both_ww_digits():
-    # tests/data/manyfiles.dm41 (a DM41L dump) has WW=0x1f in region 0.
+    # tests/data/manyfiles.dm41 (a DM41L state) has WW=0x1f in region 0.
     memory = Memory.from_file(DATA_DIR / "manyfiles.dm41")
     build = memory.extended_memory._build_region_pointer  # pylint: disable=protected-access
     assert (
@@ -267,7 +267,7 @@ def test_add_file_uses_the_free_space_at_the_bottom_of_region_two():
 
 
 def test_add_file_exactly_fills_then_overflows_the_last_region():
-    # The dump has only a handful of free registers left in region 2 (see
+    # The state has only a handful of free registers left in region 2 (see
     # MAX_FREE_DATA_REGISTERS). The largest file that still leaves a usable
     # address, above the region's pointer register, for the directory
     # terminator must fit...

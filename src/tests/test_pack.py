@@ -14,7 +14,7 @@ that global labels can be viewed and assigned to keys"), pack() does not
 just compact whatever list_programs()'s existing backward-chain walk
 already recognizes -- it re-derives the whole chain from the raw opcodes,
 forward, independent of whatever the existing backward-chain-link fields
-say. lander.dm41/targ.dm41 (below) are real-world dumps -- from the
+say. lander.dm41/targ.dm41 (below) are real-world states -- from the
 user's own investigation (project notes,
 pack_anomaly_investigation_2026-08-24.md) into a real DM41L, comparing
 against a third-party tool's export -- whose backward chain is entirely
@@ -37,7 +37,7 @@ DATA_DIR = Path(__file__).parent / "data"
 
 ALL_FIXTURES = sorted(DATA_DIR.glob("*.dm41"))
 
-# Real-world dumps whose backward chain is missing entirely -- pack() is
+# Real-world states whose backward chain is missing entirely -- pack() is
 # *expected* to change what list_programs() reports for these (that's
 # the whole point of the fix), so they're excluded from the "never
 # changes what's already visible" sweep below and covered by their own
@@ -46,7 +46,7 @@ REPAIR_FIXTURES = {"lander.dm41", "targ.dm41"}
 STABLE_FIXTURES = [p for p in ALL_FIXTURES if p.name not in REPAIR_FIXTURES]
 
 
-# -- Safety/idempotence across every real sample dump ------------------------
+# -- Safety/idempotence across every real sample state ------------------------
 
 
 def _listings(memory):
@@ -200,7 +200,7 @@ def test_pack_on_empty_program_memory_is_a_safe_no_op():
 
 
 def test_pack_on_a_freshly_constructed_memory_does_not_raise():
-    # A brand-new Memory() (no dump loaded at all) has no sane R00/.END.
+    # A brand-new Memory() (no state loaded at all) has no sane R00/.END.
     # partition -- pack() should still repack Key Assignments/Alarms
     # (trivially empty) without raising, and leave program memory alone.
     memory = Memory()
@@ -211,12 +211,12 @@ def test_pack_on_a_freshly_constructed_memory_does_not_raise():
 # -- Rebuilding a broken/missing backward chain (the pack() correction) ------
 #
 # The scenario the user's own real-hardware investigation identified
-# (pack_anomaly_investigation_2026-08-24.md, referenced above): a dump
+# (pack_anomaly_investigation_2026-08-24.md, referenced above): a state
 # written by a tool other than this app or a real HP-41/DM41L can leave
 # the backward chain-link fields zeroed or never set at all, even though
 # real FOCAL program bytes are physically present. Before this fix,
 # list_programs()/list_global_chain() reported nothing at all for such a
-# dump, and nothing in it could be assigned to a key. lander.dm41/
+# state, and nothing in it could be assigned to a key. lander.dm41/
 # targ.dm41 are exactly that scenario; lander-packed.dm41/targ-packed.dm41
 # are the same content after a real PACK on real hardware.
 

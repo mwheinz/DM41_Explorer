@@ -171,7 +171,7 @@ a no-op.
 
 ## Documentation
 
-There are many markdown files in the [`docs`](https://github.com/mwheinz/DM41L_Explorer/tree/main/docs) directory. These represent my
+There are many markdown files in the [`docs`](https://github.com/mwheinz/DM41_Explorer/tree/main/docs) directory. These represent my
 research notes from developing this project. Hopefully they will be useful to
 you if you are curious about the internals of the HP41 and the DM41L emulator.
 
@@ -186,8 +186,8 @@ states
 ## Running from source
 
 ```sh
-git clone https://github.com/mwheinz/DM41L_Explorer.git
-cd DM41L_Explorer
+git clone https://github.com/mwheinz/DM41_Explorer.git
+cd DM41_Explorer
 python3 -m venv venv
 source venv/bin/activate   # on Windows: venv\Scripts\activate
 pip install -r requirements.txt
@@ -265,4 +265,14 @@ pytest
 
 ## License
 
-See [`LICENSE`](LICENSE).
+Copyright (C) 2026 Michael Heinz.
+
+DM41_Explorer is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License, version 3, as published by
+the Free Software Foundation. It is distributed in the hope that it will be
+useful, but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General
+Public License for more details.
+
+The full text is in [`LICENSE`](LICENSE), and is also at
+<https://www.gnu.org/licenses/gpl-3.0.html>.

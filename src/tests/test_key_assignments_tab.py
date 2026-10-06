@@ -7,7 +7,7 @@ flow through _edit_key() for both assignment kinds, and the mutual-
 exclusion behavior between the two storage mechanisms on the same key.
 
 manyfiles.dm41 is used here specifically because it has both kinds of
-assignment already present in one real dump (three global-label
+assignment already present in one real state (three global-label
 assignments -- XMBCD/XMALPHA/PURXM on keys 11/12/13 unshifted -- plus two
 built-in/peripheral ones -- EMROOM/XTOA on keys 14/15 unshifted).
 

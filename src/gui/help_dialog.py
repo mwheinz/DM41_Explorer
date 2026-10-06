@@ -24,8 +24,8 @@ _SECTIONS = [
         "File",
         [
             ("New Memory Buffer", f"{_ACC}+N"),
-            ("Open Dump...", f"{_ACC}+O"),
-            ("Save Dump", f"{_ACC}+S"),
+            ("Open State...", f"{_ACC}+O"),
+            ("Save State", f"{_ACC}+S"),
             ("Preferences", f"{_ACC}+,"),
             ("Quit", f"{_ACC}+Q"),
         ],
@@ -36,8 +36,8 @@ _SECTIONS = [
             ("Connect / Reconnect...", f"{_ACC}+K"),
             ("Disconnect", f"{_ACC}+D"),
             ("Set Calculator Time", f"{_ACC}+T"),
-            ("Get Dump from DM41L", f"{_ACC}+G"),
-            ("Send Dump to DM41L", f"{_ACC}+U"),
+            ("Get State from DM41L", f"{_ACC}+G"),
+            ("Send State to DM41L", f"{_ACC}+U"),
         ],
     ),
     (

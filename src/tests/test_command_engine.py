@@ -262,31 +262,31 @@ def test_set_time_command_failure(engine, mock_serial_manager):
 
 # -- MemoryStringCommand / LoadMemoryStringCommand ---------------------
 #
-# These are the commands actually wired into the GUI's Get/Send Dump
-# features (gui/app.py's get_dump_from_calculator/send_dump_to_calculator).
+# These are the commands actually wired into the GUI's Get/Send State
+# features (gui/app.py's get_state_from_calculator/send_state_to_calculator).
 # They're the in-memory-string counterparts of the file-path-based
-# MemoryDumpCommand/LoadMemoryCommand tested in test_commands.py, which
+# MemoryStringCommand/LoadMemoryStringCommand tested in test_commands.py, which
 # are dead code in the running app (never imported by gui/app.py -- likely
 # leftover from the removed CLI). Until now those two were the only pair
 # with dedicated tests, despite not being the pair the app actually uses.
 
 
 def test_memory_string_command_success(engine, mock_serial_manager):
-    """Verifies a full dump round-trip through the engine: echo detection,
+    """Verifies a full state round-trip through the engine: echo detection,
     prompt detection, and parse_response()'s strip() are all exercised
-    with a real (empty) Memory dump, the same way the calculator's own
+    with a real (empty) Memory state, the same way the calculator's own
     's' response gets turned into a Memory object in gui/app.py's
-    _on_dump_received."""
+    _on_state_received."""
     cmd = MemoryStringCommand()
     expected_echo = "s\n"
-    dump_body = Memory().to_string()
+    state_body = Memory().to_string()
     prompt = "DM41 >> "
 
     callback_mock = MagicMock()
     error_mock = MagicMock()
     mock_serial_manager.get_next_message.side_effect = [
         expected_echo,  # Line 1: the echo
-        dump_body + "\n" + prompt,  # Line 2: dump body + termination prompt
+        state_body + "\n" + prompt,  # Line 2: state body + termination prompt
     ]
 
     # Act part 1: Execute command
@@ -296,11 +296,11 @@ def test_memory_string_command_success(engine, mock_serial_manager):
     # Act part 2: First iteration - receive echo
     engine.process_incoming_data()
     assert engine.state == EngineState.COLLECTING
-    # Act part 3: Second iteration - receive dump body + prompt
+    # Act part 3: Second iteration - receive state body + prompt
     engine.process_incoming_data()
     # Assertions
     assert engine.state == EngineState.IDLE
-    callback_mock.assert_called_once_with(dump_body.strip())
+    callback_mock.assert_called_once_with(state_body.strip())
 
 
 def test_load_memory_string_command_success(engine, mock_serial_manager):
@@ -335,7 +335,7 @@ def test_load_memory_string_command_failure(engine, mock_serial_manager, caplog)
     """A 'Read FAILED' response should raise inside parse_response(), which
     the engine must catch, route to the error callback, and log -- and
     must never reach the success callback."""
-    cmd = LoadMemoryStringCommand(["some dump text"])
+    cmd = LoadMemoryStringCommand(["some state text"])
     expected_echo = "l\n"
     response_body = "Read FAILED\n"
     prompt = "DM41 >> "
@@ -375,18 +375,18 @@ def test_load_memory_string_command_trigger_transfer_sends_data():
     valid in-memory Memory object it's already serialized via
     memory.to_string()."""
     mock_serial = MagicMock()
-    dump_body = Memory().to_string()
-    cmd = LoadMemoryStringCommand([dump_body], serial=mock_serial)
+    state_body = Memory().to_string()
+    cmd = LoadMemoryStringCommand([state_body], serial=mock_serial)
 
     cmd.trigger_transfer()
 
-    mock_serial.send_data.assert_called_once_with(dump_body)
+    mock_serial.send_data.assert_called_once_with(state_body)
 
 
 def test_load_memory_string_command_trigger_transfer_no_serial(caplog):
     """Without a serial manager, trigger_transfer() should log and return
     rather than raising."""
-    cmd = LoadMemoryStringCommand(["some dump text"])  # serial defaults to None
+    cmd = LoadMemoryStringCommand(["some state text"])  # serial defaults to None
 
     cmd.trigger_transfer()  # must not raise
 

@@ -18,7 +18,7 @@ class ProgramInfo:
     One entry found while walking the "global chain" -- the backward-
     linked list of every global alpha label and END marker in program
     memory, described in docs/program.md sec 5 (reverse-engineered from
-    sample dumps and Wickes' "Synthetic Programming on the HP-41C",
+    sample states and Wickes' "Synthetic Programming on the HP-41C",
     section 2C). This is the raw, per-marker view (Memory.list_global_chain());
     for the grouped, "one row per real program" view most callers actually
     want, see Program/Memory.list_programs() below and docs/program.md sec

@@ -1,20 +1,20 @@
-# The Memory Dump Text Format (`.dm41` and `.d41`)
+# The Memory State Text Format (`.dm41` and `.d41`)
 
 2026-10-04 · Michael Heinz (research by Claude)
 
-This document describes the text file format shared by the DM41L's `.dm41` memory dumps and the DM41X's `.d41` state files. It covers the file layout only. What the registers mean is described in `memory.md`, and the sub-structures inside them in `extended_memory.md`, `key_assignments.md`, `alarms.md` and `program.md`.
+This document describes the text file format shared by the DM41L's `.dm41` memory states and the DM41X's `.d41` state files. It covers the file layout only. What the registers mean is described in `memory.md`, and the sub-structures inside them in `extended_memory.md`, `key_assignments.md`, `alarms.md` and `program.md`.
 
 ## 1. Source Material
 
 - **`src/memory/memory.py`**: `Memory.from_string()` and `Memory.to_string()`, the reader and writer this document was checked against.
-- **`src/tests/data/*.dm41` and `*.d41`**: the 40 sample dumps.
+- **`src/tests/data/*.dm41` and `*.d41`**: the 40 sample states.
 - **`dm41x_first_look_2026-10-04.md`**: where the DM41X `.d41` was first shown to be this format.
 
 **Where the samples came from.** `dm41x_manyfiles.dm41` and `backuptest.d41` were made on a real DM41X (stated by the user). The other fixtures with calculator-style spacing (section 4) are believed to be calculator output as well, but no record of how each was made was checked.
 
 ## 2. Same Format on Every Model
 
-A DM41L `.dm41` dump and a DM41X `.d41` file use the identical text format, with the same `DM41` header line. The file cannot say which model wrote it; the caller chooses the memory map (`DeviceProfile`, see `device_profile.py`). The DM41X differs only in having more extended-memory registers, so its dump has rows at addresses up to 0x3ef.
+A DM41L `.dm41` state and a DM41X `.d41` file use the identical text format, with the same `DM41` header line. The file cannot say which model wrote it; the caller chooses the memory map (`DeviceProfile`, see `device_profile.py`). The DM41X differs only in having more extended-memory registers, so its state has rows at addresses up to 0x3ef.
 
 ## 3. File Layout
 
@@ -38,7 +38,7 @@ The first line is exactly `DM41`. It is not `DM41X` on a DM41X (observed in the 
 
 - Each row starts with a **hexadecimal register address**, lowercase, at least two digits (`00`, `0c`, `198`, `3e8`). No `0x` prefix and no zero-padding beyond two digits.
 - Then up to **four registers**, each **14 hex digits** (7 bytes), separated by two spaces.
-- Row addresses written by the calculator and by DM41L_Explorer are multiples of 4, so a row holds the registers at `base` to `base+3`.
+- Row addresses written by the calculator and by DM41_Explorer are multiples of 4, so a row holds the registers at `base` to `base+3`.
 - Rows are in ascending address order.
 - A row whose four registers are all zero is **omitted**. A register at an address that no row covers is an all-zero register.
 - Hex digits are written in the same order as `Register.get_hex()`: the first printed byte is byte 0, as in the register layouts in `memory.md`.
@@ -62,13 +62,13 @@ M: <14 hex digits>  N: <14 hex digits>  G: <2 hex digits>
 ### 3.4 Line endings and the end of the file
 
 - Samples written by the calculator use **LF** line endings, no CR, and end with a newline. `to_string()` also writes LF and a final newline. No sample in `tests/data` contains a CR.
-- `empty.dm41` is the smallest sample: the header, three register rows (`08`, `0c`, `198`) and three special-register lines, 331 bytes. `Memory()` starts with registers `08`, `0c`, `0d` and `0e` already set to the "Memory Lost" values, so an empty dump still has those.
+- `empty.dm41` is the smallest sample: the header, three register rows (`08`, `0c`, `198`) and three special-register lines, 331 bytes. `Memory()` starts with registers `08`, `0c`, `0d` and `0e` already set to the "Memory Lost" values, so an empty state still has those.
 
 ## 4. Whitespace
 
 Two spacing styles occur in the samples.
 
-| Place | Calculator style | DM41L_Explorer style (`to_string()`) |
+| Place | Calculator style | DM41_Explorer style (`to_string()`) |
 | --- | --- | --- |
 | Between registers on a row | two spaces | two spaces |
 | After the last register on a row | two trailing spaces in most files (see below) | none |
@@ -114,8 +114,8 @@ The register contents themselves are unchanged. Loading a file, saving it and lo
 
 ## 7. Open Questions
 
-- Does a DM41L accept a dump without the trailing spaces? The DM41X test is one file.
+- Does a DM41L accept a state without the trailing spaces? The DM41X test is one file.
 - Does the calculator accept single spaces between special-register pairs, or any of the other variations in section 5? Only the trailing-space removal has been tested.
 - Why do `lander.dm41` and `targ.dm41` lack trailing spaces when the other calculator-style files have them?
-- What do the special registers `A` to `N` and `G` hold, and which parts of them matter when a dump is loaded back into a calculator?
+- What do the special registers `A` to `N` and `G` hold, and which parts of them matter when a state is loaded back into a calculator?
 - Does a `.d41` file from a DM41XN (not yet released) use the same format?

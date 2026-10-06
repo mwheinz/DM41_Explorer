@@ -1,5 +1,5 @@
 '''
-DM41L Explorer: a CustomTkinter GUI for DM41L_Explorer.
+DM41_Explorer: a CustomTkinter GUI for DM41-series calculator memory states.
 
 '''
 
@@ -47,7 +47,7 @@ from gui.key_assignments_tab import KeyAssignmentsTab
 from gui.alarms_tab import AlarmsTab
 
 try:
-    from dm41lversion import APP_VERSION
+    from dm41version import APP_VERSION
 except ImportError:
     APP_VERSION = "unknown"
 
@@ -57,7 +57,7 @@ PLATFORM_SYSTEM = platform.system()
 
 # Header-button methods that Cmd/Ctrl+E / Cmd/Ctrl+I forward to, for
 # whichever tab is currently active -- see _bind_keys() and
-# DM41LExplorerApp._dispatch_tab_action() below. A tab name missing
+# DM41ExplorerApp._dispatch_tab_action() below. A tab name missing
 # from one of these dicts means that shortcut is a silent no-op there
 # (e.g. Overview has no Import/Export at all).
 _EXPORTABLE_TABS = {
@@ -85,7 +85,7 @@ def _format_recent_label(path_str: str) -> str:
 
 logger = logging.getLogger(__name__)
 
-# Cap the log file at 2MB with 3 rotated backups (dm41l_explorer.log,
+# Cap the log file at 2MB with 3 rotated backups (dm41_explorer.log,
 # .log.1, .log.2, .log.3 -- ~8MB worst case) so a long-running session
 # (or a chatty DEBUG level left on by mistake) can't grow the file
 # unbounded the way the previous plain FileHandler did.
@@ -103,7 +103,7 @@ LOG_FILE_BACKUP_COUNT = 3
 #            serial bytes, state-machine transitions, expected/no-op
 #            exceptions swallowed during defensive rendering).
 #   INFO     Normal lifecycle events a user could plausibly want to see
-#            in their own log: connect/disconnect, a dump loaded/saved,
+#            in their own log: connect/disconnect, a state loaded/saved,
 #            an XM file added/edited/removed, a register edited,
 #            preferences saved.
 #   WARNING  Something unexpected happened but the app recovered on its
@@ -125,7 +125,7 @@ LOG_FILE_BACKUP_COUNT = 3
 # exception and decides how to present it to the user.
 
 
-def _setup_logging(config_store, log_basename="dm41l_explorer"):
+def _setup_logging(config_store, log_basename="dm41_explorer"):
     # `log_basename` names the log file (<log_basename>.log) so each app in
     # this repository writes its own, instead of all sharing one.
     level = getattr(logging, config_store.logging_level.upper(), logging.INFO)
@@ -191,7 +191,7 @@ def _apply_font_prefs(config_store):
         ctk.ThemeManager.theme["CTkFont"]["size"] = config_store.font_size
 
 
-# A DM41L `.dm41` dump and a DM41X `.d41` state file are the same text format.
+# A DM41L `.dm41` state and a DM41X `.d41` state file are the same text format.
 STATE_EXTENSIONS = (".dm41", ".d41")
 STATE_FILETYPES = [
     ("DM41 memory state", ("*.dm41", "*.d41")),
@@ -199,7 +199,7 @@ STATE_FILETYPES = [
 ]
 
 
-class DM41LExplorerApp(ctk.CTk):
+class DM41ExplorerApp(ctk.CTk):
     '''Main application window.'''
 
     def __init__(self):
@@ -218,7 +218,7 @@ class DM41LExplorerApp(ctk.CTk):
         ctk.set_default_color_theme(self.config_store.color_theme)
         _apply_font_prefs(self.config_store)
 
-        self.title("DM41L Explorer")
+        self.title("DM41_Explorer")
         self.geometry("1080x768")
 
         self.serial = SerialManager(error_callback=self._handle_serial_error)
@@ -244,8 +244,8 @@ class DM41LExplorerApp(ctk.CTk):
         self._start_engine_pump()
         self._render_tabs()
 
-        # Kick off the auto-connect sequence once the window is up.
-        self.after(100, self.attempt_auto_connect)
+        # Nothing touches the serial port until the user chooses
+        # Connect / Reconnect... (the app starts offline).
 
     def _handle_serial_error(self, msg: str):
         logger.error("Serial error: %s", msg)
@@ -377,22 +377,22 @@ class DM41LExplorerApp(ctk.CTk):
         )
         file_menu.add_separator()
         file_menu.add_command(
-            label="Open Dump...",
-            command=self.load_dump_from_file,
+            label="Open State...",
+            command=self.load_state_from_file,
             accelerator=f"{acc}+O",
             underline=0,
         )
         self._recent_menu = Menu(file_menu, tearoff=0)
         file_menu.add_cascade(label="Open Recent", menu=self._recent_menu, underline=5)
         file_menu.add_command(
-            label="Save Dump",
-            command=self.save_dump_to_file,
+            label="Save State",
+            command=self.save_state_to_file,
             accelerator=f"{acc}+S",
             underline=0,
         )
         file_menu.add_command(
-            label="Save Dump As...",
-            command=self.save_dump_as,
+            label="Save State As...",
+            command=self.save_state_as,
             underline=13,
         )
         file_menu.add_separator()
@@ -436,14 +436,14 @@ class DM41LExplorerApp(ctk.CTk):
         )
         connect_menu.add_separator()
         connect_menu.add_command(
-            label="Get Dump from DM41L",
-            command=self.get_dump_from_calculator,
+            label="Get State from DM41L",
+            command=self.get_state_from_calculator,
             accelerator=f"{acc}+G",
             underline=0,
         )
         connect_menu.add_command(
-            label="Send Dump to DM41L",
-            command=self.send_dump_to_calculator,
+            label="Send State to DM41L",
+            command=self.send_state_to_calculator,
             accelerator=f"{acc}+U",
             underline=0,
         )
@@ -472,7 +472,7 @@ class DM41LExplorerApp(ctk.CTk):
         help_menu = Menu(menubar, tearoff=0)
         if PLATFORM_SYSTEM != "Darwin":
             help_menu.add_command(
-                label="About DM41L Explorer", command=self._show_about
+                label="About DM41_Explorer", command=self._show_about
             )
             help_menu.add_separator()
         help_menu.add_command(
@@ -495,8 +495,8 @@ class DM41LExplorerApp(ctk.CTk):
         acc = "Command" if PLATFORM_SYSTEM == "Darwin" else "Control"
 
         self.bind(f"<{acc}-n>", lambda e: self.new_memory_buffer())
-        self.bind(f"<{acc}-o>", lambda e: self.load_dump_from_file())
-        self.bind(f"<{acc}-s>", lambda e: self.save_dump_to_file())
+        self.bind(f"<{acc}-o>", lambda e: self.load_state_from_file())
+        self.bind(f"<{acc}-s>", lambda e: self.save_state_to_file())
         self.bind(f"<{acc}-q>", lambda e: self.on_close())
         # Preferences' menu accelerator (Cmd/Ctrl+,) never actually had
         # a matching bind() -- the menu's `accelerator=` text is purely
@@ -521,16 +521,18 @@ class DM41LExplorerApp(ctk.CTk):
         self.bind(f"<{acc}-k>", lambda e: self.show_connect_dialog())
         self.bind(f"<{acc}-d>", lambda e: self.disconnect())
         self.bind(f"<{acc}-t>", lambda e: self.set_calculator_time())
-        self.bind(f"<{acc}-g>", lambda e: self.get_dump_from_calculator())
-        self.bind(f"<{acc}-u>", lambda e: self.send_dump_to_calculator())
+        self.bind(f"<{acc}-g>", lambda e: self.get_state_from_calculator())
+        self.bind(f"<{acc}-u>", lambda e: self.send_state_to_calculator())
 
     def _show_about(self):
         messagebox.showinfo(
-            "About DM41L Explorer",
+            "About DM41_Explorer",
             f"Read, Write and Manipulate\n"
-            "DM41L memory files\n\n"
+            "DM41-series memory states\n\n"
             f"Version:\n{APP_VERSION}\n\n"
-            "Written by Michael Heinz.\n",
+            "Written by Michael Heinz.\n\n"
+            "Free software under the GNU General Public License,\n"
+            "version 3, with no warranty. See the LICENSE file.\n",
         )
 
     def _export_current_tab(self):
@@ -559,7 +561,7 @@ class DM41LExplorerApp(ctk.CTk):
         """Repopulates File > Open Recent from
         self.config_store.recent_files -- called once at startup
         (_build_menus()) and again every time the list changes (a
-        dump opened/saved, a stale entry pruned in open_dump_file(),
+        state opened/saved, a stale entry pruned in open_state_file(),
         or Clear Recent Files). Tk menu items are static once added,
         so the submenu has to be torn down and rebuilt rather than
         updated in place."""
@@ -571,7 +573,7 @@ class DM41LExplorerApp(ctk.CTk):
         for path_str in recent:
             self._recent_menu.add_command(
                 label=_format_recent_label(path_str),
-                command=lambda p=path_str: self.open_dump_file(p),
+                command=lambda p=path_str: self.open_state_file(p),
             )
         self._recent_menu.add_separator()
         self._recent_menu.add_command(
@@ -586,7 +588,7 @@ class DM41LExplorerApp(ctk.CTk):
     def _persist_config(self, context: str):
         """Saves self.config_store to disk, surfacing a failure the
         same way _connect_and_verify's own preference-save already
-        does -- these config writes are rare enough (once per dump
+        does -- these config writes are rare enough (once per state
         opened/saved) that a real failure (e.g. a read-only home
         directory) is worth telling the user about rather than
         silently dropping."""
@@ -636,7 +638,7 @@ class DM41LExplorerApp(ctk.CTk):
         self._tabs_dirty[name] = False
 
     def _render_tabs(self):
-        '''Invalidates every tab (e.g. after loading a whole new dump) and
+        '''Invalidates every tab (e.g. after loading a whole new state) and
         immediately re-renders whichever one is currently visible; the
         rest pick up the new memory next time they're selected.'''
         for name in self._tabs_dirty:
@@ -663,20 +665,6 @@ class DM41LExplorerApp(ctk.CTk):
         self.after(ENGINE_POLL_MS, self._pump_engine)
 
     # -- Connection -------------------------------------------------------
-
-    def attempt_auto_connect(self):
-        '''Entry point: try the configured default port; on failure, prompt.'''
-        default_port = self.config_store.serial_port
-        ports = self.serial.get_available_ports()
-
-        if default_port in ports:
-            self._connect_and_verify(default_port)
-        else:
-            self._prompt_for_port(
-                f"Could not find the configured port '{default_port}'. "
-                "Please select a serial port to connect to the DM41L, or "
-                "cancel to work offline."
-            )
 
     def _prompt_for_port(self, message: str):
         dialog = PortSelectionDialog(
@@ -749,7 +737,7 @@ class DM41LExplorerApp(ctk.CTk):
             ),
         )
 
-    # -- Startup sequence: battery -> timeout -> time -> memory dump
+    # -- Startup sequence: battery -> timeout -> time -> memory state
 
     def _on_startup_battery(self, voltage_mv):
         logger.info("Battery: %s", voltage_mv)
@@ -776,47 +764,47 @@ class DM41LExplorerApp(ctk.CTk):
     def _on_startup_time(self, time_str):
         logger.info("Time: %s", time_str)
         self._calc_time_label.configure(text=f"Calc time: {time_str}")
-        self.after(10, self._fetch_memory_dump)
+        self.after(10, self._fetch_memory_state)
 
-    def _fetch_memory_dump(self):
+    def _fetch_memory_state(self):
         if self.memory_source is None and not self.memory.modified:
-            self._set_status("Reading memory dump...")
+            self._set_status("Reading memory state...")
             self.after(
                 10,
                 lambda: self.engine.execute(
                     MemoryStringCommand(),
-                    self._on_auto_dump_received,
+                    self._on_auto_state_received,
                     self._on_command_error,
                 ),
             )
 
-        # We've already got a modified memory dump loaded. Just return.
+        # We've already got a modified memory state loaded. Just return.
         self._set_status(f"Connected to {self.serial.serial_inst.port}")
         return
 
-    def _on_auto_dump_received(self, dump):
-        # Re-check right at the moment the fetched dump is about to be
+    def _on_auto_state_received(self, state):
+        # Re-check right at the moment the fetched state is about to be
         # applied. It's a small race condition, but it does exist.
         if self.memory_source is not None or self.memory.modified:
             logger.info(
-                "Discarding auto-connect's fetched dump: a file was opened "
+                "Discarding auto-connect's fetched state: a file was opened "
                 "in the meantime."
             )
             self._set_status(f"Connected to {self.serial.serial_inst.port}")
             return
-        self._on_dump_received(dump)
+        self._on_state_received(state)
 
-    def _on_dump_received(self, dump):
-        logger.info("Dump received.")
+    def _on_state_received(self, state):
+        logger.info("State received.")
         try:
-            self.memory = Memory.from_string(dump)
+            self.memory = Memory.from_string(state)
             self.memory_source = None
             self._modified_label.configure(text="")
             self._update_source_label()
             self._render_tabs()
-            self._set_status("Connected -- memory dump loaded.")
+            self._set_status("Connected -- memory state loaded.")
         except Exception as e:
-            self._on_command_error(f"Failed to parse memory dump: {e}")
+            self._on_command_error(f"Failed to parse memory state: {e}")
 
     # -- Command callbacks -------------------------------------------------
 
@@ -916,9 +904,9 @@ class DM41LExplorerApp(ctk.CTk):
             ),
         )
 
-    def save_dump_to_file(self):
+    def save_state_to_file(self):
         if self.memory_source is None:
-            self.save_dump_as()
+            self.save_state_as()
             return
         if not messagebox.askyesno(
             "Overwrite File", f"Overwrite {self.memory_source} with your changes?"
@@ -927,16 +915,16 @@ class DM41LExplorerApp(ctk.CTk):
         try:
             self.memory.to_file(self.memory_source)
             self._modified_label.configure(text="")
-            logger.info("Dump saved to %s", self.memory_source)
+            logger.info("State saved to %s", self.memory_source)
             self.config_store.add_recent_file(self.memory_source)
             self._persist_config("recent files")
             self._rebuild_recent_files_menu()
-            messagebox.showinfo("Saved", f"Memory dump written to {self.memory_source}")
+            messagebox.showinfo("Saved", f"Memory state written to {self.memory_source}")
         except Exception as e:
-            logger.exception("Could not save dump to %s", self.memory_source)
-            messagebox.showerror("Error", f"Could not save dump: {e}")
+            logger.exception("Could not save state to %s", self.memory_source)
+            messagebox.showerror("Error", f"Could not save state: {e}")
 
-    def save_dump_as(self):
+    def save_state_as(self):
         # A file keeps its own extension: the text format is the same.
         extension = (
             self.memory_source.suffix
@@ -954,28 +942,28 @@ class DM41LExplorerApp(ctk.CTk):
             self.memory_source = Path(path)
             self._modified_label.configure(text="")
             self._update_source_label()
-            logger.info("Dump saved to %s", path)
+            logger.info("State saved to %s", path)
             self.config_store.add_recent_file(path)
             self._persist_config("recent files")
             self._rebuild_recent_files_menu()
-            messagebox.showinfo("Saved", f"Memory dump written to {path}")
+            messagebox.showinfo("Saved", f"Memory state written to {path}")
         except Exception as e:
-            logger.exception("Could not save dump to %s", path)
-            messagebox.showerror("Error", f"Could not save dump: {e}")
+            logger.exception("Could not save state to %s", path)
+            messagebox.showerror("Error", f"Could not save state: {e}")
 
-    def load_dump_from_file(self):
+    def load_state_from_file(self):
         if self.memory.modified and not messagebox.askyesno(
-            "Unsaved Changes", "Discard unsaved changes and load a different dump?"
+            "Unsaved Changes", "Discard unsaved changes and load a different state?"
         ):
             return
         path = filedialog.askopenfilename(filetypes=STATE_FILETYPES)
         if not path:
             return
-        self._load_dump_into_buffer(path)
+        self._load_state_into_buffer(path)
 
-    def _load_dump_into_buffer(self, path):
+    def _load_state_into_buffer(self, path):
         '''Reads `path` into self.memory and refreshes the UI to match.
-        This is the actual load step shared by every way of opening a dump
+        This is the actual load step shared by every way of opening a state
         (File > Open..., a startup file argument, and double-clicking a
         .dm41 file) -- callers are responsible for checking `self.memory.modified`
         and confirming with the user first, since the right prompt (or
@@ -990,17 +978,17 @@ class DM41LExplorerApp(ctk.CTk):
             self._update_source_label()
             self._render_tabs()
             name = Path(path).name
-            self._set_status(f"Loaded dump from {name}")
-            logger.info("Dump loaded from %s", path)
+            self._set_status(f"Loaded state from {name}")
+            logger.info("State loaded from %s", path)
             self.config_store.add_recent_file(path)
             self._persist_config("recent files")
             self._rebuild_recent_files_menu()
         except Exception as e:
-            logger.exception("Could not load dump from %s", path)
-            messagebox.showerror("Error", f"Could not load dump: {e}")
+            logger.exception("Could not load state from %s", path)
+            messagebox.showerror("Error", f"Could not load state: {e}")
 
-    def open_dump_file(self, path):
-        '''Opens `path` as the app's current dump, prompting to discard
+    def open_state_file(self, path):
+        '''Opens `path` as the app's current state, prompting to discard
         unsaved changes first if needed (same prompt File > Open... uses).
 
         Public entry point for anything that hands the app a file path
@@ -1018,10 +1006,10 @@ class DM41LExplorerApp(ctk.CTk):
             self._rebuild_recent_files_menu()
             return
         if self.memory.modified and not messagebox.askyesno(
-            "Unsaved Changes", "Discard unsaved changes and load a different dump?"
+            "Unsaved Changes", "Discard unsaved changes and load a different state?"
         ):
             return
-        self._load_dump_into_buffer(path)
+        self._load_state_into_buffer(path)
 
     def _on_mac_open_document(self, *paths):
         '''Handles macOS's "Open Document" AppleEvent -- what Finder sends
@@ -1036,11 +1024,11 @@ class DM41LExplorerApp(ctk.CTk):
         # (e.g. multi-selecting files and choosing Open); this app only
         # has one buffer, so just open the last one -- "last one wins" is
         # the least surprising choice for a single-document app.
-        self.open_dump_file(paths[-1])
+        self.open_state_file(paths[-1])
 
     # -- Connect menu actions -----------------------------------------------
 
-    def send_dump_to_calculator(self):
+    def send_state_to_calculator(self):
         if not self.serial.is_connected:
             messagebox.showwarning("Not Connected", "Connect to the DM41L first.")
             return
@@ -1064,7 +1052,7 @@ class DM41LExplorerApp(ctk.CTk):
 
         message = (
             "This will overwrite the calculator's current memory with the "
-            "currently loaded dump."
+            "currently loaded state."
         )
         if warnings:
             message += (
@@ -1073,15 +1061,15 @@ class DM41LExplorerApp(ctk.CTk):
             )
         else:
             message += " Continue?"
-        if not messagebox.askyesno("Send Dump to Calculator", message):
+        if not messagebox.askyesno("Send State to Calculator", message):
             return
 
-        dump_text = self.memory.to_string()
+        state_text = self.memory.to_string()
 
-        command = LoadMemoryStringCommand([dump_text], serial=self.serial)
+        command = LoadMemoryStringCommand([state_text], serial=self.serial)
         accepted = self.engine.execute(
             command,
-            self._on_dump_sent,
+            self._on_state_sent,
             self._on_io_failed,
         )
         if not accepted:
@@ -1092,17 +1080,17 @@ class DM41LExplorerApp(ctk.CTk):
             return
         command.trigger_transfer()
 
-    def _on_dump_sent(self, result):
-        logger.info("Dump sent: %s", result)
+    def _on_state_sent(self, result):
+        logger.info("State sent: %s", result)
         self.after(
             0,
-            lambda: messagebox.showinfo("Sent", "Memory dump sent to the calculator."),
+            lambda: messagebox.showinfo("Sent", "Memory state sent to the calculator."),
         )
 
     def _on_io_failed(self, message):
         self._on_command_error(message)
 
-    def get_dump_from_calculator(self):
+    def get_state_from_calculator(self):
         if not self.serial.is_connected:
             messagebox.showwarning("Not Connected", "Connect to the DM41L first.")
             return
@@ -1111,11 +1099,11 @@ class DM41LExplorerApp(ctk.CTk):
             "Discard unsaved changes and read the calculator's memory?",
         ):
             return
-        self._set_status("Reading memory dump...")
+        self._set_status("Reading memory state...")
         self.after(
             10,
             lambda: self.engine.execute(
-                MemoryStringCommand(), self._on_dump_received, self._on_io_failed
+                MemoryStringCommand(), self._on_state_received, self._on_io_failed
             ),
         )
 
@@ -1176,11 +1164,11 @@ class DM41LExplorerApp(ctk.CTk):
 
 
 def _handle_startup_file_arg(app):
-    '''Opens a dump file passed on the command line at launch, if any --
+    '''Opens a state file passed on the command line at launch, if any --
     the Windows/Linux half of "double-click a .dm41 file to open it": file
     associations on those platforms launch the app with the file's path as
     an argument. macOS instead delivers this via an "Open Document"
-    AppleEvent (see `DM41LExplorerApp._on_mac_open_document`), which
+    AppleEvent (see `DM41ExplorerApp._on_mac_open_document`), which
     doesn't go through sys.argv at all, but this also covers running the
     app directly from a shell with a file argument on any platform.
 
@@ -1189,13 +1177,13 @@ def _handle_startup_file_arg(app):
     parse -- a stray flag shouldn't be treated as a file to open.
     '''
     if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
-        app.open_dump_file(sys.argv[1])
+        app.open_state_file(sys.argv[1])
 
 
 def main():
-    app = DM41LExplorerApp()
+    app = DM41ExplorerApp()
     logger.info(
-        "DM41L Explorer %s starting (Python %s, %s)",
+        "DM41_Explorer %s starting (Python %s, %s)",
         APP_VERSION,
         platform.python_version(),
         platform.platform(),

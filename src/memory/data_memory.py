@@ -12,7 +12,7 @@ stands right now.
 Registers here are addressed two ways, and it matters which one a caller
 means: R00, R01, R02 ... are *register numbers* relative to the partition
 boundary (what a user types into an HP-41 `STO`/`RCL`), while the hex
-addresses in the dump are absolute. `address_for()`/`number_for()` convert
+addresses in the state are absolute. `address_for()`/`number_for()` convert
 between them.
 '''
 
@@ -40,7 +40,7 @@ class DataMemory(MemoryRegion):
     @property
     def start(self) -> int:
         '''
-        Absolute address of R00. Reports an empty region when the dump has no
+        Absolute address of R00. Reports an empty region when the state has no
         sane R00/`.END.` partition -- a corrupt or never-loaded one -- rather
         than treating a meaningless R00 as a real boundary. See
         `Memory.has_program_partition()`.
@@ -65,7 +65,7 @@ class DataMemory(MemoryRegion):
         if number < 0 or number >= count:
             if count == 0:
                 raise ValueError(
-                    f"Data register {number} doesn't exist -- this dump has "
+                    f"Data register {number} doesn't exist -- this state has "
                     "no data register partition"
                 )
             raise ValueError(

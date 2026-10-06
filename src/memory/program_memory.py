@@ -3,7 +3,7 @@ ProgramMemory: the user-program region -- everything between the `.END.`
 sentinel and R00 -- plus the "global chain" of END lines and global alpha
 labels threaded through it (docs/program.md sec 5).
 
-This region is the most mobile one in the dump: both of its boundaries are
+This region is the most mobile one in the state: both of its boundaries are
 pointers stored in status register c, and every import, removal or pack
 moves at least one of them. Its `start`/`end` therefore read those
 pointers live on every access (see regions.py), so a `ProgramMemory`
@@ -50,7 +50,7 @@ class ProgramMemory(MemoryRegion):
     def start(self) -> int:
         '''The register holding the permanent `.END.` sentinel -- the
         lowest register program memory currently occupies. Reports an
-        empty region (start one past PRIMARY_DATA_END) when the dump has
+        empty region (start one past PRIMARY_DATA_END) when the state has
         no sane R00/`.END.` partition at all -- a corrupt or never-loaded
         one -- rather than inventing a span out of meaningless pointer
         values. See Memory.has_program_partition().'''
@@ -211,7 +211,7 @@ class ProgramMemory(MemoryRegion):
 
         Stops -- without raising -- the moment a byte that should start a
         marker doesn't have the 0xC0-0xCD high nibble, since that means
-        either this model doesn't fit this dump or the data is corrupt;
+        either this model doesn't fit this state or the data is corrupt;
         better to show whatever was found up to that point than to crash
         the caller. Also bounded to a generous iteration cap, and guards
         against revisiting the same position, as a backstop against an
@@ -458,7 +458,7 @@ class ProgramMemory(MemoryRegion):
 
         Raises ValueError if `program` doesn't match any entry in the
         current program list (e.g. it's stale, from a `list_programs()`
-        call before the dump changed).
+        call before the state changed).
         Raises DM41MemoryError if `find_program_end()` disagrees with
         the chain-derived length -- signals corrupt data or a program
         that isn't well-formed HP-41 code.
@@ -476,13 +476,13 @@ class ProgramMemory(MemoryRegion):
                         f"Program {candidate.names_label!r}'s own bytes "
                         "don't form one well-formed HP-41 program (forward "
                         "opcode scan disagrees with the global chain) -- "
-                        "the dump may be corrupt."
+                        "the state may be corrupt."
                     )
                 return instruction_bytes
         raise ValueError(
             "This program entry doesn't match the current program list -- "
             "it may be stale (from a list_programs() call taken before "
-            "the dump changed)."
+            "the state changed)."
         )
 
     # -- Import (splicing a program in) ----------------------------------
@@ -838,7 +838,7 @@ class ProgramMemory(MemoryRegion):
         `list_global_chain()`/`list_programs()` rely on. This is `repack()`'s
         primary job (below), per the user's own real-hardware
         investigation (project notes,
-        `pack_anomaly_investigation_2026-08-24.md`): a dump written by a
+        `pack_anomaly_investigation_2026-08-24.md`): a state written by a
         tool other than a real HP-41/DM41L (or this app) can leave those
         backlinks zeroed or simply never set, even though real,
         well-formed FOCAL code sits right there in the raw bytes --
@@ -888,7 +888,7 @@ class ProgramMemory(MemoryRegion):
         every real program without risking silently dropping one --
         matching this project's existing preference (see
         `get_program_bytes()`, `import_program()`) for raising over
-        guessing when a dump does not look well-formed.
+        guessing when a state does not look well-formed.
         '''
         status = self._memory.status_registers
         r00 = status.R00()
@@ -1014,7 +1014,7 @@ class ProgramMemory(MemoryRegion):
         program, physically closing the gap the removed one leaves
         behind) and `repack()` (called with every existing program,
         unchanged -- reclaims only incidental drift, e.g. from a
-        hand-edited or externally-loaded dump).
+        hand-edited or externally-loaded state).
 
         Every entry in `programs` is assumed to already be well-formed
         (each `instruction_bytes` came from this same region's own
@@ -1104,7 +1104,7 @@ class ProgramMemory(MemoryRegion):
         are left untouched), `.END.` is moved to point at it, and the now
         -superfluous separate sentinel above it (pure zero padding by
         construction) is zeroed out and reclaimed as free space. This is
-        exactly what recovers `twolabels.dm41`-style dumps (a single
+        exactly what recovers `twolabels.dm41`-style states (a single
         program with no explicit END of its own, terminated only by
         `.END.`) back to their original, maximally-compact layout after a
         `pack()` that changed nothing else about them.
@@ -1184,7 +1184,7 @@ class ProgramMemory(MemoryRegion):
 
         Raises ValueError if `program` doesn't match any entry in the
         current program list (e.g. it's stale, from a `list_programs()`
-        call taken before the dump changed) -- same defensive check as
+        call taken before the state changed) -- same defensive check as
         `get_program_bytes()`.
         '''
         key_assignments_region = self._memory.key_assignments
@@ -1201,7 +1201,7 @@ class ProgramMemory(MemoryRegion):
             raise ValueError(
                 "This program entry doesn't match the current program "
                 "list -- it may be stale (from a list_programs() call "
-                "taken before the dump changed)."
+                "taken before the state changed)."
             )
 
         for label in match.labels:
@@ -1244,7 +1244,7 @@ class ProgramMemory(MemoryRegion):
         register-alignment drift the same way `remove_program()` does for
         the program it deletes.
 
-        Matches what a REAL PACK does, as observed in before/after dumps
+        Matches what a REAL PACK does, as observed in before/after states
         captured from a real DM41L/DM41X (tests/data: manyfiles,
         dm41x_pack_dotend, lander, targ, each with a `-packed` twin; see
         tests/test_pack_hardware.py):

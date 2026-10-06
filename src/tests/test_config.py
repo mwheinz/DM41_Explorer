@@ -126,7 +126,7 @@ def test_save_raises_exception_on_permission_error(tmp_path, monkeypatch):
 
 def test_prefs_filename_gives_each_app_its_own_file(tmp_path, monkeypatch):
     """A second app passes its own prefs_filename, so it neither reads nor
-    overwrites DM41L_Explorer's preferences file."""
+    overwrites DM41_Explorer's preferences file."""
     monkeypatch.setattr("config.Path.home", lambda: tmp_path)
     x_config = ProjectConfig(prefs_filename=".dm41x_explorer.json")
     assert x_config.PREFS_FILE == tmp_path / ".dm41x_explorer.json"
@@ -138,7 +138,7 @@ def test_prefs_filename_gives_each_app_its_own_file(tmp_path, monkeypatch):
     assert (tmp_path / ".dm41x_explorer.json").exists()
     assert not (tmp_path / ".dm41l_explorer.json").exists()
 
-    # A default-constructed config (DM41L_Explorer's) doesn't see X's values.
+    # A default-constructed config (DM41_Explorer's) doesn't see X's values.
     monkeypatch.setattr(ProjectConfig, "PREFS_FILE", tmp_path / ".dm41l_explorer.json")
     l_config = ProjectConfig()
     l_config.load()

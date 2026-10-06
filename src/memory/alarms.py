@@ -212,7 +212,7 @@ class Alarms(MemoryRegion):
         buffer moving down (Key Assignments shrinking) are explicitly zeroed,
         since nothing else is about to write there. (Strictly speaking, this
         isn't necessary, but it helps avoid confusion if the user looks at the
-        raw memory dump.)
+        raw memory state.)
         '''
 
         delta = new_start - old_start
@@ -510,7 +510,7 @@ class Alarms(MemoryRegion):
 
     def _room_ceiling(self) -> int:
         '''Highest address the buffer may grow into -- bounded by
-        `.END.` when the dump has a real program partition (matching
+        `.END.` when the state has a real program partition (matching
         FreeSpace's own reasoning), falling back to PRIMARY_DATA_END
         otherwise. A tighter, more correct check than relocate()'s own
         PRIMARY_DATA_END-only backstop above, usable here because this is

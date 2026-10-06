@@ -19,7 +19,7 @@ tab's own writes never let both exist on one key at once (see
 KeyAssignments.set_assignment()/ProgramMemory.set_program_key_assignment()'s mutual-
 exclusion docstrings), but _resolve_key() below still checks the register
 first when deciding what to display, matching that real priority in case
-a dump imported from elsewhere is in an inconsistent state.
+a state imported from elsewhere is in an inconsistent state.
 
 Import/export of key assignments is still out of scope -- see
 docs/key_assignments.md sec 6 items 1-2.
@@ -131,7 +131,7 @@ KEY_BUTTON_FONT_SIZE = 14
 
 def _program_names(memory: Memory) -> list:
     """Every assignable global label's name, alphabetical -- the Program
-    tab's picker list. A set first in case a dump has a duplicate label
+    tab's picker list. A set first in case a state has a duplicate label
     name (list_global_chain() doesn't assume uniqueness). Key assignments
     live on one label's own header (sec 4.6/5.2) regardless of how many
     labels its program has, so this works off the flat per-label chain,
@@ -225,7 +225,7 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         self._memory = memory
 
         if memory is None:
-            self._header_label.configure(text="(no memory dump loaded)")
+            self._header_label.configure(text="(no memory state loaded)")
             if self._grids_built:
                 self._teardown_grids()
             return
@@ -325,11 +325,11 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         """Returns (assignment, program) for key_number/shifted --
         `assignment` is get_key_assignment()'s dict or None, `program` is
         get_program_for_key()'s ProgramInfo or None. Only one is ever
-        non-None for a dump this tab itself wrote (memory.py's
+        non-None for a state this tab itself wrote (memory.py's
         set_key_assignment()/set_program_key_assignment() enforce mutual
         exclusion on save), but the Key Assignment Register lookup is
         still checked first -- matching the real priority order (docs sec
-        4.7) -- in case a dump from elsewhere has both."""
+        4.7) -- in case a state from elsewhere has both."""
         assignment = self._memory.key_assignments.get_assignment(key_number, shifted)
         if assignment:
             return assignment, None
@@ -399,7 +399,7 @@ class KeyAssignmentsTab(ctk.CTkFrame):
             # Clear both storage mechanisms -- normally only one is ever
             # actually populated (see _resolve_key()), but this is cheap
             # and safe (both calls no-op when there's nothing to clear)
-            # and avoids leaving a stale assignment behind on a dump
+            # and avoids leaving a stale assignment behind on a state
             # that's somehow in an inconsistent state.
             try:
                 self._memory.key_assignments.delete_assignment(key_number, shifted)

@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 # lo itself is that region's reserved link/pointer register (0x40 for region
 # 0, 0x201 for region 1, 0x301 for a DM41X's region 2), not available for
 # file storage (see memory/xm_file.py's ExtendedMemory docstring). It is a
-# fixed, dump-independent ceiling, not something read from the dump itself
+# fixed, state-independent ceiling, not something read from the state itself
 # -- but it is NOT the same number a real calculator's EMDIR command
 # reports (see xm_total_registers() below).
 
@@ -161,7 +161,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
         self._clear_below_title(self._stack_frame)
 
         if self._memory is None:
-            ctk.CTkLabel(self._stack_frame, text="(no memory dump loaded)").grid(
+            ctk.CTkLabel(self._stack_frame, text="(no memory state loaded)").grid(
                 row=1, column=0, padx=10, pady=(0, 10), sticky="w"
             )
             return
@@ -210,7 +210,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
         self._clear_below_title(self._system_frame)
 
         if self._memory is None:
-            ctk.CTkLabel(self._system_frame, text="(no memory dump loaded)").grid(
+            ctk.CTkLabel(self._system_frame, text="(no memory state loaded)").grid(
                 row=1, column=0, padx=10, pady=(0, 10), sticky="w"
             )
             return
@@ -250,7 +250,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
         if r00 < MIN_SANE_R00:
             ctk.CTkLabel(
                 self._partition_frame,
-                text="No dump loaded yet -- start a new buffer or load/read a dump first.",
+                text="No state loaded yet -- start a new buffer or load/read a state first.",
                 text_color="gray60",
             ).grid(row=1, column=0, columnspan=3, padx=10, pady=(0, 10), sticky="w")
             return
@@ -404,7 +404,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
             return
 
         # Memory.has_program_partition() is the single source of truth
-        # for whether this dump has a sane R00/.END. partition, replacing
+        # for whether this state has a sane R00/.END. partition, replacing
         # this method's old separate R00()/DotEnd()/MIN_SANE_R00 check
         # (GitHub issue #25). It is also exactly what decides whether the
         # "program"/"data" spans appear in regions()'s output below, so
@@ -412,7 +412,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
         # check (which only looked at R00, not R00 vs .END.), but that old
         # combination -- a sane R00 with .END. above it -- was already not
         # a state _render_partition() treats as a normal partition either,
-        # so no real dump should ever notice the difference.
+        # so no real state should ever notice the difference.
         spans = {span.key: span for span in self._memory.regions()}
         has_partition = self._memory.has_program_partition()
 

@@ -1,11 +1,11 @@
 """
 Shared helper for tests that sweep every fixture in tests/data/.
 
-A DM41L `.dm41` dump and a DM41X state file are the same text format, so
+A DM41L `.dm41` state and a DM41X state file are the same text format, so
 nothing in a file says which model's memory map applies; the caller must say
 (Memory.from_string(..., profile=...)). By convention in this repository,
 fixtures captured from a DM41X are named `dm41x_*` and are loaded with the
-DM41X profile; every other fixture is a DM41L dump.
+DM41X profile; every other fixture is a DM41L state.
 """
 
 from memory import Memory, DM41L, DM41X
