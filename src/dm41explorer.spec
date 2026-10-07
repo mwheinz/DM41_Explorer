@@ -23,12 +23,8 @@ a = Analysis(
     ["gui/app.py"],
     pathex=["."],
     binaries=[],
-    # docs/flags.md is bundled so the Flags tab's live flag names match the
-    # docs even when frozen. gui/flags_doc.py already falls back to its own
-    # built-in copy of the same table if this can't be found at the
-    # expected path inside the bundle, so a missing/stale copy here
-    # degrades gracefully rather than crashing the app.
-    datas=[("../docs/flags.md", "docs")],
+    # No data files: the Flags tab's names are hardcoded (gui/flag_names.py).
+    datas=[],
     # dm41version.py is generated fresh by build.sh right before this spec
     # runs (see above) -- it's not imported anywhere except gui/app.py's
     # own `try: from dm41version import _version / except ImportError`, so

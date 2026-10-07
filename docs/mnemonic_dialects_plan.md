@@ -405,7 +405,8 @@ The Markdown viewer choice (§4) covers README only, and is deferred.
 
 Not part of this feature (decision 5). Kept for when README in the Help
 menu is picked up. If done, README must be bundled via `datas` in
-`dm41explorer.spec` (precedent: `gui/flags_doc.py` and `docs/flags.md`), and
+`dm41explorer.spec` `datas` (which is empty since issue #45 stopped bundling
+`docs/flags.md`), and
 an in-app viewer also needs the 8 screenshots in `resources/screenshots/`.
 
 | Option | Fidelity | Dependencies | Notes |

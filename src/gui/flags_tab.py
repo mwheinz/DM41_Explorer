@@ -1,13 +1,13 @@
 """
 Flags tab: the 56 user/system flags (register d, 0x0e), editable, with
-names loaded live from docs/flags.md.
+the hardcoded names from gui/flag_names.py.
 """
 
 import logging
 import customtkinter as ctk
 
 from memory import Memory
-from gui.flags_doc import load_flag_names
+from gui.flag_names import FLAG_NAMES
 from gui.scroll_support import bind_touchpad_scroll
 from gui.tab_common import build_tab_header, CARD_KWARGS
 
@@ -24,7 +24,6 @@ class FlagsTab(ctk.CTkFrame):
         super().__init__(master, **kwargs)
         self._memory: Memory = None
         self._on_change = on_change
-        self._flag_names = load_flag_names()
         self._flag_vars = {}
         self._suspend_flag_callbacks = False
 
@@ -71,7 +70,7 @@ class FlagsTab(ctk.CTkFrame):
         for n in range(FLAG_COUNT):
             var = ctk.BooleanVar(value=current[n])
             self._flag_vars[n] = var
-            label = f"{n:02d} {self._flag_names.get(n, '')}"
+            label = f"{n:02d} {FLAG_NAMES[n]}"
             cb = ctk.CTkCheckBox(
                 self._body,
                 text=label,
