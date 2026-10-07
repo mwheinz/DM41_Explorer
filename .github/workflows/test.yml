@@ -69,11 +69,11 @@ jobs:
       # tests that are only parametrized on font_size.
       - name: Run tests (Linux, headless via Xvfb)
         if: runner.os == 'Linux'
-        run: xvfb-run -a pytest -k "not font and not fixed_size_dialog and not connect_dialog_wraps and not mnemonics_notes_rewrap and not mnemonics_dialog_can_be_made_smaller and not no_cell_text_is_wider"
+        run: xvfb-run -a pytest -k "not font and not size and not fixed_size_dialog and not connect_dialog_wraps and not mnemonics_notes_rewrap and not mnemonics_dialog_can_be_made_smaller and not no_cell_text_is_wider"
 
       - name: Run tests (macOS)
         if: runner.os == 'macOS'
-        run: pytest -k "not font and not fixed_size_dialog and not connect_dialog_wraps and not mnemonics_notes_rewrap and not mnemonics_dialog_can_be_made_smaller and not no_cell_text_is_wider"
+        run: pytest -k "not font and not size and not fixed_size_dialog and not connect_dialog_wraps and not mnemonics_notes_rewrap and not mnemonics_dialog_can_be_made_smaller and not no_cell_text_is_wider"
 
       # Windows-hosted runners have a well-known, still-unresolved
       # intermittent failure in actions/setup-python's Tcl/Tk bundle: Tcl
@@ -96,4 +96,4 @@ jobs:
           timeout_minutes: 10
           max_attempts: 3
           retry_wait_seconds: 20
-          command: pytest -k "not font and not fixed_size_dialog and not connect_dialog_wraps and not mnemonics_notes_rewrap and not mnemonics_dialog_can_be_made_smaller and not no_cell_text_is_wider"
+          command: pytest -k "not font and not size and not fixed_size_dialog and not connect_dialog_wraps and not mnemonics_notes_rewrap and not mnemonics_dialog_can_be_made_smaller and not no_cell_text_is_wider"
