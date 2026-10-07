@@ -18,7 +18,7 @@ from memory import (
     NAME_MIN_CHAR,
     NAME_MAX_CHAR,
 )
-from gui.dialog_common import build_dialog_button_row
+from gui.dialog_common import build_dialog_button_row, scaled
 from gui.tab_common import MONOSPACE_FONT_FAMILY
 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ class XMFileDialog(ctk.CTkToplevel):
         else:
             name_default = ""
         self._name_var = ctk.StringVar(value=name_default)
-        ctk.CTkEntry(self, textvariable=self._name_var, width=320).pack(
+        ctk.CTkEntry(self, textvariable=self._name_var, width=scaled(320)).pack(
             anchor="w", padx=16
         )
 
@@ -101,7 +101,7 @@ class XMFileDialog(ctk.CTkToplevel):
                 "0x + 14 hex digits for raw content):"
             ),
             justify="left",
-            wraplength=320,
+            wraplength=scaled(320),
         )
         self._ascii_label = ctk.CTkLabel(
             self,
@@ -110,7 +110,7 @@ class XMFileDialog(ctk.CTkToplevel):
                 "trigraphs allowed, see docs/trigraphs.md):"
             ),
             justify="left",
-            wraplength=320,
+            wraplength=scaled(320),
         )
 
         # For `initial` (the Import File... flow), both boxes are
@@ -130,7 +130,7 @@ class XMFileDialog(ctk.CTkToplevel):
         elif initial:
             data_default = initial.get("content", "")
         self._data_box = ctk.CTkTextbox(
-            self, width=320, height=140, font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY)
+            self, width=scaled(320), height=scaled(140), font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY)
         )
         if data_default:
             self._data_box.insert("1.0", data_default)
@@ -141,7 +141,7 @@ class XMFileDialog(ctk.CTkToplevel):
         elif initial:
             ascii_default = initial.get("content", "")
         self._ascii_box = ctk.CTkTextbox(
-            self, width=320, height=140, font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY)
+            self, width=scaled(320), height=scaled(140), font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY)
         )
         if ascii_default:
             self._ascii_box.insert("1.0", ascii_default)

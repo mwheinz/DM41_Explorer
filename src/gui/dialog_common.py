@@ -8,10 +8,64 @@ pack() order that drifts apart over time -- GitHub issue #13.
 import tkinter as tk
 import customtkinter as ctk
 
+from gui.window_geometry import dialog_size, scaled_width
+
 # Every dialog's button row used this width for every button before this
 # was centralized -- kept as the shared default so build_dialog_button_row
 # callers don't each have to repeat it.
 BUTTON_WIDTH = 90
+
+
+def _font_size():
+    return ctk.ThemeManager.theme["CTkFont"]["size"]
+
+
+def scaled(width) -> int:
+    """A fixed dialog dimension (an entry's width, a label's wraplength) for
+    the application font: `width` at the default font size, growing in
+    proportion above it so a larger font doesn't squeeze the dialog
+    (GitHub issue #42)."""
+    return scaled_width(width, _font_size())
+
+
+def fit_dialog(dialog, base_width=0, base_height=0, *, minimum=None, content=True):
+    """Sizes and sets the minimum size of `dialog` once its widgets exist.
+
+    `base_width`/`base_height` are the size wanted at the default font size
+    (0 = whatever the content needs); they grow with the application font.
+    With `content` true (dialogs that can't scroll) the result is never
+    smaller than the widgets ask for; pass False for dialogs whose content
+    scrolls. `minimum` is the smallest size, at the default font size, the
+    user may resize to (default: the same as the size). Nothing exceeds the
+    screen. Sizes passed to Tk are unscaled, like the main window's.
+    """
+    dialog.update_idletasks()
+    undo = dialog._reverse_window_scaling
+    screen = (undo(dialog.winfo_screenwidth()), undo(dialog.winfo_screenheight()))
+    needed = (
+        (undo(dialog.winfo_reqwidth()), undo(dialog.winfo_reqheight()))
+        if content
+        else (0, 0)
+    )
+    size = dialog_size(_font_size(), (base_width, base_height), needed, screen)
+    smallest = dialog_size(_font_size(), minimum or (base_width, base_height), needed, screen)
+    dialog.geometry(f"{size[0]}x{size[1]}")
+    dialog.minsize(*smallest)
+
+
+def wrap_labels_to_width(dialog, labels, margin):
+    """Keeps each of `labels` wrapped to the dialog's width minus `margin`
+    (unscaled pixels), so text re-flows when the dialog is resized or opens
+    larger because of the font."""
+
+    def _rewrap(event):
+        if event.widget is not dialog:
+            return
+        width = max(100, int(dialog._reverse_window_scaling(event.width)) - margin)
+        for label in labels:
+            label.configure(wraplength=width)
+
+    dialog.bind("<Configure>", _rewrap, add="+")
 
 
 def _is_multiline_text_widget(widget) -> bool:
@@ -71,14 +125,14 @@ def build_dialog_button_row(
     ctk.CTkButton(
         row,
         text=cancel_text,
-        width=BUTTON_WIDTH,
+        width=scaled(BUTTON_WIDTH),
         command=on_cancel or dialog.destroy,
     ).pack(side="left")
 
     primary_button = ctk.CTkButton(
         row,
         text=primary_text,
-        width=BUTTON_WIDTH,
+        width=scaled(BUTTON_WIDTH),
         command=on_primary,
     )
     primary_button.pack(side="right")
@@ -91,7 +145,7 @@ def build_dialog_button_row(
         center = ctk.CTkFrame(row, fg_color="transparent")
         center.pack(side="left", expand=True)
         for text, command in extra_buttons:
-            ctk.CTkButton(center, text=text, width=BUTTON_WIDTH, command=command).pack(
+            ctk.CTkButton(center, text=text, width=scaled(BUTTON_WIDTH), command=command).pack(
                 side="left", padx=4
             )
 

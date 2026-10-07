@@ -23,7 +23,7 @@ import platform
 from tkinter import messagebox
 import customtkinter as ctk
 
-from gui.dialog_common import build_dialog_button_row
+from gui.dialog_common import build_dialog_button_row, scaled
 from gui.contrast import SECONDARY_TEXT
 from gui.tab_common import MONOSPACE_FONT_FAMILY
 from memory.mnemonics import (
@@ -130,7 +130,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
             self,
             text=f"Key {key_number:02d} ({shift_label}) -- {current_text}",
             font=ctk.CTkFont(weight="bold"),
-            wraplength=340,
+            wraplength=scaled(340),
             justify="left",
         ).pack(padx=16, pady=(16, 4), anchor="w")
         if flag_clear:
@@ -138,11 +138,11 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
                 self,
                 text=_FLAG_CLEAR_NOTE,
                 text_color=SECONDARY_TEXT,
-                wraplength=340,
+                wraplength=scaled(340),
                 justify="left",
             ).pack(padx=16, pady=(0, 4), anchor="w")
 
-        tabs = ctk.CTkTabview(self, width=360)
+        tabs = ctk.CTkTabview(self, width=scaled(360))
         tabs.pack(padx=16, pady=8, fill="both", expand=True)
         tabs.add("Function")
         tabs.add("Program")
@@ -162,7 +162,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
             tabs.tab("Function"),
             values=_ALL_FUNCTION_NAMES,
             variable=self._function_var,
-            width=300,
+            width=scaled(300),
         ).pack(anchor="w", padx=8, fill="x")
         # Typing and picking both change the variable, so one trace covers
         # both.
@@ -170,7 +170,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
             tabs.tab("Function"),
             text="",
             text_color=SECONDARY_TEXT,
-            wraplength=320,
+            wraplength=scaled(320),
             justify="left",
         )
         self._dm41x_hint.pack(anchor="w", padx=8, pady=(8, 0))
@@ -184,7 +184,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
             text="Raw function byte(s): 2 hex digits (e.g. 40) for a "
             "built-in function, or 4 (e.g. A681) for an XROM/"
             "peripheral function.",
-            wraplength=320,
+            wraplength=scaled(320),
             justify="left",
         ).pack(anchor="w", padx=8, pady=(12, 4))
         ctk.CTkEntry(
@@ -209,14 +209,14 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
                 tabs.tab("Program"),
                 text="Global program (a program can be on only one key -- "
                 "picking one already assigned elsewhere moves it here):",
-                wraplength=320,
+                wraplength=scaled(320),
                 justify="left",
             ).pack(anchor="w", padx=8, pady=(12, 4))
             ctk.CTkComboBox(
                 tabs.tab("Program"),
                 values=self._program_names,
                 variable=self._program_var,
-                width=300,
+                width=scaled(300),
             ).pack(anchor="w", padx=8, fill="x")
         else:
             self._program_var = None
@@ -224,7 +224,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
                 tabs.tab("Program"),
                 text="This state has no global programs to assign.",
                 text_color=SECONDARY_TEXT,
-                wraplength=320,
+                wraplength=scaled(320),
                 justify="left",
             ).pack(anchor="w", padx=8, pady=(12, 4))
 

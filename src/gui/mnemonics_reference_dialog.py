@@ -18,6 +18,7 @@ import platform
 
 import customtkinter as ctk
 
+from gui.dialog_common import fit_dialog, scaled, wrap_labels_to_width
 from gui.tab_common import apply_row_tags, build_tree_with_scrollbar, style_treeview
 from memory.mnemonic_doc import (
     mnemonic_reference_rows,
@@ -57,17 +58,24 @@ _INSTRUCTIONS_HELP = (
 )
 
 
+# Size at the default font, and the smallest it may be resized to; both grow
+# with the application font. _NOTE_MARGIN is what the tab padding and window
+# border take from the width available to the notes.
+_BASE_SIZE = (760, 560)
+_BASE_MINIMUM_SIZE = (560, 360)
+_NOTE_MARGIN = 60
+
+
 class MnemonicsReferenceDialog(ctk.CTkToplevel):
     """Non-modal, read-only reference window (see module docstring)."""
 
     def __init__(self, master):
         super().__init__(master)
         self.title("FOCAL Mnemonics Reference")
-        self.geometry("760x560")
-        self.minsize(560, 360)
         if PLATFORM_SYSTEM == "Darwin" and hasattr(master, "_menubar"):
             self.config(menu=master._menubar)
 
+        self._notes = []
         self._rows = mnemonic_reference_rows()
         stripe_bg = style_treeview(_STYLE, selectable=False)
 
@@ -79,15 +87,13 @@ class MnemonicsReferenceDialog(ctk.CTkToplevel):
 
         # -- Instructions: filter box + table ---------------------------
         page = tabs.tab("Instructions")
-        ctk.CTkLabel(
-            page, text=_INSTRUCTIONS_HELP, wraplength=700, justify="left"
-        ).pack(anchor="w", padx=4, pady=(4, 6))
+        self._note(page, _INSTRUCTIONS_HELP)
         filter_row = ctk.CTkFrame(page, fg_color="transparent")
         filter_row.pack(fill="x", padx=4, pady=(0, 6))
         ctk.CTkLabel(filter_row, text="Filter:").pack(side="left")
         self._filter_var = ctk.StringVar()
         self._filter_entry = ctk.CTkEntry(
-            filter_row, textvariable=self._filter_var, width=220
+            filter_row, textvariable=self._filter_var, width=scaled(220)
         )
         self._filter_entry.pack(side="left", padx=(6, 12))
         self._count_label = ctk.CTkLabel(filter_row, text="")
@@ -97,41 +103,54 @@ class MnemonicsReferenceDialog(ctk.CTkToplevel):
 
         # -- Substitutions / Trigraphs: small fixed tables -----------------
         page = tabs.tab("Substitutions")
-        ctk.CTkLabel(
+        self._note(
             page,
-            text="Each special character in a display name can be typed as "
+            "Each special character in a display name can be typed as "
             "any of these ASCII stand-ins, in any combination "
             "(SIGMAREG, X!=Y?, X**2).",
-            wraplength=700,
-            justify="left",
-        ).pack(anchor="w", padx=4, pady=(4, 6))
+        )
         self._fill(
             self._build_table(page, _SUBSTITUTION_COLUMNS, stripe_bg),
             substitution_rows(),
         )
 
         page = tabs.tab("Trigraphs")
-        ctk.CTkLabel(
+        self._note(
             page,
-            text="A backslash escape stands for one FOCAL character, in "
+            "A backslash escape stands for one FOCAL character, in "
             "instruction names and in quoted ALPHA text. Escapes are "
             "case-sensitive (\\E is Σ; \\e is an error). Any byte can also be "
             "written as a backslash and three decimal digits (\\126 is Σ).",
-            wraplength=700,
-            justify="left",
-        ).pack(anchor="w", padx=4, pady=(4, 6))
+        )
         self._fill(
             self._build_table(page, _TRIGRAPH_COLUMNS, stripe_bg), trigraph_rows()
         )
 
-        ctk.CTkButton(self, text="Close", width=90, command=self.destroy).pack(
+        ctk.CTkButton(self, text="Close", width=scaled(90), command=self.destroy).pack(
             padx=12, pady=(4, 12), anchor="e"
         )
         self.protocol("WM_DELETE_WINDOW", self.destroy)
         self.bind("<Escape>", lambda e: self.destroy())
 
+        # Opens at the size for the application font (never larger than the
+        # screen) and re-wraps the explanatory notes as the window is resized.
+        # The tables scroll, so the content doesn't set the size.
+        fit_dialog(
+            self, *_BASE_SIZE, minimum=_BASE_MINIMUM_SIZE, content=False
+        )
+        wrap_labels_to_width(self, self._notes, _NOTE_MARGIN)
+
         self._apply_filter()
         self._filter_entry.focus_set()
+
+    def _note(self, page, text):
+        """An explanatory paragraph at the top of a tab, wrapped to the
+        window width (see wrap_labels_to_width)."""
+        label = ctk.CTkLabel(
+            page, text=text, wraplength=scaled(_BASE_SIZE[0] - _NOTE_MARGIN), justify="left"
+        )
+        label.pack(anchor="w", padx=4, pady=(4, 6))
+        self._notes.append(label)
 
     @staticmethod
     def _build_table(parent, columns, stripe_bg):

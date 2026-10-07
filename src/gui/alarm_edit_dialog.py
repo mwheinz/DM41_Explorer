@@ -15,7 +15,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from memory import Alarm
-from gui.dialog_common import build_dialog_button_row
+from gui.dialog_common import build_dialog_button_row, scaled
 from gui.contrast import SECONDARY_TEXT
 from gui.tab_common import ui_font
 
@@ -46,7 +46,7 @@ class AlarmEditDialog(ctk.CTkToplevel):
             anchor="w", padx=16, pady=(16, 4)
         )
         self._date_var = ctk.StringVar(value=when.strftime("%Y-%m-%d"))
-        ctk.CTkEntry(self, textvariable=self._date_var, width=320).pack(
+        ctk.CTkEntry(self, textvariable=self._date_var, width=scaled(320)).pack(
             anchor="w", padx=16
         )
 
@@ -54,7 +54,7 @@ class AlarmEditDialog(ctk.CTkToplevel):
             anchor="w", padx=16, pady=(12, 4)
         )
         self._time_var = ctk.StringVar(value=when.strftime("%H:%M:%S"))
-        ctk.CTkEntry(self, textvariable=self._time_var, width=320).pack(
+        ctk.CTkEntry(self, textvariable=self._time_var, width=scaled(320)).pack(
             anchor="w", padx=16
         )
 
@@ -66,13 +66,13 @@ class AlarmEditDialog(ctk.CTkToplevel):
             values=list(_TYPE_LABELS.values()),
             variable=self._type_var,
             command=self._on_type_changed,
-            width=320,
+            width=scaled(320),
         ).pack(anchor="w", padx=16, fill="x")
 
         self._text_label = ctk.CTkLabel(self, text="Message (0-24 characters):")
         self._text_label.pack(anchor="w", padx=16, pady=(12, 4))
         self._text_var = ctk.StringVar(value=existing.text if existing else "")
-        ctk.CTkEntry(self, textvariable=self._text_var, width=320).pack(
+        ctk.CTkEntry(self, textvariable=self._text_var, width=scaled(320)).pack(
             anchor="w", padx=16
         )
         ctk.CTkLabel(
@@ -83,6 +83,8 @@ class AlarmEditDialog(ctk.CTkToplevel):
             ),
             font=ui_font(-2),
             text_color=SECONDARY_TEXT,
+            wraplength=scaled(440),
+            justify="left",
         ).pack(anchor="w", padx=16)
         self._on_type_changed(type_default)
 
@@ -117,7 +119,7 @@ class AlarmEditDialog(ctk.CTkToplevel):
             col = ctk.CTkFrame(self._repeat_row, fg_color="transparent")
             col.pack(side="left", padx=(0, 8))
             ctk.CTkLabel(col, text=label).pack(anchor="w")
-            ctk.CTkEntry(col, textvariable=var, width=60).pack(anchor="w")
+            ctk.CTkEntry(col, textvariable=var, width=scaled(60)).pack(anchor="w")
         self._on_repeat_toggled()
 
         self._past_due_var = ctk.BooleanVar(

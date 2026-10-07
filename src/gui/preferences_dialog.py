@@ -10,7 +10,7 @@ from tkinter import filedialog, messagebox
 import tkinter.font as tkfont
 import customtkinter as ctk
 
-from gui.dialog_common import build_dialog_button_row
+from gui.dialog_common import build_dialog_button_row, scaled
 from gui.contrast import WARNING_TEXT
 from gui.tab_common import ui_font
 
@@ -160,7 +160,7 @@ class PreferencesDialog(ctk.CTkToplevel):
             sizes.append(current_size)
         self._font_size_var = ctk.StringVar(value=current_size)
         ctk.CTkOptionMenu(
-            size_col, values=sizes, variable=self._font_size_var, width=90
+            size_col, values=sizes, variable=self._font_size_var, width=scaled(90)
         ).pack(anchor="w", pady=(4, 0))
 
         ctk.CTkLabel(
@@ -181,7 +181,7 @@ class PreferencesDialog(ctk.CTkToplevel):
             side="left", fill="x", expand=True
         )
         ctk.CTkButton(
-            dir_row, text="Browse...", width=90, command=self._pick_log_directory
+            dir_row, text="Browse...", width=scaled(90), command=self._pick_log_directory
         ).pack(side="left", padx=(8, 0))
 
     def _pick_log_directory(self):

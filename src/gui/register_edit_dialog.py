@@ -9,7 +9,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from memory import Register
-from gui.dialog_common import build_dialog_button_row
+from gui.dialog_common import build_dialog_button_row, scaled
 from gui.tab_common import MONOSPACE_FONT_FAMILY
 
 logger = logging.getLogger(__name__)
@@ -61,7 +61,7 @@ class RegisterEditDialog(ctk.CTkToplevel):
             self, text=f"Register 0x{addr:03x}", font=ctk.CTkFont(weight="bold")
         ).pack(padx=16, pady=(16, 4), anchor="w")
 
-        tabs = ctk.CTkTabview(self, width=360)
+        tabs = ctk.CTkTabview(self, width=scaled(360))
         tabs.pack(padx=16, pady=8, fill="both", expand=True)
         tabs.add("Number")
         tabs.add("Text")

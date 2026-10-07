@@ -110,3 +110,21 @@ def scaled_width(width, font_size) -> int:
     the default font size, growing in proportion above it so text isn't
     truncated by a larger font."""
     return int(round(width * font_scale(font_size)))
+
+
+def dialog_size(font_size, base, needed, screen):
+    """The size to give a dialog (GitHub issue #42, dialog sizes).
+
+    `base` is the (width, height) the dialog wants at the default font size
+    (0 for "whatever the content needs"); it grows with the font like
+    everything else in the dialog. `needed` is the (width, height) the
+    widgets ask for, which a dialog that can't scroll must always get --
+    otherwise a large font clips it. `screen` is the display's size; no
+    dialog is larger than the screen allows.
+    """
+    scale = font_scale(font_size)
+    cap = _cap(screen)
+    return tuple(
+        min(max(int(wanted * scale), int(need)), limit)
+        for wanted, need, limit in zip(base, needed, cap)
+    )

@@ -12,6 +12,7 @@ changed, or removed in `app.py`, update _SECTIONS below to match.
 import platform
 import customtkinter as ctk
 
+from gui.dialog_common import fit_dialog, scaled
 from gui.tab_common import MONOSPACE_FONT_FAMILY
 
 PLATFORM_SYSTEM = platform.system()
@@ -109,7 +110,7 @@ class KeyboardShortcutsDialog(ctk.CTkToplevel):
                 ).grid(row=row, column=1, sticky="e", pady=2)
                 row += 1
 
-        ctk.CTkButton(self, text="Close", width=90, command=self.destroy).pack(
+        ctk.CTkButton(self, text="Close", width=scaled(90), command=self.destroy).pack(
             padx=16, pady=(0, 16), anchor="e"
         )
 
@@ -117,6 +118,6 @@ class KeyboardShortcutsDialog(ctk.CTkToplevel):
         self.bind("<Return>", lambda e: self.destroy())
         self.bind("<Escape>", lambda e: self.destroy())
 
-        self.update_idletasks()
-        self.geometry(f"{DIALOG_WIDTH}x{self.winfo_reqheight()}")
-        self.minsize(DIALOG_WIDTH, self.winfo_reqheight())
+        # DIALOG_WIDTH is for the default font; a larger font widens it, and
+        # it is never narrower than the shortcut list needs.
+        fit_dialog(self, DIALOG_WIDTH)

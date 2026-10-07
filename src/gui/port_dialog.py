@@ -5,7 +5,7 @@ Modal dialog for choosing a serial port to connect to the DM41L.
 import platform
 import customtkinter as ctk
 
-from gui.dialog_common import build_dialog_button_row
+from gui.dialog_common import build_dialog_button_row, fit_dialog, scaled
 from gui.contrast import WARNING_TEXT
 
 PLATFORM_SYSTEM = platform.system()
@@ -39,7 +39,7 @@ class PortSelectionDialog(ctk.CTkToplevel):
             ctk.CTkLabel(
                 self,
                 text=message,
-                wraplength=DIALOG_WIDTH - 40,
+                wraplength=scaled(DIALOG_WIDTH - 40),
                 justify="left",
                 text_color=WARNING_TEXT,
             ).pack(padx=16, pady=(16, 8), anchor="w")
@@ -68,9 +68,7 @@ class PortSelectionDialog(ctk.CTkToplevel):
         # Fix the dialog to a constant width so short status messages don't
         # leave the buttons jammed together; height still adapts to whether
         # a message is shown.
-        self.update_idletasks()
-        self.geometry(f"{DIALOG_WIDTH}x{self.winfo_reqheight()}")
-        self.minsize(DIALOG_WIDTH, self.winfo_reqheight())
+        fit_dialog(self, DIALOG_WIDTH)
 
     def _populate_ports(self):
         """Refreshes the dropdown options with current available ports."""

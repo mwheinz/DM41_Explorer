@@ -14,7 +14,7 @@ import platform
 from tkinter import messagebox
 import customtkinter as ctk
 
-from gui.dialog_common import build_dialog_button_row
+from gui.dialog_common import build_dialog_button_row, scaled
 
 logger = logging.getLogger(__name__)
 
@@ -52,10 +52,10 @@ class RegisterRangeDialog(ctk.CTkToplevel):
         row.pack(anchor="w", padx=16, pady=(0, 16))
         ctk.CTkLabel(row, text="Export from R").grid(row=0, column=0)
         self._start_var = ctk.StringVar(value="0")
-        ctk.CTkEntry(row, textvariable=self._start_var, width=50).grid(row=0, column=1)
+        ctk.CTkEntry(row, textvariable=self._start_var, width=scaled(50)).grid(row=0, column=1)
         ctk.CTkLabel(row, text=" through R").grid(row=0, column=2)
         self._end_var = ctk.StringVar(value=str(last))
-        ctk.CTkEntry(row, textvariable=self._end_var, width=50).grid(row=0, column=3)
+        ctk.CTkEntry(row, textvariable=self._end_var, width=scaled(50)).grid(row=0, column=3)
 
         build_dialog_button_row(
             self,
@@ -131,14 +131,14 @@ class RegisterImportLocationDialog(ctk.CTkToplevel):
                 f"R00-R{last:02d} ({count} registers)."
             ),
             justify="left",
-            wraplength=320,
+            wraplength=scaled(320),
         ).pack(anchor="w", padx=16, pady=(16, 8))
 
         row = ctk.CTkFrame(self, fg_color="transparent")
         row.pack(anchor="w", padx=16, pady=(0, 16))
         ctk.CTkLabel(row, text="Import starting at R").grid(row=0, column=0)
         self._start_var = ctk.StringVar(value="0")
-        ctk.CTkEntry(row, textvariable=self._start_var, width=50).grid(row=0, column=1)
+        ctk.CTkEntry(row, textvariable=self._start_var, width=scaled(50)).grid(row=0, column=1)
 
         build_dialog_button_row(
             self,
