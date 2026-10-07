@@ -11,6 +11,8 @@ import tkinter.font as tkfont
 import customtkinter as ctk
 
 from gui.dialog_common import build_dialog_button_row
+from gui.contrast import WARNING_TEXT
+from gui.tab_common import ui_font
 
 logger = logging.getLogger(__name__)
 
@@ -164,8 +166,8 @@ class PreferencesDialog(ctk.CTkToplevel):
         ctk.CTkLabel(
             tab,
             text="Font changes take effect after restarting DM41_Explorer.",
-            text_color="#d9822b",
-            font=ctk.CTkFont(size=11),
+            text_color=WARNING_TEXT,
+            font=ui_font(-2),
         ).pack(anchor="w", padx=8, pady=(4, 0))
 
         ctk.CTkLabel(tab, text="Log file directory:").pack(

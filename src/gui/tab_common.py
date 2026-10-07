@@ -25,9 +25,13 @@ control flow.
 
 import logging
 import tkinter
+import tkinter.font as tkfont
 from pathlib import Path
 from tkinter import ttk, filedialog, messagebox
 import customtkinter as ctk
+
+from gui.contrast import SECONDARY_TEXT
+from gui.window_geometry import scaled_row_height, scaled_width
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +43,21 @@ logger = logging.getLogger(__name__)
 # uses the same family instead of each hard-coding "Courier" separately.
 MONOSPACE_FONT_FAMILY = "Courier"
 
+# The smallest font size ui_font() will return, so a hint label never
+# becomes unreadable however small the main font is set.
+MIN_UI_FONT_SIZE = 8
+
+
+def ui_font(offset: int = 0, **kwargs) -> "ctk.CTkFont":
+    """A CTkFont whose size follows the application font (Preferences >
+    Font): the configured size plus `offset` points, never below
+    MIN_UI_FONT_SIZE. Use it instead of a hard-coded `size=` so captions
+    and the status bar scale with the rest of the UI (GitHub issue #42).
+    Extra keyword arguments (weight=, family=) pass through to CTkFont."""
+    base = ctk.ThemeManager.theme["CTkFont"]["size"]
+    return ctk.CTkFont(size=max(MIN_UI_FONT_SIZE, base + offset), **kwargs)
+
+
 # Alternating-row background shade, shared by every tab with a table (Data
 # Registers' ttk.Treeview, and the XM Files/Programs tabs' CTkScrollableFrame
 # grids) so odd rows get the exact same subtle tint everywhere instead of
@@ -46,6 +65,23 @@ MONOSPACE_FONT_FAMILY = "Courier"
 # data_registers_tab.py used before this was centralized here.
 STRIPE_BG_DARK = "#2b2b2b"
 STRIPE_BG_LIGHT = "#f4f4f4"
+
+# Text and field colors of every ttk.Treeview (light, dark) -- see
+# style_treeview(). Constants so tests/test_contrast.py can check them
+# against the stripe and region backgrounds (GitHub issue #42).
+TREEVIEW_FG = ("#1a1a1a", "#e6e6e6")
+TREEVIEW_FIELD_BG = ("#ffffff", "#242424")
+
+# The red Remove/Delete button shared by the Programs, Alarms and XM Files
+# tabs. The text colors are explicit because the theme's own text color is
+# black in the "gold" and "green" themes, which fails on this fill
+# (tests/test_contrast.py checks every theme).
+DANGER_BUTTON_KWARGS = {
+    "fg_color": "#a03e3e",
+    "hover_color": "#832f2f",
+    "text_color": "#ffffff",
+    "text_color_disabled": "#e6c8c8",
+}
 
 # Selected-row highlight for a ttk.Treeview -- see highlight_selected_row()
 # below and gui/data_registers_tab.py's _on_tree_selected() docstring
@@ -81,6 +117,18 @@ def stripe_bg_color() -> str:
     """The alternating-row background color for the current appearance
     mode (dark vs. light)."""
     return STRIPE_BG_DARK if ctk.get_appearance_mode() == "Dark" else STRIPE_BG_LIGHT
+
+
+def treeview_fonts():
+    """(cell font, heading font) as Tk font tuples -- the monospace
+    family at the application font size for cells, the UI family in bold
+    for headings. The one place both style_treeview() and fit_columns()
+    get them from, so what is measured is what is drawn."""
+    theme_font = ctk.ThemeManager.theme["CTkFont"]
+    return (
+        (MONOSPACE_FONT_FAMILY, theme_font["size"]),
+        (theme_font["family"], theme_font["size"], "bold"),
+    )
 
 
 def style_treeview(style_name: str = "Treeview", *, selectable: bool = True) -> str:
@@ -119,17 +167,16 @@ def style_treeview(style_name: str = "Treeview", *, selectable: bool = True) -> 
         logger.debug("Could not switch ttk theme to 'default': %s", e)
     dark = ctk.get_appearance_mode() == "Dark"
     bg = stripe_bg_color()
-    field_bg = "#242424" if dark else "#ffffff"
-    fg = "#e6e6e6" if dark else "#1a1a1a"
-    ui_font = ctk.ThemeManager.theme["CTkFont"]
-    font = (MONOSPACE_FONT_FAMILY, ui_font["size"])
-    heading_font = (ui_font["family"], ui_font["size"], "bold")
+    field_bg = TREEVIEW_FIELD_BG[1 if dark else 0]
+    fg = TREEVIEW_FG[1 if dark else 0]
+    theme_font = ctk.ThemeManager.theme["CTkFont"]
+    font, heading_font = treeview_fonts()
     style.configure(
         style_name,
         background=field_bg,
         fieldbackground=field_bg,
         foreground=fg,
-        rowheight=22,
+        rowheight=scaled_row_height(theme_font["size"]),
         borderwidth=0,
         font=font,
     )
@@ -158,7 +205,9 @@ def build_tree_with_scrollbar(
     CustomTkinter widget per row/cell at all).
 
     `columns` is a list of (column_id, heading_text, width, stretch)
-    tuples, applied in order via `tree.heading()`/`tree.column()`.
+    tuples, applied in order via `tree.heading()`/`tree.column()`. Widths
+    are for the default font size and grow in proportion with a larger
+    application font (GitHub issue #42).
     `style`, if given, is passed through as the Treeview's ttk style name
     (see style_treeview() above) -- omit it to use ttk's built-in
     "Treeview" style.
@@ -171,15 +220,56 @@ def build_tree_with_scrollbar(
     if style:
         kwargs["style"] = style
     tree = ttk.Treeview(parent, columns=[col[0] for col in columns], **kwargs)
+    font_size = ctk.ThemeManager.theme["CTkFont"]["size"]
     for col, text, width, stretch in columns:
         tree.heading(col, text=text)
-        tree.column(col, width=width, anchor="w", stretch=stretch)
+        tree.column(col, width=scaled_width(width, font_size), anchor="w", stretch=stretch)
 
     vsb = tkinter.Scrollbar(parent, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=vsb.set)
     tree.pack(side="left", fill="both", expand=True)
     vsb.pack(side="left", fill="y")
     return tree, vsb
+
+
+# Pixels added to the widest text in a column: the Treeview's own cell
+# padding, and the room a heading keeps for its sort arrow and borders.
+CELL_PADDING = 14
+HEADING_PADDING = 24
+# Only this many rows are measured; the first few hundred are
+# representative and measuring thousands would slow every render.
+FIT_ROW_LIMIT = 500
+
+
+def fit_columns(tree: ttk.Treeview, columns: list) -> None:
+    """Widens each non-stretching column of `tree` so its heading and the
+    text of its rows are not truncated, measured in the fonts actually
+    used (treeview_fonts()) rather than guessed from the font size.
+
+    `columns` is the same (column_id, heading_text, width, stretch) list
+    given to build_tree_with_scrollbar(). A column is never narrower than
+    its scaled base width, and stretching columns are left alone -- they
+    take whatever space remains. Call it after populating the rows.
+
+    Fixed pixel widths (even scaled with the font) turned out not to be
+    enough: the Alarms tab's 150-pixel time column truncated a full
+    "YYYY-MM-DD HH:MM:SS" even at the default font size."""
+    cell_spec, heading_spec = treeview_fonts()
+    cell_font = tkfont.Font(font=cell_spec)
+    heading_font = tkfont.Font(font=heading_spec)
+    font_size = ctk.ThemeManager.theme["CTkFont"]["size"]
+    ids = [col[0] for col in columns]
+    widest = {
+        col[0]: heading_font.measure(col[1]) + HEADING_PADDING for col in columns
+    }
+    for iid in tree.get_children()[:FIT_ROW_LIMIT]:
+        for column_id, value in zip(ids, tree.item(iid, "values")):
+            needed = cell_font.measure(str(value)) + CELL_PADDING
+            if needed > widest[column_id]:
+                widest[column_id] = needed
+    for column_id, _text, width, stretch in columns:
+        if not stretch:
+            tree.column(column_id, width=max(scaled_width(width, font_size), widest[column_id]))
 
 
 def build_tab_treeview(
@@ -325,8 +415,8 @@ def build_caption_label(master, text: str) -> ctk.CTkLabel:
     label = ctk.CTkLabel(
         master,
         text=text,
-        font=ctk.CTkFont(size=12),
-        text_color="gray60",
+        font=ui_font(-1),
+        text_color=SECONDARY_TEXT,
         anchor="w",
         justify="left",
         wraplength=900,

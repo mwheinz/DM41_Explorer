@@ -40,6 +40,7 @@ import logging
 import customtkinter as ctk
 
 from memory import Memory
+from gui.contrast import SECONDARY_TEXT
 from gui.key_assignment_edit_dialog import KeyAssignmentEditDialog
 from gui.scroll_support import bind_touchpad_scroll
 from gui.tab_common import build_tab_header, build_caption_label, CARD_FG, CARD_BORDER
@@ -75,13 +76,16 @@ DM41L_LAYOUT = [
 DM41L_TAB = "DM41L"
 DM41X_TAB = "DM41X"
 
-UNASSIGNED_TEXT = "gray50"
+UNASSIGNED_TEXT = SECONDARY_TEXT
 UNASSIGNED_FG = ("gray85", "gray24")
 
 # An assignment whose key flag is clear (what LKAOFF leaves behind): shown
-# like any other assignment, but in amber and marked with a warning sign,
-# since the calculator treats the key as unassigned.
-FLAG_CLEAR_TEXT = ("#a35b00", "#e6a23c")
+# like any other assignment, but on an amber-brown fill and marked with a
+# warning sign, since the calculator treats the key as unassigned. It is a
+# fill rather than amber text because amber text on the blue key button is
+# unreadable (issue #42); white on this fill is 6.8:1.
+FLAG_CLEAR_FG = ("#8a4b00", "#8a4b00")
+FLAG_CLEAR_TEXT = "#ffffff"
 FLAG_CLEAR_MARK = "⚠"
 
 # Background colors for the fixed non-assignable physical-key cells
@@ -321,7 +325,7 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         ctk.CTkLabel(
             cell,
             text=label,
-            text_color=STATIC_CELL_TEXT_COLORS.get(label, "gray50"),
+            text_color=STATIC_CELL_TEXT_COLORS.get(label, SECONDARY_TEXT),
             font=ctk.CTkFont(size=10),
             width=KEY_BUTTON_WIDTH,
             height=44,
@@ -353,6 +357,7 @@ class KeyAssignmentsTab(ctk.CTkFrame):
                 text_color = self._default_text_color
                 if (key_number, shifted) in flag_clear:
                     prefix = FLAG_CLEAR_MARK + prefix
+                    fg_color = FLAG_CLEAR_FG
                     text_color = FLAG_CLEAR_TEXT
                 if assignment:
                     text = f"{prefix}{assignment['name']}"

@@ -22,6 +22,7 @@ import customtkinter as ctk
 
 from memory import Memory
 from gui.tab_common import (
+    ui_font,
     build_tab_header,
     build_tree_with_scrollbar,
     style_treeview,
@@ -51,8 +52,8 @@ REGIONS = [
     ("xm", "XM", "#d7f0dc", "#3f6b4f"),
     ("key", "Key Assignments", "#e6d9f5", "#6b4f8c"),
     ("alarms", "Alarms", "#f5d9df", "#7a3f52"),
-    ("program", "User Programs", "#f5e3c2", "#8c6b2f"),
-    ("data", "Data Memory", "#c9f0ee", "#2f7a7a"),
+    ("program", "User Programs", "#f5e3c2", "#81622b"),
+    ("data", "Data Memory", "#c9f0ee", "#2c7171"),
     ("nonexistent", "Inaccessible", "#d0d0d0", "#242424"),
 ]
 
@@ -123,7 +124,7 @@ class HexViewTab(ctk.CTkFrame):
                 corner_radius=3,
             )
             swatch.pack(side="left", padx=(0, 5))
-            ctk.CTkLabel(chip, text=label, font=ctk.CTkFont(size=11)).pack(side="left")
+            ctk.CTkLabel(chip, text=label, font=ui_font(-2)).pack(side="left")
             self._legend_swatches.append((light, dark_color, swatch))
 
     def _apply_region_tags(self):

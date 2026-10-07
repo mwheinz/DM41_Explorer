@@ -81,6 +81,8 @@ from memory import (
     decode_program_txt,
 )
 from gui.tab_common import (
+    DANGER_BUTTON_KWARGS,
+    fit_columns,
     build_tab_header,
     build_tab_treeview,
     build_caption_label,
@@ -133,8 +135,7 @@ class ProgramTab(ctk.CTkFrame):
             header,
             text="Remove",
             width=90,
-            fg_color="#a03e3e",
-            hover_color="#832f2f",
+            **DANGER_BUTTON_KWARGS,
             command=self._remove_selected,
         ).pack(side="right", padx=(0, 8))
 
@@ -203,6 +204,7 @@ class ProgramTab(ctk.CTkFrame):
                 ),
                 tags=("oddrow",) if pos % 2 else (),
             )
+        fit_columns(self._tree, _TREE_COLUMNS)
 
     @staticmethod
     def _key_assignment_text(program) -> str:

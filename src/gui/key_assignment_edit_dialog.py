@@ -24,6 +24,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from gui.dialog_common import build_dialog_button_row
+from gui.contrast import SECONDARY_TEXT
 from gui.tab_common import MONOSPACE_FONT_FAMILY
 from memory.mnemonics import (
     assignable_display_names,
@@ -136,7 +137,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
             ctk.CTkLabel(
                 self,
                 text=_FLAG_CLEAR_NOTE,
-                text_color="gray50",
+                text_color=SECONDARY_TEXT,
                 wraplength=340,
                 justify="left",
             ).pack(padx=16, pady=(0, 4), anchor="w")
@@ -168,7 +169,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         self._dm41x_hint = ctk.CTkLabel(
             tabs.tab("Function"),
             text="",
-            text_color="gray50",
+            text_color=SECONDARY_TEXT,
             wraplength=320,
             justify="left",
         )
@@ -222,7 +223,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
             ctk.CTkLabel(
                 tabs.tab("Program"),
                 text="This state has no global programs to assign.",
-                text_color="gray50",
+                text_color=SECONDARY_TEXT,
                 wraplength=320,
                 justify="left",
             ).pack(anchor="w", padx=8, pady=(12, 4))

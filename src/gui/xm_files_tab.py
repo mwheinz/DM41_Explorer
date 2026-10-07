@@ -27,6 +27,8 @@ import customtkinter as ctk
 from memory import Memory, ExtendedMemory, DM41MemoryError, parse_data_line
 from gui.xm_file_dialog import XMFileDialog
 from gui.tab_common import (
+    DANGER_BUTTON_KWARGS,
+    fit_columns,
     build_caption_label,
     build_tab_header,
     build_tab_treeview,
@@ -123,8 +125,7 @@ class XMFilesTab(ctk.CTkFrame):
             header,
             text="Remove",
             width=90,
-            fg_color="#a03e3e",
-            hover_color="#832f2f",
+            **DANGER_BUTTON_KWARGS,
             command=self._remove_selected,
         )
         remove_button.pack(side="right", padx=(0, 8))
@@ -238,6 +239,7 @@ class XMFilesTab(ctk.CTkFrame):
                 ),
                 tags=("oddrow",) if pos % 2 else (),
             )
+        fit_columns(self._tree, _TREE_COLUMNS)
         self._update_action_buttons(None)
 
     @staticmethod

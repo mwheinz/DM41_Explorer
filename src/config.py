@@ -34,6 +34,8 @@ class ProjectConfig:
         "font_family": "",  # "" = use CustomTkinter's built-in per-platform default
         "font_size": 0,  # 0 = use CustomTkinter's built-in default size
         "recent_files": [],  # paths of recently opened/saved state files, most-recent first
+        "window_width": 0,  # main window size at last close; 0 = not saved yet
+        "window_height": 0,
     }
 
     # File > Open Recent is capped at this many entries -- oldest
@@ -151,6 +153,25 @@ class ProjectConfig:
     @font_size.setter
     def font_size(self, value):
         self._prefs["font_size"] = value
+
+    @property
+    def window_size(self):
+        """The main window's (width, height) saved at the last close, or
+        None if none was saved (or the saved values are unusable)."""
+        try:
+            width = int(self._prefs["window_width"])
+            height = int(self._prefs["window_height"])
+        except (KeyError, TypeError, ValueError):
+            return None
+        if width <= 0 or height <= 0:
+            return None
+        return (width, height)
+
+    @window_size.setter
+    def window_size(self, value):
+        width, height = value
+        self._prefs["window_width"] = int(width)
+        self._prefs["window_height"] = int(height)
 
     @property
     def recent_files(self) -> list:

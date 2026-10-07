@@ -15,6 +15,7 @@ from memory import (
     MIN_SANE_R00,
 )
 from gui.scroll_support import bind_touchpad_scroll
+from gui.contrast import SECONDARY_TEXT
 from gui.tab_common import MONOSPACE_FONT_FAMILY, CARD_KWARGS
 
 logger = logging.getLogger(__name__)
@@ -251,7 +252,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
             ctk.CTkLabel(
                 self._partition_frame,
                 text="No state loaded yet -- start a new buffer or load/read a state first.",
-                text_color="gray60",
+                text_color=SECONDARY_TEXT,
             ).grid(row=1, column=0, columnspan=3, padx=10, pady=(0, 10), sticky="w")
             return
 

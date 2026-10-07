@@ -33,6 +33,9 @@ from engine.commands import (
 )
 
 from config import ProjectConfig
+from gui.contrast import SECONDARY_TEXT, WARNING_TEXT, improve_theme_contrast
+from gui.tab_common import ui_font
+from gui.window_geometry import initial_window_size, minimum_window_size, parse_geometry
 from gui.port_dialog import PortSelectionDialog
 from gui.preferences_dialog import PreferencesDialog
 from gui.help_dialog import KeyboardShortcutsDialog
@@ -202,8 +205,17 @@ STATE_FILETYPES = [
 class DM41ExplorerApp(ctk.CTk):
     '''Main application window.'''
 
+    # How long after the last resize event the window size is saved.
+    RESIZE_SAVE_DELAY_MS = 1000
+
     def __init__(self):
         super().__init__()
+
+        self._closing = False
+        self._tracking_size = False
+        self._applied_size = None
+        self._resize_after_id = None
+        self._tracking_after_id = None
 
         self.config_store = ProjectConfig()
         try:
@@ -217,9 +229,9 @@ class DM41ExplorerApp(ctk.CTk):
         ctk.set_appearance_mode(self.config_store.appearance_mode)
         ctk.set_default_color_theme(self.config_store.color_theme)
         _apply_font_prefs(self.config_store)
+        improve_theme_contrast(ctk.ThemeManager.theme)
 
         self.title("DM41_Explorer")
-        self.geometry("1080x768")
 
         self.serial = SerialManager(error_callback=self._handle_serial_error)
         self.engine = CommandEngine(self.serial)
@@ -228,6 +240,7 @@ class DM41ExplorerApp(ctk.CTk):
         self._command_pending = False
 
         self._build_layout()
+        self._apply_window_size()
         self._menubar = self._build_menus()
         self._bind_keys()
 
@@ -240,6 +253,11 @@ class DM41ExplorerApp(ctk.CTk):
             # event binding; see main()/_handle_startup_file_arg below for
             # the non-macOS (sys.argv-based) half of double-click support.
             self.createcommand("::tk::mac::OpenDocument", self._on_mac_open_document)
+            # Cmd+Q and the application menu's own "Quit DM41_Explorer"
+            # call this command, whose Tk default does not go through the
+            # WM_DELETE_WINDOW handler: without this they would skip the
+            # unsaved-changes prompt and the saving of the window size.
+            self.createcommand("::tk::mac::Quit", self.on_close)
 
         self._start_engine_pump()
         self._render_tabs()
@@ -261,6 +279,104 @@ class DM41ExplorerApp(ctk.CTk):
         # there's nothing left to clean up from here.
         self.after(0, lambda: messagebox.showerror("Error", "Disconnected."))
 
+    # -- Window size ------------------------------------------------------
+
+    def _apply_window_size(self):
+        '''Sets the minimum size and the opening size (GitHub issue #42).
+
+        Must run after _build_layout(): the minimum is never less than what
+        the tab bar and status bar ask for, and both grow with the
+        application font. The opening size is the one saved at the last
+        close if there is one, else a default scaled with the font; see
+        gui/window_geometry.py for the rules.
+        '''
+        self.update_idletasks()
+        needed = (
+            self._reverse_window_scaling(self.winfo_reqwidth()),
+            self._reverse_window_scaling(self.winfo_reqheight()),
+        )
+        screen = (
+            self._reverse_window_scaling(self.winfo_screenwidth()),
+            self._reverse_window_scaling(self.winfo_screenheight()),
+        )
+        font_size = ctk.ThemeManager.theme["CTkFont"]["size"]
+        self.minsize(*minimum_window_size(font_size, needed, screen))
+        width, height = initial_window_size(
+            self.config_store.window_size, font_size, needed, screen
+        )
+        self.geometry(f"{width}x{height}")
+        self._applied_size = (width, height)
+        # Let the window manager finish placing the window before resizes
+        # count as the user's: the size is then re-read, and every later
+        # change is saved shortly after it stops (see _on_configure()).
+        self._tracking_after_id = self.after(2000, self._start_tracking_size)
+
+    def _start_tracking_size(self):
+        self._tracking_after_id = None
+        self.update_idletasks()
+        self._applied_size = parse_geometry(self.geometry()) or self._applied_size
+        self._tracking_size = True
+        self.bind("<Configure>", self._on_configure, add="+")
+
+    def _on_configure(self, event):
+        '''Saves the window size a moment after the user stops resizing, so
+        it survives however the app ends (force quit, crash, a quit path
+        that never reaches on_close()).'''
+        if event.widget is not self or not self._tracking_size:
+            return
+        if self._resize_after_id is not None:
+            self.after_cancel(self._resize_after_id)
+        self._resize_after_id = self.after(
+            self.RESIZE_SAVE_DELAY_MS, self._save_size_after_resize
+        )
+
+    def _save_size_after_resize(self):
+        self._resize_after_id = None
+        self._remember_window_size()
+
+    def destroy(self):
+        '''Cancels the pending size timers first, so none fires into a
+        window that no longer exists.'''
+        for name in ("_tracking_after_id", "_resize_after_id"):
+            after_id = getattr(self, name, None)
+            if after_id is not None:
+                try:
+                    self.after_cancel(after_id)
+                except Exception:  # pylint: disable=broad-except
+                    pass
+                setattr(self, name, None)
+        super().destroy()
+
+    def _window_is_maximized(self) -> bool:
+        '''True if the window is maximized/zoomed, whose size must not be
+        remembered (restoring it would open a normal window at full-screen
+        size).'''
+        try:
+            if self.state() == "zoomed":
+                return True
+        except Exception:  # pylint: disable=broad-except
+            pass
+        try:
+            return bool(self.attributes("-zoomed"))  # X11
+        except Exception:  # pylint: disable=broad-except
+            return False
+
+    def _remember_window_size(self):
+        '''Saves the current window size to the preferences, for the next
+        launch. Never raises: failing to save a size mustn't stop the app
+        from closing.'''
+        try:
+            if self._window_is_maximized():
+                return
+            size = parse_geometry(self.geometry())
+            if size is None or size == self._applied_size:
+                return  # nothing the user changed: don't touch the file
+            self.config_store.window_size = size
+            self.config_store.save()
+            self._applied_size = size
+        except Exception as e:  # pylint: disable=broad-except
+            logger.warning("Could not save the window size: %s", e)
+
     # -- Layout ---------------------------------------------------------
 
     def _build_layout(self):
@@ -271,26 +387,26 @@ class DM41ExplorerApp(ctk.CTk):
         status_bar.pack(side="bottom", fill="x", padx=8, pady=(0, 8))
 
         self._status_label = ctk.CTkLabel(
-            status_bar, text="Not connected", font=ctk.CTkFont(size=13)
+            status_bar, text="Not connected", font=ui_font()
         )
         self._status_label.pack(side="left", padx=8, pady=6)
         self._modified_label = ctk.CTkLabel(
-            status_bar, text="", font=ctk.CTkFont(size=13), text_color="#d9822b"
+            status_bar, text="", font=ui_font(), text_color=WARNING_TEXT
         )
         self._modified_label.pack(side="left", padx=8, pady=6)
         self._battery_label = ctk.CTkLabel(
-            status_bar, text="", font=ctk.CTkFont(size=13)
+            status_bar, text="", font=ui_font()
         )
         self._battery_label.pack(side="right", padx=16, pady=6)
         self._calc_time_label = ctk.CTkLabel(
-            status_bar, text="", font=ctk.CTkFont(size=13)
+            status_bar, text="", font=ui_font()
         )
         self._calc_time_label.pack(side="right", padx=16, pady=6)
         self._source_label = ctk.CTkLabel(
             status_bar,
             text="(new, unsaved buffer)",
-            font=ctk.CTkFont(size=13),
-            text_color="gray60",
+            font=ui_font(),
+            text_color=SECONDARY_TEXT,
         )
         self._source_label.pack(side="right", padx=16, pady=6)
 
@@ -1152,10 +1268,17 @@ class DM41ExplorerApp(ctk.CTk):
     # -- Shutdown -----------------------------------------------------------
 
     def on_close(self):
+        if self._closing:
+            return  # e.g. Cmd+Q delivered by two routes at once
         if self.memory.modified and not messagebox.askyesno(
             "Unsaved Changes", "Discard unsaved changes and quit?"
         ):
             return
+        self._closing = True
+        if self._resize_after_id is not None:
+            self.after_cancel(self._resize_after_id)
+            self._resize_after_id = None
+        self._remember_window_size()
         # Runs on the main Tk thread (window-close handler), so a direct
         # disconnect() call here is safe -- see _on_verify_failed.
         if self.serial.is_connected:

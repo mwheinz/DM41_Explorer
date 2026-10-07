@@ -16,6 +16,8 @@ import customtkinter as ctk
 from memory import Memory, DM41MemoryError
 from gui.alarm_edit_dialog import AlarmEditDialog
 from gui.tab_common import (
+    DANGER_BUTTON_KWARGS,
+    fit_columns,
     build_tab_header,
     build_tab_treeview,
     style_treeview,
@@ -94,8 +96,7 @@ class AlarmsTab(ctk.CTkFrame):
             header,
             text="Remove",
             width=90,
-            fg_color="#a03e3e",
-            hover_color="#832f2f",
+            **DANGER_BUTTON_KWARGS,
             command=self._remove_selected,
         )
         remove_button.pack(side="right", padx=(0, 8))
@@ -174,6 +175,7 @@ class AlarmsTab(ctk.CTkFrame):
                 ),
                 tags=("oddrow",) if pos % 2 else (),
             )
+        fit_columns(self._tree, _TREE_COLUMNS)
         self._update_action_buttons(None)
 
     # -- Add / Edit / Remove ------------------------------------------------

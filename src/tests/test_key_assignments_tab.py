@@ -27,7 +27,7 @@ import customtkinter as ctk
 
 from memory import DM41X, Memory
 from memory.mnemonics import key_bytes_for, resolve
-from gui.key_assignments_tab import FLAG_CLEAR_TEXT, KeyAssignmentsTab
+from gui.key_assignments_tab import FLAG_CLEAR_FG, FLAG_CLEAR_TEXT, KeyAssignmentsTab
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -208,6 +208,8 @@ def test_flag_clear_assignment_is_shown_with_a_warning_mark(tab):
     assert _button_text(tab, 12, True) == "⚠⇧▸BBB"
     button = tab._key_buttons[(11, False)][0]
     assert button.cget("text_color") == FLAG_CLEAR_TEXT
+    # Issue #42: the mark is a fill, not amber text on the blue key button.
+    assert tuple(button.cget("fg_color")) == FLAG_CLEAR_FG
 
 
 def test_lkaon_state_shows_the_same_assignments_unmarked(tab):
@@ -215,7 +217,7 @@ def test_lkaon_state_shows_the_same_assignments_unmarked(tab):
 
     assert _button_text(tab, 11, False) == "▸LKATST"
     assert _button_text(tab, 12, True) == "⇧▸BBB"
-    assert tab._key_buttons[(11, False)][0].cget("text_color") != FLAG_CLEAR_TEXT
+    assert tuple(tab._key_buttons[(11, False)][0].cget("fg_color")) != FLAG_CLEAR_FG
 
 
 def test_header_counts_the_flag_clear_keys(tab):

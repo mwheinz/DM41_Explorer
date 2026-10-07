@@ -6,6 +6,7 @@ import platform
 import customtkinter as ctk
 
 from gui.dialog_common import build_dialog_button_row
+from gui.contrast import WARNING_TEXT
 
 PLATFORM_SYSTEM = platform.system()
 
@@ -40,7 +41,7 @@ class PortSelectionDialog(ctk.CTkToplevel):
                 text=message,
                 wraplength=DIALOG_WIDTH - 40,
                 justify="left",
-                text_color="#d9822b",
+                text_color=WARNING_TEXT,
             ).pack(padx=16, pady=(16, 8), anchor="w")
 
         ctk.CTkLabel(self, text="Available serial ports:").pack(
