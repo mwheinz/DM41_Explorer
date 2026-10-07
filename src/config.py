@@ -16,11 +16,8 @@ class ProjectConfig:
     """Centralized configuration with file-based persistence."""
 
     # Persistent storage location in the user's home directory. This is the
-    # DM41_Explorer's file. Its name is the app's original one (DM41L_Explorer)
-    # and is kept on purpose, because existing users' settings live there. Another app passes its own
-    # `prefs_filename` to __init__() instead, which shadows this class
-    # attribute on that instance only.
-    PREFS_FILE = Path.home() / ".dm41l_explorer.json"
+    # DM41_Explorer's file. 
+    PREFS_FILE = Path.home() / ".dm41_explorer.json"
 
     # Default values
     DEFAULT_PREFS = {
