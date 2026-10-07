@@ -52,7 +52,7 @@ SHOTS = {
     "key_assigns_hp41": (
         "keyassigns.dm41",
         "Key Assignments",
-        "HP41",
+        "DM41X",
         {},
     ),
     "registers_view": ("dm41x_manyfiles.dm41", "Data Registers", None, {}),
