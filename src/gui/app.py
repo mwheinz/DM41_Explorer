@@ -208,6 +208,9 @@ class DM41ExplorerApp(ctk.CTk):
     # How long after the last resize event the window size is saved.
     RESIZE_SAVE_DELAY_MS = 1000
 
+    # How long show_connect_dialog() waits after the menu command returns.
+    CONNECT_DIALOG_DELAY_MS = 20
+
     def __init__(self):
         super().__init__()
 
@@ -801,7 +804,13 @@ class DM41ExplorerApp(ctk.CTk):
             self._set_status("Not connected")
 
     def show_connect_dialog(self):
-        self._prompt_for_port(None)
+        # _prompt_for_port() blocks in wait_window() until the dialog closes.
+        # Called straight from a menu item, that nested wait runs inside
+        # macOS's menu-tracking event loop mode, which never delivers events
+        # to the new window: the dialog shows, but can't be clicked or
+        # closed, and the app gets the spinning beachball. Returning from the
+        # menu command first lets the dialog run in the normal event loop.
+        self.after(self.CONNECT_DIALOG_DELAY_MS, lambda: self._prompt_for_port(None))
 
     def disconnect(self):
         if not self.serial.is_connected:

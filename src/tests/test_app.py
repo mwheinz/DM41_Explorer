@@ -19,6 +19,7 @@ the rest of the project's manual/ad-hoc GUI verification described in
 project memory.
 """
 import json
+import time
 from pathlib import Path
 
 import pytest
@@ -577,3 +578,21 @@ def test_the_app_starts_offline_and_never_touches_the_serial_port(
         assert instance._status_label.cget("text") == "Not connected"
     finally:
         instance.destroy()
+
+
+# -- Connect dialog: never opened from inside the menu command ---------------
+
+
+def test_connect_menu_command_returns_before_the_dialog_blocks(app):
+    """The Connect dialog waits for itself to close, which hangs the app on
+    macOS when started from inside a menu command (the dialog can't be
+    clicked and the app shows the beachball). So show_connect_dialog()
+    must return first and open the dialog from the normal event loop."""
+    with mock.patch.object(app, "_prompt_for_port") as prompt:
+        app.show_connect_dialog()
+        prompt.assert_not_called()
+        deadline = time.time() + 2
+        while not prompt.called and time.time() < deadline:
+            app.update()
+            time.sleep(0.01)
+        prompt.assert_called_once_with(None)
