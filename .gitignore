@@ -9,3 +9,6 @@ src/engine/__pycache__/**
 src/gui/__pycache__/**
 src/scratch
 _to_delete/*
+
+# Scratch copy of the GitHub issue list, regenerated on demand; never committed.
+issues.json
