@@ -37,13 +37,23 @@ their existing buttons' text/color are updated in place via configure().
 """
 
 import logging
+from dataclasses import dataclass
+
 import customtkinter as ctk
 
 from memory import Memory
+from memory.functions import SINGLE_BYTE_FUNCTIONS, XROM_FUNCTIONS
 from gui.contrast import SECONDARY_TEXT
 from gui.key_assignment_edit_dialog import KeyAssignmentEditDialog
 from gui.scroll_support import bind_touchpad_scroll
-from gui.tab_common import build_tab_header, build_caption_label, CARD_FG, CARD_BORDER
+from gui.tab_common import (
+    build_tab_header,
+    build_caption_label,
+    ui_font,
+    CARD_FG,
+    CARD_BORDER,
+)
+from gui.window_geometry import scaled_row_height
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +64,13 @@ logger = logging.getLogger(__name__)
 # the same 34 assignable keys -- see the docs section for why they're laid
 # out differently (the DM41L's actual compact keyboard relocates several
 # keys relative to the classic HP-41's row layout).
+#
+# The ENTER key (41) has only one MxN position but is a double-size key on
+# both keyboards, so it is listed in two neighbouring positions: side by
+# side in a row (the DM41X's double-width key) or one above the other in
+# the same position of two rows (the DM41L's double-height key). Repeating
+# an assignable key number like this makes it ONE key that spans those
+# positions -- see layout_placements().
 DM41X_LAYOUT = [
     [11, 12, 13, 14, 15, "ON"],
     [21, 22, 23, 24, 25, "USR"],
@@ -130,15 +147,115 @@ STATIC_CELL_TEXT_COLORS = {
     "⬇︎": ("gray90", "gray10"),
 }
 
-# Sized for the actual function-name lengths in memory/functions.py (median
-# 4 characters, longest 7, e.g. "RCLFLAG") rather than the widest string
-# that could ever appear -- a handful of long names may render a touch
-# wider than this minimum, which is fine; a fixed width big enough for the
-# rare 7-character name made every column far wider than it needed to be
-# and pushed the DM41L grid's 10 columns past the visible area.
-KEY_BUTTON_WIDTH = 62
-KEY_BUTTON_HEIGHT = 20
-KEY_BUTTON_FONT_SIZE = 14
+# Key sizing (GitHub issue #41). Everything on the keys follows the
+# application font (Preferences > Font): the key number, the assignment text
+# and the labels of the fixed physical keys all use it, and a key button is
+# never narrower than KEY_MIN_CHARS characters of that font -- so a long
+# function name (the longest are 7 characters, e.g. "RCLFLAG") doesn't make
+# its whole column of keys wider than the others.
+KEY_MIN_CHARS = 7
+# Height of an assignment button at the default font size; it grows with
+# the font (see window_geometry.scaled_row_height()).
+KEY_BUTTON_BASE_HEIGHT = 20
+
+# What _refresh_buttons() puts in front of a shifted assignment's text. The
+# minimum width leaves room for it on the longest name; the rarer program
+# marker (▸) and warning mark (⚠, after LKAOFF) can still widen a key a little.
+KEY_TEXT_PREFIXES = "⇧"
+
+# What CTkButton adds to its text's width before it has to grow (measured:
+# a button asked to be narrower than its text ends up this much wider).
+BUTTON_TEXT_PADDING = 14
+
+# A physical keyboard row is drawn on a grid of this many columns, and each
+# of the row's keys spans an equal share of them: 6-key rows (5 columns
+# per key) and 5-key rows (6 columns per key) therefore come out the same
+# total width, the way the DM41X's 5-key section is spaced more widely
+# than its 6-key section. 30 is the least common multiple of every row
+# length in both layouts (5, 6 and 10).
+GRID_COLUMNS = 30
+# Horizontal gap between neighbouring keys, each side.
+CELL_PADX = 1
+# A key cell's border is drawn on the cell itself, and the children of a
+# CTkFrame are placed from its very edge -- so the key number label has to be
+# pushed down past the border, or it paints over the border's top edge and
+# leaves a gap in it.
+KEY_NUMBER_PADY = 2
+# What a key's cell adds around its buttons: the padding each button is
+# packed with (padx=2, both sides).
+KEY_CELL_MARGIN = 2 * 2
+
+
+@dataclass
+class CellPlacement:
+    """Where one key (or fixed physical-key label) goes on a layout's
+    GRID_COLUMNS-wide grid. `cell` is an assignable key number (int) or a
+    label (str)."""
+
+    cell: object
+    row: int
+    column: int
+    columnspan: int
+    rowspan: int = 1
+
+
+def layout_placements(layout) -> list:
+    """Turns a layout (DM41X_LAYOUT/DM41L_LAYOUT) into the CellPlacements
+    to draw. Every position in a row is GRID_COLUMNS // len(row) grid
+    columns wide, and a key number that is repeated in neighbouring
+    positions of a row, or in the same position of neighbouring rows
+    (same-length rows only), is merged into one key spanning them all --
+    the double-size ENTER key (see the layout comment above). Labels are
+    never merged."""
+    placements = []
+    owners = {}  # (row, position) -> the CellPlacement covering that position
+    for row_index, row in enumerate(layout):
+        unit = GRID_COLUMNS // len(row)
+        above_row = row_index - 1
+        comparable_above = above_row >= 0 and len(layout[above_row]) == len(row)
+        position = 0
+        while position < len(row):
+            cell = row[position]
+            width = 1
+            above = None
+            if isinstance(cell, int):
+                while position + width < len(row) and row[position + width] == cell:
+                    width += 1
+                if comparable_above:
+                    candidate = owners.get((above_row, position))
+                    if (
+                        candidate is not None
+                        and candidate.cell == cell
+                        and candidate.column == position * unit
+                        and candidate.columnspan == width * unit
+                    ):
+                        above = candidate
+            if above is not None:
+                above.rowspan += 1
+                placement = above
+            else:
+                placement = CellPlacement(cell, row_index, position * unit, width * unit)
+                placements.append(placement)
+            for covered in range(position, position + width):
+                owners[(row_index, covered)] = placement
+            position += width
+    return placements
+
+
+def _function_names() -> set:
+    return set(SINGLE_BYTE_FUNCTIONS.values()) | set(XROM_FUNCTIONS.values())
+
+
+def key_button_min_width(font) -> int:
+    """The least width (CustomTkinter units, i.e. before display scaling)
+    of an assignment button for `font`: KEY_MIN_CHARS characters of the
+    font -- the wider of that many digits and the widest function name, so
+    every name the calculator can show fits -- plus room for the prefixes
+    the tab adds (KEY_TEXT_PREFIXES). `font` is a CTkFont; its measure()
+    is in the same unscaled units as a widget's width."""
+    digits = font.measure("0" * KEY_MIN_CHARS)
+    widest_name = max(font.measure(name) for name in _function_names())
+    return max(digits, widest_name) + font.measure(KEY_TEXT_PREFIXES) + BUTTON_TEXT_PADDING
 
 
 def _program_names(memory: Memory) -> list:
@@ -179,6 +296,15 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         # both need to stay in sync. Order within each list follows grid
         # build order in render(): DM41L button first, DM41X second.
         self._key_buttons = {}
+
+        # Fonts and sizes for the keys, all from the application font
+        # (issue #41); see KEY_MIN_CHARS.
+        self._key_font = ui_font()
+        self._key_number_font = ui_font(-3, weight="bold")
+        self._static_font = ui_font(-3)
+        self._key_width = key_button_min_width(self._key_font)
+        font_size = ctk.ThemeManager.theme["CTkFont"]["size"]
+        self._key_height = scaled_row_height(font_size, KEY_BUTTON_BASE_HEIGHT)
 
         _, self._header_label = build_tab_header(self)
 
@@ -278,14 +404,18 @@ class KeyAssignmentsTab(ctk.CTkFrame):
     # -- Grid construction (once) -------------------------------------------
 
     def _build_grid(self, parent, layout):
-        for row_index, row in enumerate(layout):
-            for col_index, cell in enumerate(row):
-                if isinstance(cell, int):
-                    self._build_key_cell(parent, cell, row_index, col_index)
-                else:
-                    self._build_static_cell(parent, cell, row_index, col_index)
+        # All GRID_COLUMNS columns are kept the same width by
+        # _equalize_columns(), so a row of 5 keys (each spanning 6 columns)
+        # is as wide as a row of 6 keys (5 columns each). A double-size key
+        # (ENTER) spans two positions, one cell with one pair of buttons.
+        for placement in layout_placements(layout):
+            if isinstance(placement.cell, int):
+                self._build_key_cell(parent, placement)
+            else:
+                self._build_static_cell(parent, placement)
 
-    def _build_key_cell(self, parent, key_number: int, row: int, col: int):
+    def _build_key_cell(self, parent, placement: CellPlacement):
+        key_number = placement.cell
         cell = ctk.CTkFrame(
             parent,
             fg_color=CARD_FG,
@@ -293,27 +423,49 @@ class KeyAssignmentsTab(ctk.CTkFrame):
             border_color=CARD_BORDER,
             corner_radius=6,
         )
-        cell.grid(row=row, column=col, padx=2, pady=2, sticky="nsew")
+        self._grid_cell(cell, placement)
 
         ctk.CTkLabel(
             cell,
             text=f"{key_number:02d}",
-            font=ctk.CTkFont(size=10, weight="bold"),
-        ).pack(pady=(0, 0))
+            font=self._key_number_font,
+        ).pack(pady=(KEY_NUMBER_PADY, 0))
 
+        # A double-height key's buttons share the extra height between them.
+        tall = placement.rowspan > 1
         for shifted in (False, True):
             btn = ctk.CTkButton(
                 cell,
                 text="",
-                width=KEY_BUTTON_WIDTH,
-                height=KEY_BUTTON_HEIGHT,
-                font=ctk.CTkFont(size=KEY_BUTTON_FONT_SIZE),
+                width=self._key_width,
+                height=self._key_height,
+                font=self._key_font,
                 command=lambda k=key_number, s=shifted: self._edit_key(k, s),
             )
-            btn.pack(padx=3, pady=(0, 3 if shifted else 1))
+            # fill="x": a key in a 5-key row (or a double-width key) is wider
+            # than the minimum, and its buttons stretch to match.
+            btn.pack(
+                fill="both" if tall else "x",
+                expand=tall,
+                padx=2,
+                pady=(0, 3 if shifted else 1),
+            )
             self._key_buttons.setdefault((key_number, shifted), []).append(btn)
 
-    def _build_static_cell(self, parent, label: str, row: int, col: int):
+    @staticmethod
+    def _grid_cell(cell, placement: CellPlacement):
+        cell.grid(
+            row=placement.row,
+            column=placement.column,
+            columnspan=placement.columnspan,
+            rowspan=placement.rowspan,
+            padx=CELL_PADX,
+            pady=2,
+            sticky="nsew",
+        )
+
+    def _build_static_cell(self, parent, placement: CellPlacement):
+        label = placement.cell
         cell = ctk.CTkFrame(
             parent,
             fg_color=STATIC_CELL_BG_COLORS.get(label, CARD_FG),
@@ -321,15 +473,44 @@ class KeyAssignmentsTab(ctk.CTkFrame):
             border_color=CARD_BORDER,
             corner_radius=6,
         )
-        cell.grid(row=row, column=col, padx=2, pady=2, sticky="nsew")
+        self._grid_cell(cell, placement)
+        # The cell stretches to the height of the key cells in its row, so
+        # the label just fills it (no height of its own to scale).
         ctk.CTkLabel(
             cell,
             text=label,
             text_color=STATIC_CELL_TEXT_COLORS.get(label, SECONDARY_TEXT),
-            font=ctk.CTkFont(size=10),
-            width=KEY_BUTTON_WIDTH,
-            height=44,
-        ).pack(expand=True)
+            font=self._static_font,
+            width=self._key_width,
+        ).pack(expand=True, fill="both")
+
+    def _equalize_columns(self, frame):
+        """Gives all GRID_COLUMNS columns of `frame` the same width: the
+        least that holds every key, a key spanning several columns counting
+        for its share. (Tk's own "uniform" columns don't do this for
+        spanning cells -- it hands a wide cell's extra width to only some of
+        the columns it spans.) A key whose text outgrows the minimum width
+        therefore widens every column together, so the grid stays aligned.
+
+        The widths are worked out from the fonts and the padding this class
+        puts around the buttons, not read back from the widgets: asking Tk
+        for a widget's size first flushes all pending drawing, and
+        customtkinter's scroll bars start drawing again from inside that
+        flush -- which, nested, took minutes on macOS."""
+        width = 0
+        for cell in frame.winfo_children():
+            info = cell.grid_info()
+            if not info:
+                continue
+            widest = self._key_width
+            for button in cell.winfo_children():
+                if isinstance(button, ctk.CTkButton):
+                    text_width = self._key_font.measure(button.cget("text"))
+                    widest = max(widest, text_width + BUTTON_TEXT_PADDING)
+            needed = widest + KEY_CELL_MARGIN + 2 * CELL_PADX
+            width = max(width, -(-needed // int(info["columnspan"])))
+        for column in range(GRID_COLUMNS):
+            frame.grid_columnconfigure(column, minsize=width)
 
     # -- Refresh (every render) ----------------------------------------------
 
@@ -371,6 +552,8 @@ class KeyAssignmentsTab(ctk.CTkFrame):
                 text_color = UNASSIGNED_TEXT
             for btn in btns:
                 btn.configure(text=text, fg_color=fg_color, text_color=text_color)
+        self._equalize_columns(self._dm41l_frame)
+        self._equalize_columns(self._hp41_frame)
 
     # -- Editing ------------------------------------------------------------
 
