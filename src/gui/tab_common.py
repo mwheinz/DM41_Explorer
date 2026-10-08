@@ -31,6 +31,7 @@ from tkinter import ttk, filedialog, messagebox
 import customtkinter as ctk
 
 from gui.contrast import SECONDARY_TEXT
+from gui.scroll_support import SmoothTreeview
 from gui.window_geometry import scaled_row_height, scaled_width
 
 logger = logging.getLogger(__name__)
@@ -215,11 +216,17 @@ def build_tree_with_scrollbar(
     Returns (tree, scrollbar). Row tag colors ("oddrow"/"selectedrow") are
     NOT applied here -- see apply_row_tags() below -- since callers vary
     in exactly when they have a stripe color ready to apply.
+
+    The tree is a gui/scroll_support.py SmoothTreeview rather than a bare
+    ttk.Treeview: a ttk.Treeview in every other respect (it only adds its
+    own <MouseWheel>/<TouchpadScroll> bindings, and only on macOS), so
+    that every table in the app gets the GitHub issue #29 scroll fix from
+    this one construction site.
     """
     kwargs = {"show": "headings", "selectmode": selectmode}
     if style:
         kwargs["style"] = style
-    tree = ttk.Treeview(parent, columns=[col[0] for col in columns], **kwargs)
+    tree = SmoothTreeview(parent, columns=[col[0] for col in columns], **kwargs)
     font_size = ctk.ThemeManager.theme["CTkFont"]["size"]
     for col, text, width, stretch in columns:
         tree.heading(col, text=text)
