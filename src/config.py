@@ -27,7 +27,8 @@ class ProjectConfig:
         "logging_level": "INFO",
         "log_directory": str(Path.home()),
         "appearance_mode": "System",  # "System", "Light", "Dark"
-        "color_theme": "blue",  # CustomTkinter built-in theme name
+        "color_theme": "blue",  # CustomTkinter built-in theme name (or a theme file's path)
+        "high_contrast": True,  # True = gui/contrast.py adjusts the theme's colors so text is readable
         "font_family": "",  # "" = use CustomTkinter's built-in per-platform default
         "font_size": 0,  # 0 = use CustomTkinter's built-in default size
         "recent_files": [],  # paths of recently opened/saved state files, most-recent first
@@ -134,6 +135,20 @@ class ProjectConfig:
     @color_theme.setter
     def color_theme(self, value):
         self._prefs["color_theme"] = value
+
+    @property
+    def high_contrast(self) -> bool:
+        """Whether the theme's colors are adjusted for readable text. A
+        hand-edited value that is not a JSON true/false reads as the
+        default (on)."""
+        value = self._prefs["high_contrast"]
+        if isinstance(value, bool):
+            return value
+        return self.DEFAULT_PREFS["high_contrast"]
+
+    @high_contrast.setter
+    def high_contrast(self, value):
+        self._prefs["high_contrast"] = bool(value)
 
     @property
     def font_family(self) -> str:

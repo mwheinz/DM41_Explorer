@@ -173,6 +173,20 @@ def _setup_logging(config_store, log_basename="dm41_explorer"):
     )
 
 
+def _apply_color_theme(name):
+    '''Loads the CustomTkinter color theme `name` (a built-in theme's name,
+    or the path of a theme JSON file). A theme that can't be loaded -- a
+    hand-edited preference naming a file that is gone, say -- is logged and
+    replaced by the default theme instead of stopping the app from
+    starting. Must run before any widget is built.'''
+    try:
+        ctk.set_default_color_theme(name)
+    except (OSError, ValueError) as e:
+        default = ProjectConfig.DEFAULT_PREFS["color_theme"]
+        logger.warning("Could not load color theme %r, using %r: %s", name, default, e)
+        ctk.set_default_color_theme(default)
+
+
 def _apply_font_prefs(config_store):
     '''Overrides CustomTkinter's default UI font family/size, if configured.
 
@@ -230,9 +244,10 @@ class DM41ExplorerApp(ctk.CTk):
         _setup_logging(self.config_store)
 
         ctk.set_appearance_mode(self.config_store.appearance_mode)
-        ctk.set_default_color_theme(self.config_store.color_theme)
+        _apply_color_theme(self.config_store.color_theme)
         _apply_font_prefs(self.config_store)
-        improve_theme_contrast(ctk.ThemeManager.theme)
+        if self.config_store.high_contrast:
+            improve_theme_contrast(ctk.ThemeManager.theme)
 
         self.title("DM41_Explorer")
 

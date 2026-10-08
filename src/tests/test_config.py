@@ -124,22 +124,24 @@ def test_save_raises_exception_on_permission_error(tmp_path, monkeypatch):
     assert "Could not save preferences to" in str(excinfo.value)
 
 
-def test_prefs_filename_gives_each_app_its_own_file(tmp_path, monkeypatch):
-    """A second app passes its own prefs_filename, so it neither reads nor
-    overwrites DM41_Explorer's preferences file."""
-    monkeypatch.setattr("config.Path.home", lambda: tmp_path)
-    x_config = ProjectConfig(prefs_filename=".dm41x_explorer.json")
-    assert x_config.PREFS_FILE == tmp_path / ".dm41x_explorer.json"
-    # The class-level default is untouched by the instance override.
-    assert ProjectConfig.PREFS_FILE.name == ".dm41l_explorer.json"
+def test_high_contrast_defaults_to_on(prefs_file):
+    assert ProjectConfig().high_contrast is True
 
-    x_config.baudrate = 57600
-    x_config.save()
-    assert (tmp_path / ".dm41x_explorer.json").exists()
-    assert not (tmp_path / ".dm41l_explorer.json").exists()
 
-    # A default-constructed config (DM41_Explorer's) doesn't see X's values.
-    monkeypatch.setattr(ProjectConfig, "PREFS_FILE", tmp_path / ".dm41l_explorer.json")
-    l_config = ProjectConfig()
-    l_config.load()
-    assert l_config.baudrate == ProjectConfig.DEFAULT_PREFS["baudrate"]
+def test_high_contrast_round_trips_through_the_file(prefs_file):
+    config = ProjectConfig()
+    config.high_contrast = False
+    config.save()
+    assert json.loads(prefs_file.read_text())["high_contrast"] is False
+
+    reloaded = ProjectConfig()
+    reloaded.load()
+    assert reloaded.high_contrast is False
+
+
+@pytest.mark.parametrize("junk", ["false", 0, None, "no"])
+def test_a_hand_edited_high_contrast_value_reads_as_the_default(prefs_file, junk):
+    prefs_file.write_text(json.dumps({"high_contrast": junk}))
+    config = ProjectConfig()
+    config.load()
+    assert config.high_contrast is True

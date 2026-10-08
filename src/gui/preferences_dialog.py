@@ -1,6 +1,6 @@
 """
-Preferences dialog: default serial port/baud/timeout, logging, appearance,
-and font.
+Preferences dialog: default serial port/baud/timeout, logging, appearance
+(mode, color theme, contrast), and font.
 """
 
 import logging
@@ -19,6 +19,10 @@ logger = logging.getLogger(__name__)
 PLATFORM_SYSTEM = platform.system()
 
 LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+
+# CustomTkinter's built-in color themes (customtkinter/assets/themes/*.json).
+# tests/test_preferences_themes.py checks each one is really there.
+COLOR_THEMES = ["blue", "dark-blue", "gold", "green"]
 
 FONT_DEFAULT_LABEL = "System Default"
 FONT_SIZE_DEFAULT_LABEL = "Default"
@@ -130,6 +134,24 @@ class PreferencesDialog(ctk.CTkToplevel):
             tab, values=["System", "Light", "Dark"], variable=self._appearance_var
         ).pack(anchor="w", padx=8, fill="x")
 
+        ctk.CTkLabel(tab, text="Color theme:").pack(anchor="w", padx=8, pady=(16, 4))
+        themes = list(COLOR_THEMES)
+        current_theme = self._config.color_theme
+        if current_theme not in themes:
+            # e.g. the path of a theme file typed into the preferences file
+            themes.append(current_theme)
+        self._color_theme_var = ctk.StringVar(value=current_theme)
+        ctk.CTkOptionMenu(
+            tab, values=themes, variable=self._color_theme_var
+        ).pack(anchor="w", padx=8, fill="x")
+
+        self._high_contrast_var = ctk.BooleanVar(value=self._config.high_contrast)
+        ctk.CTkCheckBox(
+            tab,
+            text="Higher-contrast colors (easier to read)",
+            variable=self._high_contrast_var,
+        ).pack(anchor="w", padx=8, pady=(12, 0))
+
         font_row = ctk.CTkFrame(tab, fg_color="transparent")
         font_row.pack(anchor="w", padx=8, pady=(16, 0), fill="x")
         font_row.grid_columnconfigure(0, weight=1)
@@ -165,7 +187,9 @@ class PreferencesDialog(ctk.CTkToplevel):
 
         ctk.CTkLabel(
             tab,
-            text="Font changes take effect after restarting DM41_Explorer.",
+            text="Font, color theme and contrast changes\n"
+            "take effect after restarting DM41_Explorer.",
+            justify="left",
             text_color=WARNING_TEXT,
             font=ui_font(-2),
         ).pack(anchor="w", padx=8, pady=(4, 0))
@@ -228,6 +252,8 @@ class PreferencesDialog(ctk.CTkToplevel):
             logger.warning("Invalid baud rate or console timeout, not saved: %s", e)
         self._config.logging_level = self._log_level_var.get()
         self._config.appearance_mode = self._appearance_var.get()
+        self._config.color_theme = self._color_theme_var.get()
+        self._config.high_contrast = self._high_contrast_var.get()
         family_choice = self._font_family_var.get()
         self._config.font_family = (
             "" if family_choice == FONT_DEFAULT_LABEL else family_choice
