@@ -9,8 +9,8 @@ issues and pull requests easy to act on.
 ```sh
 git clone https://github.com/mwheinz/DM41_Explorer.git
 cd DM41_Explorer
-python3 -m venv dm41l-venv
-source dm41l-venv/bin/activate   # on Windows: venv\Scripts\activate
+python3 -m venv dm41-venv
+source dm41-venv/bin/activate   # on Windows: venv\Scripts\activate
 pip install -r requirements-dev.txt
 cd src
 python3 -m gui.app

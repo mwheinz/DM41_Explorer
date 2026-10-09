@@ -21,7 +21,10 @@ for readability. The current components are:
                     the HP41/DM41L FOCAL character set's non-ASCII symbols)
   device_profile.py
                    DeviceProfile and the DM41L/DM41X profiles -- the per-model
-                    memory map (extended-memory regions) a Memory carries
+                    memory map (extended-memory regions), built-in XROMs and
+                    serial support a Memory carries -- plus DeviceMode, the
+                    user's choice of which profile the app works in, and
+                    DEFAULT_MODE
   constants.py     address-range and sentinel-register constants
   regions.py       MemoryRegion (the base class -- a live view of one
                     named span, whose boundaries are recomputed on every
@@ -92,7 +95,9 @@ for readability. The current components are:
                     (`python -m memory.mnemonic_doc`)
   profile_fit.py   check_profile_fit() -- what in a memory state will not fit
                     a given model (XM beyond its regions, XROM functions it
-                    lacks); the check before Send to a DM41L
+                    lacks); the check before Send to a DM41L. Plus
+                    evaluate_mode_switch(), the errors-only subset asked
+                    before opening a state in a mode (phase 6)
   memory.py        Memory (the top-level state: parsing, serialization,
                     raw register access, whole-state pack(), and the
                     region lookup -- Memory.region(key) plus the named
@@ -111,7 +116,14 @@ from .registers import (
     parse_data_line,
 )
 from .trigraphs import encode_trigraphs, decode_trigraphs, focal_to_unicode
-from .device_profile import DeviceProfile, DM41L, DM41X, PROFILES
+from .device_profile import (
+    DeviceProfile,
+    DeviceMode,
+    DEFAULT_MODE,
+    DM41L,
+    DM41X,
+    PROFILES,
+)
 from .constants import (
     STATUS_REGISTERS_RANGE,
     VOID_RANGE,
@@ -155,6 +167,7 @@ from .profile_fit import (
     WARNING,
     ProfileFinding,
     check_profile_fit,
+    evaluate_mode_switch,
     format_findings,
 )
 
@@ -179,6 +192,8 @@ __all__ = [
     "STATUS_REGISTER_LABELS",
     "XM_REGIONS",
     "DeviceProfile",
+    "DeviceMode",
+    "DEFAULT_MODE",
     "DM41L",
     "DM41X",
     "PROFILES",
@@ -218,5 +233,6 @@ __all__ = [
     "WARNING",
     "ProfileFinding",
     "check_profile_fit",
+    "evaluate_mode_switch",
     "format_findings",
 ]

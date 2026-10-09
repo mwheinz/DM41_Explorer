@@ -29,7 +29,7 @@ pytest.importorskip("customtkinter")
 from unittest import mock
 
 from config import ProjectConfig
-from memory import DM41L, DM41X, Memory
+from memory import DM41L, DM41X, DeviceMode, Memory
 from gui.app import DM41ExplorerApp
 from gui.overview_tab import xm_total_registers
 
@@ -49,7 +49,30 @@ def prefs_file(tmp_path, monkeypatch):
 @pytest.fixture
 def app(prefs_file, tmp_path):
     """A real DM41ExplorerApp. It starts offline, so nothing here needs a
-    serial port or a modal dialog."""
+    serial port or a modal dialog.
+
+    Its mode is whatever the preferences default to, which is DM41X --
+    see dm41l_app for the other one."""
+    instance = DM41ExplorerApp()
+    yield instance
+    instance.destroy()
+
+
+@pytest.fixture
+def dm41l_prefs(tmp_path, monkeypatch):
+    """prefs_file, but with the mode saved as DM41L, so the app comes up
+    in that mode through the real config path rather than by having its
+    attribute poked afterwards."""
+    fake_prefs_path = tmp_path / ".dm41_test_prefs.json"
+    fake_prefs_path.write_text(
+        json.dumps({"log_directory": str(tmp_path / "logs"), "mode": "DM41L"})
+    )
+    monkeypatch.setattr(ProjectConfig, "PREFS_FILE", fake_prefs_path)
+    return fake_prefs_path
+
+
+@pytest.fixture
+def dm41l_app(dm41l_prefs):
     instance = DM41ExplorerApp()
     yield instance
     instance.destroy()
@@ -227,19 +250,31 @@ ORIGINAL_CONFIRMATION = (
 
 
 @pytest.fixture
-def connected_app(app):
+def connected_app(dm41l_app):
     """The app with a (pretend) open serial connection and a command
-    engine that accepts every command, so nothing touches a port."""
-    app.serial.is_connected = True
-    with mock.patch.object(app.engine, "execute", return_value=True) as execute:
-        app.sent = execute
-        yield app
+    engine that accepts every command, so nothing touches a port.
+
+    In DM41L mode, because that is the only mode that can connect at all
+    (phase 6): a DM41X has no serial console."""
+    dm41l_app.serial.is_connected = True
+    with mock.patch.object(dm41l_app.engine, "execute", return_value=True) as execute:
+        dm41l_app.sent = execute
+        yield dm41l_app
 
 
 def _send(app, name, *, answer=True):
-    """Opens tests/data/<name> and presses Send. Returns the mocks for the
-    error box and the confirmation, in that order."""
-    app._load_state_into_buffer(str(DATA_DIR / name))
+    """Puts tests/data/<name> in the buffer and presses Send. Returns the
+    mocks for the error box and the confirmation, in that order.
+
+    The state is assigned directly, with the DM41X profile, rather than
+    opened through _load_state_into_buffer(): since phase 6, opening a
+    too-large state in DM41L mode offers a switch to DM41X mode instead
+    of loading it, so the load path can no longer produce the situation
+    the Send check guards against. These tests are about Send's own
+    behaviour given such a state, so they build it directly -- see the
+    note in send_state_to_calculator()."""
+    app.memory = Memory.from_file(DATA_DIR / name, profile=DM41X)
+    app.memory_source = DATA_DIR / name
     with mock.patch("gui.app.messagebox.showerror") as error, mock.patch(
         "gui.app.messagebox.askyesno", return_value=answer
     ) as confirm:
@@ -316,12 +351,18 @@ def test_send_checks_against_the_model_the_connection_declares(connected_app):
     connected_app.sent.assert_called_once()
 
 
-def test_send_when_not_connected_does_not_check_anything(app):
-    app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+def test_send_when_not_connected_does_not_check_anything(dm41l_app):
+    """In DM41L mode, where Send is available at all: not being connected
+    is what stops it, before any checking. (In DM41X mode the mode guard
+    fires first instead -- see
+    test_the_serial_actions_refuse_in_dm41x_mode.)"""
+    dm41l_app.memory = Memory.from_file(
+        DATA_DIR / "dm41x_manyfiles.dm41", profile=DM41X
+    )
     with mock.patch("gui.app.messagebox.showwarning") as warn, mock.patch(
         "gui.app.check_profile_fit"
     ) as check:
-        app.send_state_to_calculator()
+        dm41l_app.send_state_to_calculator()
 
     warn.assert_called_once()
     check.assert_not_called()
@@ -334,10 +375,23 @@ def _tree_rows(tree):
     return [tree.item(iid, "values") for iid in tree.get_children()]
 
 
-def test_a_state_file_opens_with_the_dm41x_profile(app):
+def test_a_state_file_opens_with_the_modes_profile(app):
+    """Phase 3 opened every file with the DM41X profile; phase 6 replaced
+    that with the mode's profile. The default mode is DM41X, so this
+    fixture still lands on DM41X -- but now because of the mode."""
     app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
 
+    assert app.mode is DeviceMode.DM41X
     assert app.memory.profile is DM41X
+
+
+def test_a_dm41l_state_opens_with_the_dm41l_profile_in_dm41l_mode(dm41l_app):
+    """The whole point of DM41L mode: a DM41L owner's own state is shown
+    as a DM41L's, not padded out to the DM41X's memory map."""
+    dm41l_app._load_state_into_buffer(str(DATA_DIR / "lander.dm41"))
+
+    assert dm41l_app.memory.profile is DM41L
+    assert xm_total_registers(dm41l_app.memory.profile) == 362
 
 
 def test_a_dm41l_state_from_the_calculator_keeps_the_dm41l_profile(app):
@@ -420,11 +474,17 @@ def test_save_as_keeps_the_files_own_extension(app, name, extension):
     assert ask.call_args.kwargs["defaultextension"] == extension
 
 
-def test_save_as_of_a_new_buffer_defaults_to_dm41(app):
+def test_save_as_of_a_new_buffer_follows_the_mode(app, dm41l_app):
+    """A buffer with no file of its own gets the extension the current
+    mode's calculator writes (plan, phase 6). Before modes this was always
+    ".dm41"."""
     with mock.patch("gui.app.filedialog.asksaveasfilename", return_value="") as ask:
         app.save_state_as()
+    assert ask.call_args.kwargs["defaultextension"] == ".d41", "DM41X mode"
 
-    assert ask.call_args.kwargs["defaultextension"] == ".dm41"
+    with mock.patch("gui.app.filedialog.asksaveasfilename", return_value="") as ask:
+        dm41l_app.save_state_as()
+    assert ask.call_args.kwargs["defaultextension"] == ".dm41", "DM41L mode"
 
 
 def test_a_d41_file_saves_back_identically(app, tmp_path):
@@ -575,7 +635,9 @@ def test_the_app_starts_offline_and_never_touches_the_serial_port(
         instance.update()
         assert calls == []
         assert not instance.serial.is_connected
-        assert instance._status_label.cget("text") == "Not connected"
+        # Empty, not "Not connected": this app is in DM41X mode, where
+        # there is nothing to connect to (see the idle-status tests).
+        assert instance._status_label.cget("text") == ""
     finally:
         instance.destroy()
 
@@ -583,16 +645,430 @@ def test_the_app_starts_offline_and_never_touches_the_serial_port(
 # -- Connect dialog: never opened from inside the menu command ---------------
 
 
-def test_connect_menu_command_returns_before_the_dialog_blocks(app):
+def test_connect_menu_command_returns_before_the_dialog_blocks(dm41l_app):
     """The Connect dialog waits for itself to close, which hangs the app on
     macOS when started from inside a menu command (the dialog can't be
     clicked and the app shows the beachball). So show_connect_dialog()
-    must return first and open the dialog from the normal event loop."""
-    with mock.patch.object(app, "_prompt_for_port") as prompt:
-        app.show_connect_dialog()
+    must return first and open the dialog from the normal event loop.
+
+    In DM41L mode: since phase 6, DM41X mode refuses the action outright
+    and never reaches the dialog."""
+    with mock.patch.object(dm41l_app, "_prompt_for_port") as prompt:
+        dm41l_app.show_connect_dialog()
         prompt.assert_not_called()
         deadline = time.time() + 2
         while not prompt.called and time.time() < deadline:
-            app.update()
+            dm41l_app.update()
             time.sleep(0.01)
         prompt.assert_called_once_with(None)
+
+
+# -- Explicit DM41L/DM41X modes (plan, phase 6 -- GitHub issue #43) ----------
+#
+# The mode is the single source of truth for the active profile. Changing it
+# erases the open state, and an auto-switch offered when a state will not fit
+# the current mode lasts for this session only. The core decision logic is
+# tested without a window in test_device_mode.py; these cover the
+# application's own sequence.
+
+
+def _yes():
+    return mock.patch("gui.app.messagebox.askyesno", return_value=True)
+
+
+def _no():
+    return mock.patch("gui.app.messagebox.askyesno", return_value=False)
+
+
+def test_the_mode_comes_from_the_saved_preference(app, dm41l_app):
+    assert app.mode is DeviceMode.DM41X
+    assert app.profile is DM41X
+    assert dm41l_app.mode is DeviceMode.DM41L
+    assert dm41l_app.profile is DM41L
+
+
+def test_a_new_buffer_uses_the_modes_profile(dm41l_app):
+    """Before phase 6 a new buffer was always a DM41L-profile memory, even
+    when a DM41X state had just been open."""
+    assert dm41l_app.memory.profile is DM41L
+    with _yes():
+        dm41l_app.new_memory_buffer()
+    assert dm41l_app.memory.profile is DM41L
+
+
+def test_switching_mode_starts_an_empty_state(dm41l_app):
+    dm41l_app._load_state_into_buffer(str(DATA_DIR / "keyassigns.dm41"))
+    assert dm41l_app.memory.programs.list_programs(), "the fixture has programs"
+    assert dm41l_app.memory_source is not None
+
+    with _yes():
+        assert dm41l_app.set_mode(DeviceMode.DM41X, persist=True) is True
+
+    assert dm41l_app.mode is DeviceMode.DM41X
+    assert dm41l_app.memory.profile is DM41X
+    assert dm41l_app.memory_source is None
+    assert not dm41l_app.memory.programs.list_programs(), "the state was erased"
+    assert dm41l_app.memory.to_string() == Memory(profile=DM41X).to_string()
+
+
+def test_switching_mode_erases_in_both_directions(app):
+    """Mike, 2026-10-09: one rule either way. Widening is lossless, but
+    preserving the state would mean rebuilding the Memory through
+    to_string()/from_string(), which phase 6 deliberately avoids."""
+    app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    assert app.memory.extended_memory.list_files()
+
+    with _yes():
+        assert app.set_mode(DeviceMode.DM41L, persist=True) is True
+
+    assert app.mode is DeviceMode.DM41L
+    assert app.memory.profile is DM41L
+    assert not app.memory.extended_memory.list_files(), "the state was erased"
+
+
+def test_switching_to_the_same_mode_does_nothing(app):
+    app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    source = app.memory_source
+
+    with mock.patch("gui.app.messagebox.askyesno") as ask:
+        assert app.set_mode(DeviceMode.DM41X, persist=True) is True
+
+    ask.assert_not_called(), "no confirmation for a no-op"
+    assert app.memory_source == source, "the open state is untouched"
+
+
+def test_declining_the_switch_confirmation_changes_nothing(app):
+    app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    source = app.memory_source
+
+    with _no():
+        assert app.set_mode(DeviceMode.DM41L, persist=True) is False
+
+    assert app.mode is DeviceMode.DM41X
+    assert app.memory_source == source
+    assert app.memory.extended_memory.list_files(), "the state is still there"
+
+
+def test_the_discard_guard_runs_before_the_switch_confirmation(app):
+    """An unsaved buffer gets the usual discard prompt first, and
+    declining it stops the switch before the mode question is even
+    asked."""
+    app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    app._on_memory_changed()
+    assert app.memory.modified
+
+    with mock.patch("gui.app.messagebox.askyesno", return_value=False) as ask:
+        assert app.set_mode(DeviceMode.DM41L, persist=True) is False
+
+    assert ask.call_count == 1, "stopped at the discard guard"
+    assert "Discard unsaved changes" in ask.call_args.args[1]
+    assert app.mode is DeviceMode.DM41X
+
+
+def test_the_switch_confirmation_names_the_consequence(app):
+    with mock.patch("gui.app.messagebox.askyesno", return_value=False) as ask:
+        app.set_mode(DeviceMode.DM41L, persist=True)
+
+    message = ask.call_args.args[1]
+    assert "starts a new, empty memory state" in message
+    assert "export" in message, "says how to move data between models"
+
+
+def test_switching_mode_persists_only_when_asked(app, prefs_file):
+    with _yes():
+        app.set_mode(DeviceMode.DM41L, persist=True)
+    assert json.loads(prefs_file.read_text())["mode"] == "DM41L"
+    assert app.config_store.mode is DeviceMode.DM41L
+    assert not app.mode_is_temporary
+
+    with _yes():
+        app.set_mode(DeviceMode.DM41X, persist=False)
+    assert json.loads(prefs_file.read_text())["mode"] == "DM41L", "not written"
+    assert app.mode is DeviceMode.DM41X
+    assert app.mode_is_temporary
+
+
+def test_the_status_bar_shows_the_mode_and_marks_an_override(app):
+    assert app._mode_label.cget("text") == "DM41X mode"
+
+    with _yes():
+        app.set_mode(DeviceMode.DM41L, persist=True)
+    assert app._mode_label.cget("text") == "DM41L mode"
+
+    with _yes():
+        app.set_mode(DeviceMode.DM41X, persist=False)
+    assert app._mode_label.cget("text") == "DM41X mode (this session)"
+
+
+# -- Auto-switch when a state will not fit the mode --------------------------
+
+
+def test_a_too_large_state_offers_dm41x_mode_and_loads_on_yes(dm41l_app):
+    with _yes() as ask:
+        dm41l_app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+
+    message = ask.call_args.args[1]
+    assert "does not fit a DM41L" in message
+    assert "XM files use memory a DM41L does not have" in message
+    assert dm41l_app.mode is DeviceMode.DM41X
+    assert dm41l_app.memory.profile is DM41X
+    assert len(dm41l_app.memory.extended_memory.list_files()) == 59
+
+
+def test_an_accepted_auto_switch_is_not_persisted(dm41l_app, dm41l_prefs):
+    """Mike, 2026-10-09: someone who owns one calculator will rarely want
+    the other mode permanently, so the offer is session-only."""
+    with _yes():
+        dm41l_app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+
+    assert dm41l_app.mode is DeviceMode.DM41X
+    assert dm41l_app.config_store.mode is DeviceMode.DM41L
+    assert dm41l_app.mode_is_temporary
+    assert json.loads(dm41l_prefs.read_text())["mode"] == "DM41L"
+
+
+def test_declining_the_offer_aborts_the_load(dm41l_app):
+    """The mode and the previously open state are both untouched."""
+    dm41l_app._load_state_into_buffer(str(DATA_DIR / "lander.dm41"))
+    before = dm41l_app.memory.to_string()
+
+    with _no():
+        dm41l_app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+
+    assert dm41l_app.mode is DeviceMode.DM41L
+    assert dm41l_app.memory_source == DATA_DIR / "lander.dm41"
+    assert dm41l_app.memory.to_string() == before
+
+
+def test_a_state_that_fits_loads_without_any_offer(dm41l_app):
+    with mock.patch("gui.app.messagebox.askyesno") as ask:
+        dm41l_app._load_state_into_buffer(str(DATA_DIR / "lander.dm41"))
+
+    ask.assert_not_called()
+    assert dm41l_app.mode is DeviceMode.DM41L
+
+
+def test_stale_data_above_region_two_loads_in_dm41l_mode(dm41l_app):
+    """dm41x_retpfl_before.d41 has junk above 0x300 that belongs to no XM
+    file. That is a warning reported at Send, not a reason to refuse the
+    load or to offer a switch (plan, phase 6)."""
+    with mock.patch("gui.app.messagebox.askyesno") as ask:
+        dm41l_app._load_state_into_buffer(str(DATA_DIR / "dm41x_retpfl_before.d41"))
+
+    ask.assert_not_called()
+    assert dm41l_app.mode is DeviceMode.DM41L
+    assert dm41l_app.memory_source is not None
+
+
+def test_dm41x_only_xroms_load_in_dm41l_mode_without_an_offer(dm41l_app):
+    """xrom.d41 calls 18 functions a DM41L lacks. Confirmed 2026-10-09:
+    those warn at upload only -- the user may mean to retype the step on
+    the calculator."""
+    with mock.patch("gui.app.messagebox.askyesno") as ask:
+        dm41l_app._load_state_into_buffer(str(DATA_DIR / "xrom.d41"))
+
+    ask.assert_not_called()
+    assert dm41l_app.memory_source is not None
+
+
+# -- Serial is gated by the mode ---------------------------------------------
+
+
+def _connect_entries(instance):
+    menu = instance._connect_menu
+    return [
+        menu.entrycget(index, "state") or "normal"
+        for index in instance._serial_menu_indices
+    ]
+
+
+def test_the_connect_menu_is_enabled_in_dm41l_mode(dm41l_app):
+    assert dm41l_app._serial_menu_indices, "there are serial entries to gate"
+    assert set(_connect_entries(dm41l_app)) == {"normal"}
+
+
+def test_the_connect_menu_is_disabled_in_dm41x_mode(app):
+    """Disabled, not hidden (Mike, 2026-10-09)."""
+    assert set(_connect_entries(app)) == {"disabled"}
+
+
+def test_the_menu_gating_follows_a_mode_change(app):
+    with _yes():
+        app.set_mode(DeviceMode.DM41L, persist=True)
+    assert set(_connect_entries(app)) == {"normal"}
+
+    with _yes():
+        app.set_mode(DeviceMode.DM41X, persist=True)
+    assert set(_connect_entries(app)) == {"disabled"}
+
+
+@pytest.mark.parametrize("action", [
+    "show_connect_dialog",
+    "get_state_from_calculator",
+    "send_state_to_calculator",
+    "set_calculator_time",
+])
+def test_the_serial_actions_refuse_in_dm41x_mode(app, action):
+    """The keyboard shortcuts never consult the menu's state, so each
+    action guards itself as well."""
+    with mock.patch("gui.app.messagebox.showinfo") as info, \
+            mock.patch.object(app.serial, "connect") as connect:
+        getattr(app, action)()
+
+    assert info.called, f"{action} said nothing"
+    assert "DM41X Mode" in info.call_args.args[0]
+    connect.assert_not_called()
+
+
+def test_switching_mode_while_connected_warns_and_disconnects(dm41l_app):
+    dm41l_app.serial.is_connected = True
+    with mock.patch.object(dm41l_app, "disconnect") as disconnect, _yes() as ask:
+        assert dm41l_app.set_mode(DeviceMode.DM41X, persist=True) is True
+
+    assert "serial connection will be closed" in ask.call_args.args[1]
+    disconnect.assert_called_once()
+
+
+def test_declining_the_switch_leaves_the_connection_alone(dm41l_app):
+    dm41l_app.serial.is_connected = True
+    with mock.patch.object(dm41l_app, "disconnect") as disconnect, _no():
+        assert dm41l_app.set_mode(DeviceMode.DM41X, persist=True) is False
+
+    disconnect.assert_not_called()
+
+
+# -- The Preferences dialog reports the mode rather than writing it ----------
+
+
+def test_preferences_can_change_the_mode(app):
+    with _yes():
+        app._on_preferences_saved(requested_mode=DeviceMode.DM41L)
+
+    assert app.mode is DeviceMode.DM41L
+    assert app.config_store.mode is DeviceMode.DM41L
+
+
+def test_a_cancelled_mode_change_from_preferences_keeps_the_saved_value(app):
+    with _no():
+        app._on_preferences_saved(requested_mode=DeviceMode.DM41L)
+
+    assert app.mode is DeviceMode.DM41X
+    assert app.config_store.mode is DeviceMode.DM41X
+
+
+def test_preferences_can_confirm_a_session_override_without_erasing(dm41l_app):
+    """After an auto-switch the app is in DM41X mode while DM41L is saved.
+    Choosing DM41X in Preferences then means "make that the setting" --
+    there is nothing to erase, so it must not prompt."""
+    with _yes():
+        dm41l_app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    assert dm41l_app.mode_is_temporary
+    files = len(dm41l_app.memory.extended_memory.list_files())
+
+    with mock.patch("gui.app.messagebox.askyesno") as ask:
+        dm41l_app._on_preferences_saved(requested_mode=DeviceMode.DM41X)
+
+    ask.assert_not_called()
+    assert dm41l_app.config_store.mode is DeviceMode.DM41X
+    assert not dm41l_app.mode_is_temporary
+    assert len(dm41l_app.memory.extended_memory.list_files()) == files
+    assert dm41l_app._mode_label.cget("text") == "DM41X mode"
+
+
+def test_preferences_saved_without_a_mode_still_works(app):
+    """The callback keeps working for a caller that reports no mode."""
+    app._on_preferences_saved()
+    assert app.mode is DeviceMode.DM41X
+
+
+
+# -- The status bar says nothing about a connection it cannot make ----------
+
+
+def test_dm41x_mode_starts_with_an_empty_status(app):
+    """"Not connected" is only meaningful where connecting is possible
+    (Mike, 2026-10-09)."""
+    assert app._status_label.cget("text") == ""
+
+
+def test_dm41l_mode_still_says_not_connected(dm41l_app):
+    assert dm41l_app._status_label.cget("text") == "Not connected"
+
+
+def test_switching_to_dm41x_leaves_no_stale_not_connected(dm41l_app):
+    assert dm41l_app._status_label.cget("text") == "Not connected"
+
+    with _yes():
+        dm41l_app.set_mode(DeviceMode.DM41X, persist=True)
+
+    text = dm41l_app._status_label.cget("text")
+    assert "Not connected" not in text
+    assert "DM41X mode" in text, "it says what just happened instead"
+
+
+def test_disconnecting_in_dm41l_mode_says_not_connected(dm41l_app):
+    dm41l_app.serial.is_connected = True
+    dm41l_app._set_status("Connected to /dev/ttyUSB0")
+
+    with mock.patch.object(dm41l_app.serial, "disconnect"):
+        dm41l_app.disconnect()
+
+    assert dm41l_app._status_label.cget("text") == "Not connected"
+
+
+def test_a_serial_failure_in_dm41x_mode_leaves_the_status_empty(app):
+    """Not reachable through the UI -- DM41X mode refuses to connect at
+    all -- but the error callbacks are shared, so they must not print a
+    connection state in a mode that has no connection."""
+    app._set_status("")
+    # _on_command_error posts its dialog with after(0, ...), so update()
+    # below would open a real modal box and block forever.
+    with mock.patch("gui.app.messagebox.showerror"):
+        app._on_command_error("something went wrong")
+        app.update()
+
+    assert app._status_label.cget("text") == ""
+
+
+# -- The mode limits extended memory (issue #43, DM41L mode item 2) ----------
+
+
+def test_dm41l_mode_limits_extended_memory_to_the_dm41ls_size(dm41l_app, app):
+    """The limit is not a separate check: the mode's profile has only two
+    XM regions, so extended memory refuses what will not fit in them. The
+    same file goes in without complaint in DM41X mode."""
+    from memory import DM41MemoryError
+
+    assert xm_total_registers(dm41l_app.memory.profile) == 362
+    with pytest.raises(DM41MemoryError, match="Not enough free space"):
+        dm41l_app.memory.extended_memory.add_file(
+            "BIG", 2, numbers=[1.0] * 400
+        )
+
+    assert xm_total_registers(app.memory.profile) == 600
+    app.memory.extended_memory.add_file("BIG", 2, numbers=[1.0] * 400)
+    assert [f.name.strip() for f in app.memory.extended_memory.list_files()] == ["BIG"]
+
+
+def test_a_dm41x_state_file_that_fits_is_usable_in_dm41l_mode(dm41l_app):
+    """Issue #43, DM41L mode item 4: a .d41 is just a state file, and one
+    that fits a DM41L opens, edits and saves in DM41L mode."""
+    dm41l_app._load_state_into_buffer(str(DATA_DIR / "dm41x_retpfl_before.d41"))
+
+    assert dm41l_app.mode is DeviceMode.DM41L
+    assert dm41l_app.memory.profile is DM41L
+    before = len(dm41l_app.memory.extended_memory.list_files())
+    assert before, "the fixture has XM files"
+
+    dm41l_app.memory.extended_memory.add_file("NEW", 2, numbers=[1.0, 2.0])
+    assert len(dm41l_app.memory.extended_memory.list_files()) == before + 1
+
+
+def test_the_mode_is_shown_before_the_connection_status(app):
+    """Mike, 2026-10-09. The mode is the standing fact about the session;
+    the status label beside it is running commentary. Order is the pack
+    order within the status bar, left to right."""
+    bar = app._mode_label.master
+    left = [w for w in bar.winfo_children() if w.pack_info().get("side") == "left"]
+    assert left.index(app._mode_label) < left.index(app._status_label)
+    assert left.index(app._status_label) < left.index(app._modified_label)

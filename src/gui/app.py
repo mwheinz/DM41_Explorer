@@ -14,11 +14,12 @@ from tkinter import filedialog, messagebox, Menu
 import customtkinter as ctk
 
 from memory import (
-    DM41X,
     ERROR,
     WARNING,
+    DeviceMode,
     Memory,
     check_profile_fit,
+    evaluate_mode_switch,
     format_findings,
 )
 from engine.serial_manager import SerialManager
@@ -210,6 +211,14 @@ def _apply_font_prefs(config_store):
 
 # A DM41L `.dm41` state and a DM41X `.d41` state file are the same text format.
 STATE_EXTENSIONS = (".dm41", ".d41")
+
+# What Save As offers for a buffer that has no file of its own yet. The text
+# format is identical either way; this only picks the extension the user's
+# own calculator writes, so a new state lands with the name they expect.
+DEFAULT_EXTENSION_BY_MODE = {
+    DeviceMode.DM41L: ".dm41",
+    DeviceMode.DM41X: ".d41",
+}
 STATE_FILETYPES = [
     ("DM41 memory state", ("*.dm41", "*.d41")),
     ("All files", "*.*"),
@@ -251,15 +260,24 @@ class DM41ExplorerApp(ctk.CTk):
 
         self.title("DM41_Explorer")
 
+        # The effective DM41L/DM41X mode: which calculator the app is
+        # working as. It starts from the saved preference, and an
+        # auto-switch on load can move it for this session only without
+        # writing the preference back (see _offer_mode_switch_for_load).
+        # Everything that needs a memory map asks self.profile, never the
+        # config and never the connection.
+        self.mode = self.config_store.mode
+
         self.serial = SerialManager(error_callback=self._handle_serial_error)
         self.engine = CommandEngine(self.serial)
-        self.memory = Memory()
+        self.memory = Memory(profile=self.profile)
         self.memory_source = None
         self._command_pending = False
 
         self._build_layout()
         self._apply_window_size()
         self._menubar = self._build_menus()
+        self._apply_mode_to_menus()
         self._bind_keys()
 
         if PLATFORM_SYSTEM == "Darwin":
@@ -283,9 +301,178 @@ class DM41ExplorerApp(ctk.CTk):
         # Nothing touches the serial port until the user chooses
         # Connect / Reconnect... (the app starts offline).
 
+    # -- Mode (DM41L / DM41X) ---------------------------------------------
+
+    @property
+    def profile(self):
+        """The DeviceProfile the app is working in right now.
+
+        The single source of truth for every memory map question: what a
+        state is opened with, what the Overview counts, which keyboard the
+        Key Assignments tab draws. Derived from the mode, so there is no
+        second copy to keep in step."""
+        return self.mode.profile
+
+    @property
+    def mode_is_temporary(self) -> bool:
+        """Whether the effective mode differs from the saved preference,
+        i.e. an auto-switch moved it for this session only."""
+        return self.mode is not self.config_store.mode
+
+    def _mode_status_text(self) -> str:
+        text = f"{self.mode.value} mode"
+        if self.mode_is_temporary:
+            # Mike, 2026-10-09: the status bar is where a temporary
+            # override is shown; the Preferences dialog shows the saved
+            # setting and says nothing about this.
+            text += " (this session)"
+        return text
+
+    def _idle_status(self) -> str:
+        """The status text for "nothing going on": the connection state in
+        a mode that has a serial console, and nothing at all in one that
+        does not.
+
+        "Not connected" is only meaningful where connecting is possible
+        (Mike, 2026-10-09). In DM41X mode there is nothing to connect to,
+        so the status bar stays empty until something actually happens
+        (a state loaded, a mode changed), rather than reporting the
+        absence of a connection the app would refuse to make anyway."""
+        return "Not connected" if self.mode.supports_serial else ""
+
+    def _refresh_mode_indicator(self):
+        self._mode_label.configure(text=self._mode_status_text())
+
+    def _apply_mode_to_menus(self):
+        """Greys out the serial actions in a mode whose calculator has no
+        serial console -- disabled rather than hidden (Mike, 2026-10-09),
+        so the user can see the app has them and why they are unavailable.
+
+        The keyboard shortcuts bypass menu state entirely, so every one of
+        these actions also guards itself with _require_serial_mode()."""
+        state = "normal" if self.mode.supports_serial else "disabled"
+        for index in self._serial_menu_indices:
+            self._connect_menu.entryconfigure(index, state=state)
+
+    def _require_serial_mode(self) -> bool:
+        """True if the serial actions apply in this mode. Otherwise says
+        why and returns False -- the guard behind every serial action, for
+        the keyboard shortcuts that never consult the menu's state."""
+        if self.mode.supports_serial:
+            return True
+        messagebox.showinfo(
+            f"Not Available in {self.mode.value} Mode",
+            f"A {self.mode.value} has no serial console, so there is "
+            "nothing to connect to.\n\n"
+            "Switch to DM41L mode in Preferences to use the serial "
+            "connection. Note that switching mode starts a new, empty "
+            "memory state.",
+        )
+        return False
+
+    def set_mode(self, mode, *, persist: bool, reason: str = None) -> bool:
+        """Changes the effective mode, erasing the open state.
+
+        Changing mode starts a new, empty state on the new mode's profile
+        (Mike, 2026-10-09): a Memory fixes its profile when it is built, and
+        rebuilding one through to_string()/from_string() to keep the
+        contents would be a silent partial conversion in the narrowing
+        direction. Moving a state between models is done by exporting the
+        programs and data wanted and re-importing them.
+
+        The sequence, which `reason` only adds a leading sentence to:
+          1. the usual discard guard, if the buffer is modified;
+          2. a confirmation naming the consequence, which also names the
+             disconnect when a serial connection is open;
+          3. the disconnect, then the switch and the empty buffer.
+
+        `persist` writes the new mode to the preferences file. An
+        auto-switch on load passes False, so it lasts for this session
+        only. Returns whether the mode was changed; False means the user
+        cancelled at some step, and neither the mode nor the open state
+        was touched."""
+        if mode is self.mode:
+            return True
+
+        if self.memory.modified and not messagebox.askyesno(
+            "Unsaved Changes",
+            f"Discard unsaved changes and switch to {mode.value} mode?",
+        ):
+            return False
+
+        lines = []
+        if reason:
+            lines.append(reason)
+        lines.append(
+            f"Switching to {mode.value} mode starts a new, empty memory "
+            "state. Anything still in the current one is discarded."
+        )
+        connected = self.serial.is_connected
+        if connected:
+            lines.append("The serial connection will be closed.")
+        lines.append(
+            "To move programs or data between models, export them before "
+            "switching and import them afterwards."
+        )
+        lines.append(f"Switch to {mode.value} mode?")
+        if not messagebox.askyesno("Switch Mode", "\n\n".join(lines)):
+            return False
+
+        if connected:
+            self.disconnect()
+
+        previous = self.mode
+        self.mode = mode
+        if persist:
+            self.config_store.mode = mode
+            self._persist_config("the DM41L/DM41X mode")
+        logger.info(
+            "Mode changed from %s to %s (%s)",
+            previous.value,
+            mode.value,
+            "saved" if persist else "this session only",
+        )
+
+        self.memory = Memory(profile=self.profile)
+        self.memory_source = None
+        self._modified_label.configure(text="")
+        self._update_source_label()
+        self._apply_mode_to_menus()
+        self._refresh_mode_indicator()
+        self._render_tabs()
+        self._set_status(
+            f"Switched to {mode.value} mode; started a new, empty memory state."
+        )
+        return True
+
+    def _offer_mode_switch_for_load(self, path, findings) -> bool:
+        """Offers DM41X mode for a state that will not fit the current one,
+        and returns whether the caller should go on to load it.
+
+        The offer is deliberately session-only: someone who owns one
+        calculator will rarely want the other mode permanently (Mike,
+        2026-10-09), so accepting does not write the preference. Declining
+        aborts the load and leaves both the mode and the open state alone."""
+        target = DeviceMode.DM41X
+        logger.info(
+            "%s does not fit %s mode: %s",
+            path,
+            self.mode.value,
+            "; ".join(str(finding) for finding in findings),
+        )
+        reason = (
+            f"{Path(path).name} does not fit a {self.mode.value}:\n\n"
+            f"{format_findings(findings)}\n\n"
+            f"{target.value} mode can open it."
+        )
+        if not self.set_mode(target, persist=False, reason=reason):
+            self._set_status(f"Did not load {Path(path).name}: needs DM41X mode.")
+            return False
+        return True
+
     def _handle_serial_error(self, msg: str):
         logger.error("Serial error: %s", msg)
-        self._set_status("Not connected")
+        self._set_status(self._idle_status())
         self._command_pending = False
         # No self.serial.disconnect() call here (unlike the other error
         # handlers below): this callback runs directly on SerialManager's
@@ -404,8 +591,26 @@ class DM41ExplorerApp(ctk.CTk):
         status_bar = ctk.CTkFrame(self)
         status_bar.pack(side="bottom", fill="x", padx=8, pady=(0, 8))
 
+        # The effective mode comes first (Mike, 2026-10-09): it is the
+        # standing fact about the session, while the label beside it is a
+        # running commentary that _set_status() rewrites constantly. This
+        # order also keeps the bar tidy in DM41X mode, where the status
+        # text is empty -- the mode reads flush left instead of sitting
+        # behind an empty label's padding.
+        #
+        # Its own label, not text appended to the status, so neither can
+        # overwrite the other; it also carries whether the mode is only
+        # for this session, which is the one place an auto-switch
+        # override is visible.
+        self._mode_label = ctk.CTkLabel(
+            status_bar,
+            text=self._mode_status_text(),
+            font=ui_font(),
+            text_color=SECONDARY_TEXT,
+        )
+        self._mode_label.pack(side="left", padx=8, pady=6)
         self._status_label = ctk.CTkLabel(
-            status_bar, text="Not connected", font=ui_font()
+            status_bar, text=self._idle_status(), font=ui_font()
         )
         self._status_label.pack(side="left", padx=8, pady=6)
         self._modified_label = ctk.CTkLabel(
@@ -549,6 +754,12 @@ class DM41ExplorerApp(ctk.CTk):
 
         # Connect Menu
         connect_menu = Menu(menubar, tearoff=0)
+        # Every entry in this menu needs a serial console, so the whole
+        # menu is gated by the mode (see _apply_mode_to_menus). The indices
+        # are collected as the entries are added rather than hard-coded, so
+        # inserting an entry later cannot silently gate the wrong one.
+        self._connect_menu = connect_menu
+        self._serial_menu_indices = []
         connect_menu.add_command(
             label="Connect / Reconnect...",
             command=self.show_connect_dialog,
@@ -581,6 +792,11 @@ class DM41ExplorerApp(ctk.CTk):
             accelerator=f"{acc}+U",
             underline=0,
         )
+        self._serial_menu_indices = [
+            index
+            for index in range(connect_menu.index("end") + 1)
+            if connect_menu.type(index) == "command"
+        ]
         menubar.add_cascade(label="Connect", menu=connect_menu)
 
         # View Menu
@@ -816,9 +1032,11 @@ class DM41ExplorerApp(ctk.CTk):
             # connected".
             self._set_status(f"Connected to {self.serial.serial_inst.port}")
         else:
-            self._set_status("Not connected")
+            self._set_status(self._idle_status())
 
     def show_connect_dialog(self):
+        if not self._require_serial_mode():
+            return
         # _prompt_for_port() blocks in wait_window() until the dialog closes.
         # Called straight from a menu item, that nested wait runs inside
         # macOS's menu-tracking event loop mode, which never delivers events
@@ -831,7 +1049,7 @@ class DM41ExplorerApp(ctk.CTk):
         if not self.serial.is_connected:
             return
         self.serial.disconnect()
-        self._set_status("Not connected")
+        self._set_status(self._idle_status())
         self._battery_label.configure(text="")
         self._calc_time_label.configure(text="")
 
@@ -841,7 +1059,7 @@ class DM41ExplorerApp(ctk.CTk):
             port, baudrate=self.config_store.baudrate
         )
         if not success:
-            self._set_status("Not connected")
+            self._set_status(self._idle_status())
             self._prompt_for_port(f"Connection to '{port}' failed: {message}")
             return
 
@@ -868,7 +1086,7 @@ class DM41ExplorerApp(ctk.CTk):
         # own background thread and can't join itself.
         if self.serial.is_connected:
             self.serial.disconnect()
-        self._set_status("Not connected")
+        self._set_status(self._idle_status())
         self.after(
             0,
             lambda: self._prompt_for_port(
@@ -937,7 +1155,11 @@ class DM41ExplorerApp(ctk.CTk):
     def _on_state_received(self, state):
         logger.info("State received.")
         try:
-            self.memory = Memory.from_string(state)
+            # The profile is the connection driver's declared model (the
+            # serial driver declares the DM41L), not the app's mode: this
+            # state came off that calculator. The two agree today, since
+            # only DM41L mode can connect at all.
+            self.memory = Memory.from_string(state, profile=self.serial.profile)
             self.memory_source = None
             self._modified_label.configure(text="")
             self._update_source_label()
@@ -951,7 +1173,7 @@ class DM41ExplorerApp(ctk.CTk):
     def _on_command_error(self, message: str):
         logger.error("%s", message)
         self._command_pending = False
-        self._set_status("Not connected")
+        self._set_status(self._idle_status())
         # Runs on the main Tk thread (engine callback via _pump_engine), so
         # a direct disconnect() call here is safe -- see _on_verify_failed.
         if self.serial.is_connected:
@@ -969,7 +1191,7 @@ class DM41ExplorerApp(ctk.CTk):
             "Unsaved Changes", "Discard unsaved changes and start a new buffer?"
         ):
             return
-        self.memory = Memory()
+        self.memory = Memory(profile=self.profile)
         self.memory_source = None
         self._modified_label.configure(text="")
         self._update_source_label()
@@ -1025,6 +1247,8 @@ class DM41ExplorerApp(ctk.CTk):
             )
 
     def set_calculator_time(self):
+        if not self._require_serial_mode():
+            return
         if not self.serial.is_connected:
             messagebox.showwarning("Not Connected", "Connect to the DM41L first.")
             return
@@ -1065,11 +1289,13 @@ class DM41ExplorerApp(ctk.CTk):
             messagebox.showerror("Error", f"Could not save state: {e}")
 
     def save_state_as(self):
-        # A file keeps its own extension: the text format is the same.
+        # A file keeps its own extension: the text format is the same. A
+        # buffer with no file of its own gets the extension the current
+        # mode's calculator writes (.dm41 for a DM41L, .d41 for a DM41X).
         extension = (
             self.memory_source.suffix
             if self.memory_source and self.memory_source.suffix in STATE_EXTENSIONS
-            else ".dm41"
+            else DEFAULT_EXTENSION_BY_MODE[self.mode]
         )
         path = filedialog.asksaveasfilename(
             defaultextension=extension,
@@ -1107,19 +1333,44 @@ class DM41ExplorerApp(ctk.CTk):
         (File > Open..., a startup file argument, and double-clicking a
         .dm41 file) -- callers are responsible for checking `self.memory.modified`
         and confirming with the user first, since the right prompt (or
-        whether to prompt at all) differs by caller. This always
-        overwrites the current buffer unconditionally.'''
+        whether to prompt at all) differs by caller.
+
+        A state is opened with the current mode's profile. If it does not
+        fit that model, the user is offered DM41X mode instead
+        (_offer_mode_switch_for_load); declining leaves the open state
+        alone, so nothing is assigned here until that is settled.'''
         try:
-            # Every state file opens with the DM41X profile, a superset of
-            # the DM41L's, so a large state displays and saves without loss.
-            self.memory = Memory.from_file(path, profile=DM41X)
+            # Parsed into a local first: the state only replaces the open
+            # buffer once it is known to fit the mode (or the user has
+            # agreed to switch), so a declined offer is a true no-op.
+            loaded = Memory.from_file(path, profile=self.profile)
+        except Exception as e:
+            logger.exception("Could not load state from %s", path)
+            messagebox.showerror("Error", f"Could not load state: {e}")
+            return
+
+        findings = evaluate_mode_switch(loaded, self.profile)
+        if findings:
+            if not self._offer_mode_switch_for_load(path, findings):
+                return
+            # The mode moved, so the state has to be re-read under the new
+            # profile: the one just parsed still carries the old memory map.
+            try:
+                loaded = Memory.from_file(path, profile=self.profile)
+            except Exception as e:
+                logger.exception("Could not load state from %s", path)
+                messagebox.showerror("Error", f"Could not load state: {e}")
+                return
+
+        try:
+            self.memory = loaded
             self.memory_source = Path(path)
             self._modified_label.configure(text="")
             self._update_source_label()
             self._render_tabs()
             name = Path(path).name
             self._set_status(f"Loaded state from {name}")
-            logger.info("State loaded from %s", path)
+            logger.info("State loaded from %s (%s mode)", path, self.mode.value)
             self.config_store.add_recent_file(path)
             self._persist_config("recent files")
             self._rebuild_recent_files_menu()
@@ -1169,13 +1420,25 @@ class DM41ExplorerApp(ctk.CTk):
     # -- Connect menu actions -----------------------------------------------
 
     def send_state_to_calculator(self):
+        if not self._require_serial_mode():
+            return
         if not self.serial.is_connected:
             messagebox.showwarning("Not Connected", "Connect to the DM41L first.")
             return
 
         # A state can hold things the calculator on the other end does not
-        # have (every file opens with the DM41X profile). The connection
-        # declares which model that is; see memory/profile_fit.py.
+        # have. The connection declares which model that is -- not the
+        # app's mode; see memory/profile_fit.py.
+        #
+        # Since phase 6 the XM *error* branch below is defence in depth
+        # rather than a path a user can reach: connecting needs DM41L
+        # mode, and opening a state too large for a DM41L in DM41L mode
+        # forces a switch to DM41X mode, which disconnects. The check is
+        # kept because it is shared with evaluate_mode_switch() and costs
+        # nothing, and because a later model (a DM41XN over serial) could
+        # make the combination reachable again. The XROM *warning* branch
+        # is still reached normally: a state full of DM41X-only functions
+        # opens in DM41L mode quite happily.
         target = self.serial.profile
         findings = check_profile_fit(self.memory, target)
         errors = [f for f in findings if f.level == ERROR]
@@ -1231,6 +1494,8 @@ class DM41ExplorerApp(ctk.CTk):
         self._on_command_error(message)
 
     def get_state_from_calculator(self):
+        if not self._require_serial_mode():
+            return
         if not self.serial.is_connected:
             messagebox.showwarning("Not Connected", "Connect to the DM41L first.")
             return
@@ -1249,7 +1514,11 @@ class DM41ExplorerApp(ctk.CTk):
 
     def show_preferences(self):
         PreferencesDialog(
-            self, self.config_store, self.serial, on_saved=self._on_preferences_saved
+            self,
+            self.config_store,
+            self.serial,
+            on_saved=self._on_preferences_saved,
+            mode=self.config_store.mode,
         )
 
     def show_keyboard_shortcuts(self):
@@ -1267,7 +1536,26 @@ class DM41ExplorerApp(ctk.CTk):
         self._mnemonics_reference = MnemonicsReferenceDialog(self)
         return self._mnemonics_reference
 
-    def _on_preferences_saved(self):
+    def _on_preferences_saved(self, requested_mode=None):
+        """Re-applies everything the dialog may have changed.
+
+        `requested_mode` is the mode the user chose there, which the dialog
+        deliberately does NOT write to the config itself: changing mode
+        erases the open state, so it has to go through set_mode()'s
+        confirmation, and a cancelled switch must leave the saved
+        preference as it was. The dialog's other settings are already
+        saved by the time this runs, so cancelling the switch keeps those
+        and only the mode change is dropped."""
+        if requested_mode is not None and requested_mode is not self.mode:
+            self.set_mode(requested_mode, persist=True)
+        elif requested_mode is not None and self.mode_is_temporary:
+            # The dialog's value matches the mode already in force, so the
+            # user has confirmed this session's override as the saved
+            # setting. Nothing to erase; just stop calling it temporary.
+            self.config_store.mode = requested_mode
+            self._persist_config("the DM41L/DM41X mode")
+            self._refresh_mode_indicator()
+
         ctk.set_appearance_mode(self.config_store.appearance_mode)
         _setup_logging(self.config_store)
         # Hex View, Data Registers, XM Files, and Programs use native

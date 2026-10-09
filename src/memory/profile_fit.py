@@ -1,11 +1,21 @@
 """
 check_profile_fit(): will a memory state work on a given model?
 
-Every state file opens with the DM41X profile, which is a superset of the
-DM41L's (see device_profile.py), so a state can hold things a DM41L cannot
-have. Before one is sent to a DM41L the app asks this module what would not
-fit. The check is pure and synchronous, like the rest of the core, and it
-changes nothing.
+A state can hold things a narrower model cannot have: the DM41X profile is a
+superset of the DM41L's (see device_profile.py). This module answers what
+would not fit, for the two callers that need to know:
+
+  check_profile_fit()    everything that would not fit, errors and warnings.
+                         Asked before a state is SENT to a calculator.
+  evaluate_mode_switch() only what makes the state unloadable -- the errors.
+                         Asked before a state is OPENED in a mode
+                         (docs/dm41x_explorer_plan.md phase 6).
+
+The second is a filter over the first, deliberately, so that "does it fit?"
+has exactly one definition in the code rather than two that can drift.
+
+The check is pure and synchronous, like the rest of the core, and it changes
+nothing.
 
 Findings come in two levels:
 
@@ -89,6 +99,36 @@ def format_findings(findings: List[ProfileFinding], limit: int = 12) -> str:
     if len(findings) > limit:
         lines.append(f"...and {len(findings) - limit} more.")
     return "\n".join(lines)
+
+
+def evaluate_mode_switch(
+    memory: Memory, profile: DeviceProfile
+) -> List[ProfileFinding]:
+    """Why `memory` cannot be opened as a `profile` calculator, or [].
+
+    This is the question the application asks when a state is opened in
+    DM41L mode: an empty list means it loads in that mode, and anything
+    returned means it does not and the user should be offered DM41X mode
+    instead (docs/dm41x_explorer_plan.md phase 6).
+
+    Only ERROR findings count here, which is the whole difference from
+    check_profile_fit():
+
+      - XM beyond the model's regions, a directory whose end marker falls
+        outside them, or a directory that cannot be walked at all, make the
+        state unloadable. They are errors, and they block.
+      - An XROM the model lacks does not stop the state loading -- the user
+        may well mean to retype that step on the calculator -- and leftover
+        data in a region the model lacks is only stale. Both are warnings,
+        and both are reported at SEND time instead. Neither blocks a load.
+
+    Errors come from the XM check alone (see check_profile_fit), so the
+    result is also the XM reason, ready to show in the switch dialog."""
+    return [
+        finding
+        for finding in check_profile_fit(memory, profile)
+        if finding.level == ERROR
+    ]
 
 
 def _wide_view(memory: Memory) -> Memory:

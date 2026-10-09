@@ -9,6 +9,8 @@ import json
 import logging
 from pathlib import Path
 
+from memory import DEFAULT_MODE, DeviceMode
+
 logger = logging.getLogger(__name__)
 
 
@@ -21,6 +23,11 @@ class ProjectConfig:
 
     # Default values
     DEFAULT_PREFS = {
+        # Which calculator the app works as -- see memory.DeviceMode and
+        # docs/dm41x_explorer_plan.md phase 6. The DM41X is the more common
+        # device, so it is the default; note that an existing user has no
+        # such key, and so gets DM41X whichever calculator they own.
+        "mode": DEFAULT_MODE.value,
         "baudrate": 38400, # The only speed the DM41L currently supports.
         "console_timeout_minutes": 10,
         "serial_port": "/dev/tty.usbmodem14101", # MacOS default(?)
@@ -79,6 +86,26 @@ class ProjectConfig:
             raise Exception(
                 f"Error: Could not save preferences to {self.PREFS_FILE}"
                 ) from e
+
+    @property
+    def mode(self) -> DeviceMode:
+        """The saved DM41L/DM41X mode, as a DeviceMode.
+
+        This is the *persisted* setting. A session can be working in the
+        other mode after an auto-switch on load, which is deliberately not
+        written here (docs/dm41x_explorer_plan.md phase 6) -- ask the
+        application for the effective mode, not the config.
+
+        A hand-edited or unrecognised value reads as the default rather
+        than raising, so a bad preferences file cannot stop the app
+        starting."""
+        return DeviceMode.from_value(self._prefs["mode"])
+
+    @mode.setter
+    def mode(self, value):
+        """Accepts a DeviceMode or its name; stores the name, so the
+        preferences file stays readable JSON."""
+        self._prefs["mode"] = DeviceMode.from_value(value).value
 
     @property
     def baudrate(self) -> int:

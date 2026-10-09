@@ -202,3 +202,29 @@ For example:
   (and any *other* program) there.
 
 - Import and export of key assignments has not been implemented.
+
+## 5. Keyboard Layouts
+
+The DM41L and the DM41X assign the same 34 keys, but their physical
+keyboards arrange them differently: the DM41X (like the original HP-41)
+has eight rows of five or six keys, while the DM41L's more compact
+keyboard is four rows of ten, relocating several keys. The `ENTER` key
+(41) is one double-size key on both — double-width on the DM41X,
+double-height on the DM41L — and occupies two grid positions while
+remaining a single key with a single pair of assignments.
+
+**The Explorer draws one of them at a time**, the one belonging to the
+model it is working as (`docs/dm41x_explorer_plan.md`, phase 6). GitHub
+issue #39 originally put each layout on its own sub-tab so both were
+available at once; that is superseded (Mike, 2026-10-09), since the
+model is now an explicit mode rather than something the user switches
+between while looking at one state. The layout follows the rendered
+state's own `profile`, so the tab cannot disagree with the rest of the
+application about which model is in force.
+
+One consequence for the edit dialog: in DM41L mode its function list
+offers only the functions a DM41L has, and a DM41X-only name typed into
+it is refused rather than merely flagged. A state that already carries
+such an assignment (saved in DM41X mode, or made on the calculator)
+still displays it; the dialog opens on its Raw Hex tab, because the
+Function tab cannot offer that name in that mode.

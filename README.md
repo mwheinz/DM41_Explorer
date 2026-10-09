@@ -42,8 +42,10 @@ press and release the “ON” and “C” keys simultaneously to enable the ser
 console. 
 
 Once the calculator is set to SERIAL CONSOLE mode and a USB connection is
-established with your computer, choose “Connect / Reconnect…” from the
-“Connect” menu (Ctrl+K or Cmd+K on macOS). A dialog box resembling the
+established with your computer, make sure DM41_Explorer is in **DM41L mode**
+(Preferences → General → Calculator model; the status bar shows the current
+one), then choose “Connect / Reconnect…” from the “Connect” menu (Ctrl+K or
+Cmd+K on macOS). A dialog box resembling the
 following will be displayed:
 
 ![Connection](resources/screenshots/connection.png)
@@ -187,6 +189,41 @@ macOS uses `Cmd` for the same shortcuts.
 Export and Import act on whichever tab is currently active, and only take
 effect on the Data Registers, XM Files, and Programs tabs — elsewhere they're
 a no-op.
+
+The five Connect-menu shortcuts (Connect / Reconnect, Disconnect, Set
+Calculator Time, Get State, Send State) work in **DM41L mode** only. A DM41X
+has no serial console, so in DM41X mode those menu items are greyed out and
+the shortcuts say so rather than doing anything — see “Calculator model”
+below.
+
+## Calculator model
+
+DM41_Explorer works as one model at a time, chosen in Preferences → General
+→ Calculator model and shown in the status bar. New installations start in
+**DM41X mode**, the more common device.
+
+| | DM41L mode | DM41X mode |
+| --- | --- | --- |
+| Serial connection | Yes | No — a DM41X has no serial console |
+| Extended memory | 362 registers | 600 registers |
+| Functions | the HP-41CX set | that, plus the DM41X’s own |
+| Key Assignments tab | the DM41L keyboard | the classic HP-41 keyboard |
+| New files default to | `.dm41` | `.d41` |
+
+Two things follow from this:
+
+- **Changing the model starts a new, empty memory state.** To move programs
+  or data from one model to the other, export them before switching and
+  import them afterwards.
+- **Opening a state that is too large for a DM41L**, while in DM41L mode,
+  offers to switch to DM41X mode so it can be opened. Accepting applies for
+  that session only and does not change the saved setting; the status bar
+  then reads “DM41X mode (this session)”. Declining leaves everything as it
+  was.
+
+A state file itself says nothing about which model wrote it — a `.dm41` and a
+`.d41` are the same format — so the mode, not the file, decides how one is
+read.
 
 ## Documentation
 

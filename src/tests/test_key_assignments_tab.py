@@ -51,7 +51,7 @@ def _button_text(tab, key_number, shifted):
     # Both grids' buttons for a key stay in sync -- checking the first is
     # enough (test_key_assignment_storage_research's bug writeup is the
     # reason this isn't assumed without at least one assertion per key).
-    return tab._key_buttons[(key_number, shifted)][0].cget("text")
+    return tab._key_buttons[(key_number, shifted)].cget("text")
 
 
 def test_render_shows_program_assignment_with_marker(tab):
@@ -79,37 +79,85 @@ def test_render_header_counts_both_kinds(tab):
     assert tab._header_label.cget("text") == "Key assignments: 5"
 
 
-def test_both_grids_stay_in_sync_for_a_program_assignment(tab):
+def test_a_program_assignment_shows_on_its_key(tab):
+    """A global-label assignment shows with the "▸" marker rather than as
+    unassigned."""
     memory = Memory.from_file(DATA_DIR / "manyfiles.dm41")
     tab.render(memory)
 
-    dm41l_btn, hp41_btn = tab._key_buttons[(11, False)]
-    assert dm41l_btn.cget("text") == hp41_btn.cget("text") == "▸XMBCD"
+    assert tab._key_buttons[(11, False)].cget("text") == "▸XMBCD"
 
 
-def test_layouts_are_separate_subtabs_dm41l_first(tab):
-    """Issue #39: each keyboard layout lives on its own sub-tab, DM41L
-    first and DM41X second, and DM41L is the one shown by default."""
-    from gui.key_assignments_tab import DM41L_TAB, DM41X_TAB
-
-    assert tab._layout_tabs._name_list == [DM41L_TAB, DM41X_TAB]
-    assert tab._layout_tabs.get() == DM41L_TAB
+# -- One keyboard at a time (phase 6, superseding issue #39) -----------------
 
 
-def test_each_grid_is_built_on_its_own_subtab(tab):
-    """Each key's two buttons (one per layout) live under different
-    sub-tabs -- the DM41L button under the DM41L tab's frame, the DM41X
-    button under the DM41X tab's frame."""
-    from gui.key_assignments_tab import DM41L_TAB, DM41X_TAB
+def test_only_the_rendered_profiles_keyboard_is_drawn(tab):
+    """Issue #39 put each layout on its own sub-tab; phase 6 draws just
+    one, chosen by the state's profile (Mike, 2026-10-09)."""
+    from gui.key_assignments_tab import DM41L_LAYOUT, DM41X_LAYOUT, layout_placements
+    from memory import DM41L
 
-    memory = Memory.from_file(DATA_DIR / "manyfiles.dm41")
-    tab.render(memory)
+    def key_cells(layout):
+        return sum(isinstance(p.cell, int) for p in layout_placements(layout))
 
-    dm41l_btn, hp41_btn = tab._key_buttons[(11, False)]
-    dm41l_tab = tab._layout_tabs.tab(DM41L_TAB)
-    hp41_tab = tab._layout_tabs.tab(DM41X_TAB)
-    assert str(dm41l_btn).startswith(str(dm41l_tab) + ".")
-    assert str(hp41_btn).startswith(str(hp41_tab) + ".")
+    assert not hasattr(tab, "_layout_tabs"), "the sub-tab view is gone"
+
+    tab.render(Memory(profile=DM41L))
+    assert tab._built_for == "DM41L"
+    assert len(tab._key_buttons) == key_cells(DM41L_LAYOUT) * 2
+
+    tab.render(Memory(profile=DM41X))
+    assert tab._built_for == "DM41X"
+    assert len(tab._key_buttons) == key_cells(DM41X_LAYOUT) * 2
+
+
+def test_a_profile_change_rebuilds_the_grid(tab):
+    """A mode change hands the tab a Memory with a different profile. The
+    grid must be rebuilt, not relabelled -- the keys are in different
+    places."""
+    from memory import DM41L
+
+    tab.render(Memory(profile=DM41X))
+    first = tab._key_buttons[(11, False)]
+
+    tab.render(Memory(profile=DM41L))
+    assert tab._built_for == "DM41L"
+    assert tab._key_buttons[(11, False)] is not first, "rebuilt, not reused"
+    assert not first.winfo_exists(), "the old grid was destroyed"
+
+
+def test_rendering_the_same_profile_again_reuses_the_grid(tab):
+    """The expensive rebuild only happens on a real change: this tab
+    deliberately configures existing buttons in place (see its module
+    docstring) rather than recreating ~270 widgets per edit."""
+    tab.render(Memory(profile=DM41X))
+    before = tab._key_buttons[(11, False)]
+
+    tab.render(Memory(profile=DM41X))
+    assert tab._key_buttons[(11, False)] is before
+
+
+def test_the_dm41l_keyboard_is_drawn_for_a_dm41l_state(tab):
+    """A spot-check on the layout itself: key 42 sits in the first row of
+    the DM41L's keyboard and the fourth row of the DM41X's."""
+    from memory import DM41L
+
+    def row_of(key_number):
+        for cell in tab._grid_frame.winfo_children():
+            if not cell.grid_info():
+                continue
+            for label in cell.winfo_children():
+                if isinstance(label, ctk.CTkLabel) and label.cget(
+                    "text"
+                ) == f"{key_number:02d}":
+                    return int(cell.grid_info()["row"])
+        return None
+
+    tab.render(Memory(profile=DM41L))
+    assert row_of(42) == 0
+
+    tab.render(Memory(profile=DM41X))
+    assert row_of(42) == 3
 
 
 def test_edit_key_assign_program_to_unassigned_key(tab):
@@ -206,7 +254,7 @@ def test_flag_clear_assignment_is_shown_with_a_warning_mark(tab):
 
     assert _button_text(tab, 11, False) == "⚠▸LKATST"
     assert _button_text(tab, 12, True) == "⚠⇧▸BBB"
-    button = tab._key_buttons[(11, False)][0]
+    button = tab._key_buttons[(11, False)]
     assert button.cget("text_color") == FLAG_CLEAR_TEXT
     # Issue #42: the mark is a fill, not amber text on the blue key button.
     assert tuple(button.cget("fg_color")) == FLAG_CLEAR_FG
@@ -217,7 +265,7 @@ def test_lkaon_state_shows_the_same_assignments_unmarked(tab):
 
     assert _button_text(tab, 11, False) == "▸LKATST"
     assert _button_text(tab, 12, True) == "⇧▸BBB"
-    assert tuple(tab._key_buttons[(11, False)][0].cget("fg_color")) != FLAG_CLEAR_FG
+    assert tuple(tab._key_buttons[(11, False)].cget("fg_color")) != FLAG_CLEAR_FG
 
 
 def test_header_counts_the_flag_clear_keys(tab):

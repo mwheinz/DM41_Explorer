@@ -3,6 +3,7 @@ import os
 import platform
 import pytest
 from config import ProjectConfig
+from memory import DeviceMode
 
 running_as_root = hasattr(os, "geteuid") and os.geteuid() == 0
 skip_if_permission_bits_unenforced = pytest.mark.skipif(
@@ -145,3 +146,66 @@ def test_a_hand_edited_high_contrast_value_reads_as_the_default(prefs_file, junk
     config = ProjectConfig()
     config.load()
     assert config.high_contrast is True
+
+# -- The DM41L/DM41X mode (docs/dm41x_explorer_plan.md phase 6) -----------
+
+
+def test_mode_defaults_to_dm41x(prefs_file):
+    """A fresh config, with no preferences file, is in DM41X mode: the
+    more common device (Mike, 2026-10-09)."""
+    config = ProjectConfig()
+    assert config.mode is DeviceMode.DM41X
+
+
+def test_an_existing_user_with_no_mode_key_gets_dm41x(prefs_file):
+    """The release-notes case: a preferences file written by an earlier
+    version has no `mode`, so the user gets DM41X whichever calculator
+    they own, until they set it themselves."""
+    prefs_file.write_text(json.dumps({"baudrate": 115200, "color_theme": "green"}))
+    config = ProjectConfig()
+    config.load()
+    assert config.mode is DeviceMode.DM41X
+    assert config.baudrate == 115200, "the rest of their settings still load"
+
+
+def test_a_saved_mode_is_read_back(prefs_file):
+    prefs_file.write_text(json.dumps({"mode": "DM41L"}))
+    config = ProjectConfig()
+    config.load()
+    assert config.mode is DeviceMode.DM41L
+
+
+@pytest.mark.parametrize("bad", ["", "dm41l", "DM41XN", None, 41, [], {}])
+def test_an_unreadable_mode_falls_back_to_the_default(prefs_file, bad):
+    """A hand-edited preferences file must not stop the app starting."""
+    prefs_file.write_text(json.dumps({"mode": bad}))
+    config = ProjectConfig()
+    config.load()
+    assert config.mode is DeviceMode.DM41X
+
+
+def test_setting_the_mode_stores_a_readable_name(prefs_file):
+    """The preferences file stays readable JSON: the enum's name, not a
+    repr or an ordinal."""
+    config = ProjectConfig()
+    config.mode = DeviceMode.DM41L
+    config.save()
+    assert json.loads(prefs_file.read_text())["mode"] == "DM41L"
+    assert config.mode is DeviceMode.DM41L
+
+
+def test_the_mode_setter_also_accepts_a_name(prefs_file):
+    config = ProjectConfig()
+    config.mode = "DM41L"
+    assert config.mode is DeviceMode.DM41L
+
+
+def test_a_saved_mode_survives_a_restart(prefs_file):
+    """What the exit gate asks for: the persisted setting comes back."""
+    first = ProjectConfig()
+    first.mode = DeviceMode.DM41L
+    first.save()
+
+    second = ProjectConfig()
+    second.load()
+    assert second.mode is DeviceMode.DM41L

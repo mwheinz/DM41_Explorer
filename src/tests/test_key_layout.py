@@ -5,6 +5,12 @@ its 5-key rows more widely than its 6-key rows, as the real keyboard does,
 and the ENTER key (41) is one double-size key -- double-width on the DM41X,
 double-height on the DM41L -- rather than two keys.
 
+Since phase 6 of docs/dm41x_explorer_plan.md the tab draws ONE keyboard,
+the one belonging to the rendered state's profile, so `make_tab` takes the
+profile to build for and every test inspects the single `tab._grid_frame`.
+A test that is about one particular keyboard says which; the rest are
+parametrized over both.
+
 Builds the real KeyAssignmentsTab (Xvfb in CI/sandboxes, like test_app.py).
 """
 from pathlib import Path
@@ -18,9 +24,7 @@ import customtkinter as ctk
 from gui import key_assignments_tab as kat
 from gui.key_assignments_tab import (
     DM41L_LAYOUT,
-    DM41L_TAB,
     DM41X_LAYOUT,
-    DM41X_TAB,
     GRID_COLUMNS,
     KEY_MIN_CHARS,
     KEY_TEXT_PREFIXES,
@@ -30,8 +34,11 @@ from gui.key_assignments_tab import (
 )
 from gui.window_geometry import BASE_FONT_SIZE
 from gui_helpers import pump, show
-from memory import Memory
+from memory import DM41L, DM41X, Memory
 from memory.functions import SINGLE_BYTE_FUNCTIONS, XROM_FUNCTIONS
+
+# The profile each keyboard belongs to, for parametrizing over both.
+LAYOUTS = {DM41L: DM41L_LAYOUT, DM41X: DM41X_LAYOUT}
 
 DATA_DIR = Path(__file__).parent / "data"
 LARGE_FONT = 26
@@ -74,15 +81,16 @@ def make_tab(root, font_size):
     """Builds a tab at the given font size, mapped so geometry is real."""
     tabs = []
 
-    def build(size=BASE_FONT_SIZE):
+    def build(size=BASE_FONT_SIZE, profile=DM41X):
+        """A tab rendered for `profile`, so tab._grid_frame holds that
+        model's keyboard. Only one grid is built, which is what the app
+        does -- and half the widgets the two-grid version made."""
         font_size(size)
         tab = KeyAssignmentsTab(root)
         tab.pack(fill="both", expand=True)
         assert show(root)
-        tab.render(Memory())
-        for name in (DM41X_TAB, DM41L_TAB):
-            tab._layout_tabs.set(name)
-            pump(root, 0.05)
+        tab.render(Memory(profile=profile))
+        pump(root, 0.05)
         tabs.append(tab)
         return tab
 
@@ -90,7 +98,7 @@ def make_tab(root, font_size):
 
 
 def _all_buttons(tab):
-    return [b for buttons in tab._key_buttons.values() for b in buttons]
+    return list(tab._key_buttons.values())
 
 
 def _grid_cells(frame):
@@ -116,26 +124,25 @@ def _key_cell(frame, key_number):
 
 
 @pytest.mark.parametrize("size", [BASE_FONT_SIZE, 20])
-def test_key_buttons_use_the_application_font(make_tab, size):
-    tab = make_tab(size)
+@pytest.mark.parametrize("profile", list(LAYOUTS))
+def test_key_buttons_use_the_application_font(make_tab, size, profile):
+    tab = make_tab(size, profile)
     buttons = _all_buttons(tab)
-    keys = sum(
-        isinstance(p.cell, int)
-        for layout in (DM41L_LAYOUT, DM41X_LAYOUT)
-        for p in layout_placements(layout)
-    )
+    keys = sum(isinstance(p.cell, int) for p in layout_placements(LAYOUTS[profile]))
     assert len(buttons) == keys * 2, "an unshifted and a shifted button per key cell"
     assert {b.cget("font").cget("size") for b in buttons} == {size}
 
 
-def test_key_numbers_and_fixed_key_labels_follow_the_application_font(make_tab):
-    tab = make_tab(20)
+@pytest.mark.parametrize("profile", list(LAYOUTS))
+def test_key_numbers_and_fixed_key_labels_follow_the_application_font(
+    make_tab, profile
+):
+    tab = make_tab(20, profile)
     sizes = set()
-    for frame in (tab._dm41l_frame, tab._hp41_frame):
-        for cell in _grid_cells(frame):
-            for label in cell.winfo_children():
-                if isinstance(label, ctk.CTkLabel):
-                    sizes.add(label.cget("font").cget("size"))
+    for cell in _grid_cells(tab._grid_frame):
+        for label in cell.winfo_children():
+            if isinstance(label, ctk.CTkLabel):
+                sizes.add(label.cget("font").cget("size"))
     assert sizes == {17}, "key numbers and labels are 3 points under the application font"
 
 
@@ -166,11 +173,11 @@ def test_a_button_at_the_minimum_width_does_not_grow_for_any_name(make_tab, size
     """The padding CTkButton adds around its text is a constant in
     key_assignments_tab; if a platform's differs, the buttons would grow."""
     tab = make_tab(size)
-    button = tab._key_buttons[(11, False)][0]
+    button = tab._key_buttons[(11, False)]
     base = button.winfo_reqwidth()
     for name in LONGEST_NAMES:
         for shifted in (False, True):
-            button = tab._key_buttons[(11, shifted)][0]
+            button = tab._key_buttons[(11, shifted)]
             button.configure(text=(KEY_TEXT_PREFIXES if shifted else "") + name)
             tab.update_idletasks()
             assert button.winfo_reqwidth() <= base, (name, shifted)
@@ -186,18 +193,18 @@ def test_the_minimum_width_grows_with_the_font(root, font_size):
     assert large > 1.7 * small
 
 
-@pytest.mark.parametrize("frame_name", ["_dm41l_frame", "_hp41_frame"])
-def test_assigning_long_function_names_does_not_resize_the_grid(make_tab, frame_name):
-    tab = make_tab()
-    frame = getattr(tab, frame_name)
+@pytest.mark.parametrize("profile", list(LAYOUTS))
+def test_assigning_long_function_names_does_not_resize_the_grid(make_tab, profile):
+    tab = make_tab(BASE_FONT_SIZE, profile)
+    frame = tab._grid_frame
     before = (frame.winfo_reqwidth(), frame.winfo_reqheight())
-    memory = Memory.from_file(DATA_DIR / "manyfiles.dm41")
+    memory = Memory.from_file(DATA_DIR / "manyfiles.dm41", profile=profile)
     for key, name in zip((11, 12, 13), LONGEST_NAMES):
         for shifted in (False, True):
             memory.key_assignments.set_assignment(key, shifted, _function_bytes(name))
     tab.render(memory)
     tab.update_idletasks()
-    assert tab._key_buttons[(11, True)][0].cget("text") == "⇧" + LONGEST_NAMES[0]
+    assert tab._key_buttons[(11, True)].cget("text") == "⇧" + LONGEST_NAMES[0]
     assert (frame.winfo_reqwidth(), frame.winfo_reqheight()) == before
 
 
@@ -214,28 +221,31 @@ def test_the_dm41x_has_six_key_rows_and_five_key_rows():
     assert {len(row) for row in DM41X_LAYOUT} == {5, 6}
 
 
-def test_each_row_is_laid_out_across_the_whole_grid(make_tab):
-    tab = make_tab()
-    for frame, layout in ((tab._dm41l_frame, DM41L_LAYOUT), (tab._hp41_frame, DM41X_LAYOUT)):
-        by_row = {}
-        for cell in _grid_cells(frame):
-            info = cell.grid_info()
-            for row in range(int(info["row"]), int(info["row"]) + int(info["rowspan"])):
-                by_row.setdefault(row, []).append((int(info["column"]), int(info["columnspan"])))
-        assert sorted(by_row) == list(range(len(layout)))
-        for spans in by_row.values():
-            spans.sort()
-            position = 0
-            for column, span in spans:
-                assert column == position, "cells must be contiguous"
-                position += span
-            assert position == GRID_COLUMNS
+@pytest.mark.parametrize("profile", list(LAYOUTS))
+def test_each_row_is_laid_out_across_the_whole_grid(make_tab, profile):
+    tab = make_tab(BASE_FONT_SIZE, profile)
+    layout = LAYOUTS[profile]
+    by_row = {}
+    for cell in _grid_cells(tab._grid_frame):
+        info = cell.grid_info()
+        for row in range(int(info["row"]), int(info["row"]) + int(info["rowspan"])):
+            by_row.setdefault(row, []).append(
+                (int(info["column"]), int(info["columnspan"]))
+            )
+    assert sorted(by_row) == list(range(len(layout)))
+    for spans in by_row.values():
+        spans.sort()
+        position = 0
+        for column, span in spans:
+            assert column == position, "cells must be contiguous"
+            position += span
+        assert position == GRID_COLUMNS
 
 
 def test_five_key_rows_have_wider_keys_than_six_key_rows(make_tab):
     tab = make_tab()
     widths = {}
-    for cell in _single_width_cells(tab._hp41_frame):
+    for cell in _single_width_cells(tab._grid_frame):
         info = cell.grid_info()
         count = GRID_COLUMNS // int(info["columnspan"])
         widths.setdefault(count, set()).add(cell.winfo_width())
@@ -250,22 +260,22 @@ def test_five_key_rows_have_wider_keys_than_six_key_rows(make_tab):
 def test_every_dm41x_row_ends_at_the_same_edge(make_tab):
     tab = make_tab()
     ends = {}
-    for cell in _grid_cells(tab._hp41_frame):
+    for cell in _grid_cells(tab._grid_frame):
         row = int(cell.grid_info()["row"])
         ends[row] = max(ends.get(row, 0), cell.winfo_x() + cell.winfo_width())
     assert len(ends) == len(DM41X_LAYOUT)
     assert max(ends.values()) - min(ends.values()) <= 2
 
 
-def test_the_key_number_does_not_cover_the_keys_border(make_tab):
+@pytest.mark.parametrize("profile", list(LAYOUTS))
+def test_the_key_number_does_not_cover_the_keys_border(make_tab, profile):
     """The key number label sits inside the cell's 1-pixel border, not on
     top of it (where it left a gap in the border's top edge)."""
-    tab = make_tab()
-    for frame in (tab._dm41l_frame, tab._hp41_frame):
-        for cell in _grid_cells(frame):
-            for label in cell.winfo_children():
-                if isinstance(label, ctk.CTkLabel) and label.cget("text").isdigit():
-                    assert label.winfo_y() >= 1, label.cget("text")
+    tab = make_tab(BASE_FONT_SIZE, profile)
+    for cell in _grid_cells(tab._grid_frame):
+        for label in cell.winfo_children():
+            if isinstance(label, ctk.CTkLabel) and label.cget("text").isdigit():
+                assert label.winfo_y() >= 1, label.cget("text")
 
 
 # -- The double-size ENTER key (41) ------------------------------------------------
@@ -318,16 +328,25 @@ def test_only_adjacent_repeats_merge():
     ]
 
 
-def test_enter_has_one_pair_of_buttons_per_layout(make_tab):
-    tab = make_tab()
-    assert len(tab._key_buttons[(41, False)]) == 2
-    assert len(tab._key_buttons[(41, True)]) == 2
+@pytest.mark.parametrize("profile", list(LAYOUTS))
+def test_enter_is_one_key_with_one_pair_of_buttons(make_tab, profile):
+    """ENTER occupies two grid positions but is ONE key:
+    layout_placements() merges the repeats into a single cell, so it gets
+    one unshifted and one shifted button like every other key. (While
+    both keyboards were drawn at once each key had two buttons, one per
+    grid; phase 6 draws one.)"""
+    tab = make_tab(BASE_FONT_SIZE, profile)
+    keys = {k for k, _shifted in tab._key_buttons}
+    assert 41 in keys
+    assert sum(1 for k, _s in tab._key_buttons if k == 41) == 2, "unshifted + shifted"
+    for shifted in (False, True):
+        assert isinstance(tab._key_buttons[(41, shifted)], ctk.CTkButton)
 
 
 def test_enter_is_twice_as_wide_as_its_neighbours_on_the_dm41x(make_tab):
     tab = make_tab()
-    enter = _key_cell(tab._hp41_frame, 41)
-    neighbour = _key_cell(tab._hp41_frame, 42)
+    enter = _key_cell(tab._grid_frame, 41)
+    neighbour = _key_cell(tab._grid_frame, 42)
     # Two keys' worth, including the gap between them.
     assert abs(enter.winfo_width() - (2 * neighbour.winfo_width() + 2 * kat.CELL_PADX)) <= 2
     assert enter.winfo_height() == neighbour.winfo_height()
@@ -335,8 +354,8 @@ def test_enter_is_twice_as_wide_as_its_neighbours_on_the_dm41x(make_tab):
 
 def test_enter_is_twice_as_tall_as_its_neighbours_on_the_dm41l(make_tab):
     """Its cell runs from the top of row 3 to the bottom of row 4."""
-    tab = make_tab()
-    frame = tab._dm41l_frame
+    tab = make_tab(BASE_FONT_SIZE, DM41L)
+    frame = tab._grid_frame
     enter = _key_cell(frame, 41)
     third = [c for c in _grid_cells(frame) if int(c.grid_info()["row"]) == 2 and c is not enter]
     fourth = [c for c in _grid_cells(frame) if int(c.grid_info()["row"]) == 3]
@@ -345,8 +364,8 @@ def test_enter_is_twice_as_tall_as_its_neighbours_on_the_dm41l(make_tab):
     assert enter.winfo_height() > 1.8 * _key_cell(frame, 44).winfo_height()
     # ...and its two buttons share the height rather than leaving a gap.
     assert (
-        tab._key_buttons[(41, False)][0].winfo_height()
-        > tab._key_buttons[(44, False)][0].winfo_height()
+        tab._key_buttons[(41, False)].winfo_height()
+        > tab._key_buttons[(44, False)].winfo_height()
     )
 
 
@@ -362,10 +381,9 @@ def test_the_dm41l_grid_fits_a_default_size_window_at_the_default_font(root, mak
     from gui.window_geometry import BASE_DEFAULT_SIZE
 
     root.geometry(f"{BASE_DEFAULT_SIZE[0] - APP_CHROME}x{BASE_DEFAULT_SIZE[1]}")
-    tab = make_tab()
-    tab._layout_tabs.set(DM41L_TAB)
+    tab = make_tab(BASE_FONT_SIZE, DM41L)
     pump(root, 0.3)
-    scroller = tab._dm41l_frame.master  # the CTkScrollableFrame holding the grid
+    scroller = tab._grid_frame.master  # the CTkScrollableFrame holding the grid
     assert scroller.winfo_reqwidth() <= scroller.winfo_width(), (
         scroller.winfo_reqwidth(),
         scroller.winfo_width(),
@@ -376,8 +394,8 @@ def test_the_buttons_fill_their_keys(make_tab):
     """A key in a 5-key row is wider than one in a 6-key row, and its
     buttons stretch with it instead of sitting centered at the minimum."""
     tab = make_tab()
-    five = tab._key_buttons[(51, False)][1].winfo_width()
-    six = tab._key_buttons[(11, False)][1].winfo_width()
+    five = tab._key_buttons[(51, False)].winfo_width()
+    six = tab._key_buttons[(11, False)].winfo_width()
     assert five > six * 1.1
 
 
@@ -386,12 +404,12 @@ def test_one_unusually_long_assignment_widens_all_columns_equally(make_tab):
     still widen a key -- every column then grows together, so the grid
     stays aligned instead of one column jumping."""
     tab = make_tab()
-    tab._key_buttons[(12, True)][1].configure(text="⚠⇧▸ABCDEFGHIJK")
-    tab._equalize_columns(tab._hp41_frame)
+    tab._key_buttons[(12, True)].configure(text="⚠⇧▸ABCDEFGHIJK")
+    tab._equalize_columns(tab._grid_frame)
     tab.update()
     widths = {}
     ends = {}
-    for cell in _grid_cells(tab._hp41_frame):
+    for cell in _grid_cells(tab._grid_frame):
         info = cell.grid_info()
         if int(info["columnspan"]) in (5, 6):
             count = GRID_COLUMNS // int(info["columnspan"])
@@ -406,20 +424,23 @@ def test_one_unusually_long_assignment_widens_all_columns_equally(make_tab):
 
 
 @pytest.mark.parametrize("size", [BASE_FONT_SIZE, 20])
-def test_the_column_widths_match_what_the_widgets_really_ask_for(make_tab, size):
+@pytest.mark.parametrize("profile", list(LAYOUTS))
+def test_the_column_widths_match_what_the_widgets_really_ask_for(
+    make_tab, size, profile
+):
     """_equalize_columns() works the widths out from the fonts and padding;
     this checks that against the widths Tk reports, on whatever platform
     the tests run (button padding differs between them)."""
-    tab = make_tab(size)
-    tab._key_buttons[(12, True)][1].configure(text="⚠⇧▸ABCDEFGHIJK")
-    for frame in (tab._dm41l_frame, tab._hp41_frame):
-        tab._equalize_columns(frame)
-        frame.update_idletasks()
-        measured = 0
-        for cell in _grid_cells(frame):
-            needed = cell.winfo_reqwidth() + 2 * kat.CELL_PADX
-            measured = max(measured, -(-needed // int(cell.grid_info()["columnspan"])))
-        assert frame.grid_columnconfigure(0)["minsize"] == measured
+    tab = make_tab(size, profile)
+    tab._key_buttons[(12, True)].configure(text="⚠⇧▸ABCDEFGHIJK")
+    frame = tab._grid_frame
+    tab._equalize_columns(frame)
+    frame.update_idletasks()
+    measured = 0
+    for cell in _grid_cells(frame):
+        needed = cell.winfo_reqwidth() + 2 * kat.CELL_PADX
+        measured = max(measured, -(-needed // int(cell.grid_info()["columnspan"])))
+    assert frame.grid_columnconfigure(0)["minsize"] == measured
 
 
 def test_equalizing_the_columns_does_not_flush_pending_drawing(make_tab, monkeypatch):
@@ -431,6 +452,5 @@ def test_equalizing_the_columns_does_not_flush_pending_drawing(make_tab, monkeyp
     tab = make_tab()
     flushes = []
     monkeypatch.setattr(tkinter.Misc, "update_idletasks", lambda self: flushes.append(self))
-    for frame in (tab._dm41l_frame, tab._hp41_frame):
-        tab._equalize_columns(frame)
+    tab._equalize_columns(tab._grid_frame)
     assert not flushes

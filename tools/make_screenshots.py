@@ -29,6 +29,12 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from PIL import ImageGrab  # noqa: E402
 
+from memory import DeviceMode  # noqa: E402
+
+# Short names for the two modes, for the table below.
+DM41L_MODE = DeviceMode.DM41L
+DM41X_MODE = DeviceMode.DM41X
+
 DATA = ROOT / "src" / "tests" / "data"
 DEFAULT_OUT = ROOT / "resources" / "screenshots"
 
@@ -36,29 +42,27 @@ DEFAULT_OUT = ROOT / "resources" / "screenshots"
 # depend on what is plugged into the machine that takes it.
 SAMPLE_PORTS = ["/dev/cu.usbmodem14101", "/dev/cu.Bluetooth-Incoming-Port"]
 
-# name -> (state file or None, tab, sub-tab or None, options)
+# name -> (state file or None, tab, mode, options)
 # options: "size" is the window size; "first_row" scrolls the Hex View so
 # that register address `first_row` is at the top.
+#
+# The mode matters since phase 6 of docs/dm41x_explorer_plan.md: it picks
+# the memory map a state is opened with, which keyboard the Key
+# Assignments tab draws, and whether the serial actions are available at
+# all. The two keyboards used to be sub-tabs of one view and were chosen
+# by name; now each needs its own mode.
 SHOTS = {
-    "overview": ("dm41x_manyfiles.dm41", "Overview", None, {}),
-    "flags_view": ("dm41x_manyfiles.dm41", "Flags", None, {}),
-    "program_view": ("dm41x_manyfiles.dm41", "Programs", None, {}),
-    "key_assigns_dm41l": (
-        "keyassigns.dm41",
-        "Key Assignments",
-        "DM41L",
-        {},
-    ),
-    "key_assigns_hp41": (
-        "keyassigns.dm41",
-        "Key Assignments",
-        "DM41X",
-        {},
-    ),
-    "registers_view": ("dm41x_manyfiles.dm41", "Data Registers", None, {}),
-    "xm_files": ("dm41x_manyfiles.dm41", "XM Files", None, {}),
-    "hex_view": ("dm41x_manyfiles.dm41", "Hex View", None, {"first_row": 0x178}),
-    "connection": (None, "Overview", None, {}),  # empty buffer plus the port dialog
+    "overview": ("dm41x_manyfiles.dm41", "Overview", DM41X_MODE, {}),
+    "flags_view": ("dm41x_manyfiles.dm41", "Flags", DM41X_MODE, {}),
+    "program_view": ("dm41x_manyfiles.dm41", "Programs", DM41X_MODE, {}),
+    "key_assigns_dm41l": ("keyassigns.dm41", "Key Assignments", DM41L_MODE, {}),
+    "key_assigns_hp41": ("keyassigns.dm41", "Key Assignments", DM41X_MODE, {}),
+    "registers_view": ("dm41x_manyfiles.dm41", "Data Registers", DM41X_MODE, {}),
+    "xm_files": ("dm41x_manyfiles.dm41", "XM Files", DM41X_MODE, {}),
+    "hex_view": ("dm41x_manyfiles.dm41", "Hex View", DM41X_MODE, {"first_row": 0x178}),
+    # The empty buffer plus the port dialog, so DM41L mode: a DM41X has
+    # no serial console and the Connect action refuses outright.
+    "connection": (None, "Overview", DM41L_MODE, {}),
 }
 
 
@@ -124,11 +128,27 @@ def grab(app, path):
     print("wrote", path)
 
 
-def pick_sub_tab(app, tab_name, sub_name):
-    tab = app._tabs[tab_name]
-    names = tab._layout_tabs._tab_dict.keys()
-    match = next(n for n in names if sub_name.lower() in n.lower())
-    tab._layout_tabs.set(match)
+def use_mode(app, app_module, mode):
+    """Puts the app in `mode`, which erases the open state -- so this runs
+    before the shot's own state is loaded.
+
+    Goes through the application's real set_mode() rather than poking
+    app.mode, so these pictures show what the app actually does; the
+    confirmation it asks for is answered yes, there being nobody here to
+    click it.
+
+    persist=True so the status bar reads plainly "DM41L mode" rather than
+    "DM41L mode (this session)", which is how an auto-switch override is
+    marked and would be a distraction in a picture. The preferences file
+    is the throwaway one in `scratch`."""
+    if app.mode is mode:
+        return
+    original = app_module.messagebox.askyesno
+    app_module.messagebox.askyesno = lambda *args, **kwargs: True
+    try:
+        app.set_mode(mode, persist=True)
+    finally:
+        app_module.messagebox.askyesno = original
 
 
 def main():
@@ -163,8 +183,9 @@ def main():
     settle(app, 1.0)
     try:
         for name in args.only or SHOTS:
-            state, tab, sub, options = SHOTS[name]
+            state, tab, mode, options = SHOTS[name]
             app.geometry(options.get("size", "1080x768") + "+40+40")
+            use_mode(app, app_module, mode)
             if state is None:
                 app.memory_source = None
                 app._on_state_received(app_module.Memory().to_string())
@@ -174,9 +195,6 @@ def main():
             app.tabview.set(tab)
             app._on_tab_changed()
             settle(app)
-            if sub:
-                pick_sub_tab(app, tab, sub)
-                settle(app)
             if "first_row" in options:
                 tree = app.hex_view_tab._tree
                 rows = tree.get_children()

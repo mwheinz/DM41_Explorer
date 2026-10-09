@@ -1,6 +1,18 @@
 """
-Preferences dialog: default serial port/baud/timeout, logging, appearance
-(mode, color theme, contrast), and font.
+Preferences dialog, in three tabs (GitHub issue #43):
+
+  General     the DM41L/DM41X mode, and logging (level, directory)
+  Appearance  light/dark, color theme, contrast, font
+  Connection  default serial port, baud rate, console timeout
+
+The mode is the odd one out: every other setting here is written straight
+to the config when Save is clicked, but changing mode erases the open
+memory state, so it needs a confirmation this dialog is the wrong place
+for. It is reported to the caller through `on_saved(requested_mode=...)`
+instead, and the application decides (see gui/app.py's set_mode()). The
+value shown is therefore always the *saved* mode, never a session-only
+override from an auto-switch on load -- the status bar is where that is
+shown (Mike, 2026-10-09).
 """
 
 import logging
@@ -10,8 +22,9 @@ from tkinter import filedialog, messagebox
 import tkinter.font as tkfont
 import customtkinter as ctk
 
+from memory import DeviceMode
 from gui.dialog_common import build_dialog_button_row, scaled
-from gui.contrast import WARNING_TEXT
+from gui.contrast import SECONDARY_TEXT, WARNING_TEXT
 from gui.tab_common import ui_font
 
 logger = logging.getLogger(__name__)
@@ -28,6 +41,24 @@ FONT_DEFAULT_LABEL = "System Default"
 FONT_SIZE_DEFAULT_LABEL = "Default"
 FONT_SIZES = ["9", "10", "11", "12", "13", "14", "16", "18", "20"]
 
+# The mode selector's choices, in the order they are offered. Taken from
+# DeviceMode so a model added later cannot be left out of the dialog.
+MODE_VALUES = [mode.value for mode in DeviceMode]
+
+# What each mode means, shown under the selector. Kept short: the full
+# consequence (the open state is erased) is in the confirmation the
+# application shows when the mode actually changes.
+MODE_HINTS = {
+    DeviceMode.DM41L: (
+        "DM41L: serial connection, 362 extended-memory registers,\n"
+        "and only the functions an HP-41CX has built in."
+    ),
+    DeviceMode.DM41X: (
+        "DM41X: no serial connection, 600 extended-memory registers,\n"
+        "and the DM41X's own functions as well."
+    ),
+}
+
 
 class PreferencesDialog(ctk.CTkToplevel):
     """
@@ -36,7 +67,7 @@ class PreferencesDialog(ctk.CTkToplevel):
     can refresh anything that depends on the config.
     """
 
-    def __init__(self, master, config, serial_manager, on_saved=None):
+    def __init__(self, master, config, serial_manager, on_saved=None, mode=None):
         super().__init__(master)
         self.title("Preferences")
         self.resizable(False, False)
@@ -48,14 +79,24 @@ class PreferencesDialog(ctk.CTkToplevel):
         self._config = config
         self._serial_manager = serial_manager
         self._on_saved = on_saved
+        # The SAVED mode, which the caller passes in; falling back to the
+        # config means a caller that does not pass one still shows the
+        # right thing rather than nothing.
+        self._saved_mode = DeviceMode.from_value(
+            mode if mode is not None else config.mode
+        )
 
         tabs = ctk.CTkTabview(self)
         tabs.pack(padx=16, pady=16, fill="both", expand=True)
+        # Issue #43: mode and logging first, then Appearance, then
+        # Connection. CTkTabview shows whichever was added first.
+        tabs.add("General")
+        tabs.add("Appearance")
         tabs.add("Connection")
-        tabs.add("Logging & Appearance")
 
+        self._build_general_tab(tabs.tab("General"))
+        self._build_appearance_tab(tabs.tab("Appearance"))
         self._build_connection_tab(tabs.tab("Connection"))
-        self._build_logging_tab(tabs.tab("Logging & Appearance"))
 
         build_dialog_button_row(
             self,
@@ -117,17 +158,73 @@ class PreferencesDialog(ctk.CTkToplevel):
             self._port_menu.configure(values=ports)
             self._port_var.set(ports[0])
 
-    # -- Logging & appearance tab ----------------------------------------
+    # -- General tab (mode, logging) --------------------------------------
 
-    def _build_logging_tab(self, tab):
-        ctk.CTkLabel(tab, text="Log level:").pack(anchor="w", padx=8, pady=(12, 4))
+    def _build_general_tab(self, tab):
+        ctk.CTkLabel(tab, text="Calculator model:").pack(
+            anchor="w", padx=8, pady=(12, 4)
+        )
+        self._mode_var = ctk.StringVar(value=self._saved_mode.value)
+        ctk.CTkOptionMenu(
+            tab,
+            values=MODE_VALUES,
+            variable=self._mode_var,
+            command=self._on_mode_chosen,
+        ).pack(anchor="w", padx=8, fill="x")
+        self._mode_hint = ctk.CTkLabel(
+            tab,
+            text=MODE_HINTS[self._saved_mode],
+            justify="left",
+            text_color=SECONDARY_TEXT,
+            font=ui_font(-2),
+        )
+        self._mode_hint.pack(anchor="w", padx=8, pady=(4, 0))
+        ctk.CTkLabel(
+            tab,
+            text="Changing the model starts a new, empty memory state.",
+            justify="left",
+            text_color=WARNING_TEXT,
+            font=ui_font(-2),
+        ).pack(anchor="w", padx=8, pady=(4, 0))
+
+        ctk.CTkLabel(tab, text="Log level:").pack(anchor="w", padx=8, pady=(16, 4))
         self._log_level_var = ctk.StringVar(value=self._config.logging_level.upper())
         ctk.CTkOptionMenu(tab, values=LOG_LEVELS, variable=self._log_level_var).pack(
             anchor="w", padx=8, fill="x"
         )
 
-        ctk.CTkLabel(tab, text="Appearance mode:").pack(
+        ctk.CTkLabel(tab, text="Log file directory:").pack(
             anchor="w", padx=8, pady=(16, 4)
+        )
+        dir_row = ctk.CTkFrame(tab, fg_color="transparent")
+        dir_row.pack(anchor="w", padx=8, fill="x")
+
+        self._log_dir_var = ctk.StringVar(value=str(self._config.log_directory))
+        ctk.CTkEntry(dir_row, textvariable=self._log_dir_var).pack(
+            side="left", fill="x", expand=True
+        )
+        ctk.CTkButton(
+            dir_row, text="Browse...", width=scaled(90), command=self._pick_log_directory
+        ).pack(side="left", padx=(8, 0))
+
+    def _on_mode_chosen(self, value):
+        """Keeps the hint under the selector in step with it. Nothing is
+        applied here: the mode only changes when Save is clicked, and then
+        only after the application's own confirmation."""
+        self._mode_hint.configure(
+            text=MODE_HINTS[DeviceMode.from_value(value, self._saved_mode)]
+        )
+
+    @property
+    def requested_mode(self) -> DeviceMode:
+        """The mode currently selected in the dialog."""
+        return DeviceMode.from_value(self._mode_var.get(), self._saved_mode)
+
+    # -- Appearance tab ---------------------------------------------------
+
+    def _build_appearance_tab(self, tab):
+        ctk.CTkLabel(tab, text="Appearance mode:").pack(
+            anchor="w", padx=8, pady=(12, 4)
         )
         self._appearance_var = ctk.StringVar(value=self._config.appearance_mode)
         ctk.CTkOptionMenu(
@@ -193,20 +290,6 @@ class PreferencesDialog(ctk.CTkToplevel):
             text_color=WARNING_TEXT,
             font=ui_font(-2),
         ).pack(anchor="w", padx=8, pady=(4, 0))
-
-        ctk.CTkLabel(tab, text="Log file directory:").pack(
-            anchor="w", padx=8, pady=(16, 4)
-        )
-        dir_row = ctk.CTkFrame(tab, fg_color="transparent")
-        dir_row.pack(anchor="w", padx=8, fill="x")
-
-        self._log_dir_var = ctk.StringVar(value=str(self._config.log_directory))
-        ctk.CTkEntry(dir_row, textvariable=self._log_dir_var).pack(
-            side="left", fill="x", expand=True
-        )
-        ctk.CTkButton(
-            dir_row, text="Browse...", width=scaled(90), command=self._pick_log_directory
-        ).pack(side="left", padx=(8, 0))
 
     def _pick_log_directory(self):
         chosen = filedialog.askdirectory(
@@ -276,7 +359,10 @@ class PreferencesDialog(ctk.CTkToplevel):
             logger.warning("Unable to save preferences %s", str(e))
 
         if self._on_saved:
-            self._on_saved()
+            # The mode is reported, not written: changing it erases the
+            # open state, so the application confirms it first and writes
+            # the preference only if the user goes ahead.
+            self._on_saved(requested_mode=self.requested_mode)
 
         self.grab_release()
         self.destroy()

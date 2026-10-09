@@ -408,9 +408,31 @@ def display_for_key_bytes(fn_byte1: int, fn_byte2: Optional[int]) -> str:
     return f"0x{fn_byte1:02X} 0x{fn_byte2:02X}"
 
 
-def assignable_display_names() -> List[str]:
+def is_available_on(op: Op, profile) -> bool:
+    """Whether a `profile` calculator actually has `op`.
+
+    Only XROMs can be missing: a single-byte function is part of every
+    HP-41's own instruction set, while an XROM comes from a module, and
+    `profile.builtin_xroms` is what that model has built in. A `profile`
+    of None means "any model", which is what every caller that does not
+    care about availability passes."""
+    if profile is None or op.kind is not OpKind.XROM:
+        return True
+    return op.code in profile.builtin_xroms
+
+
+def assignable_display_names(profile=None) -> List[str]:
     """Every key-assignable function's display name, sorted -- built-in
-    functions (including keyboard-only ones like CAT) and XROMs."""
+    functions (including keyboard-only ones like CAT) and XROMs.
+
+    With a `profile`, only the functions that model actually has: in
+    DM41L mode the key-assignment picker offers the HP-41CX set alone,
+    since a DM41L cannot run a DM41X function at all (Mike, 2026-10-09).
+    Without one, every registered function, which is what the mnemonic
+    reference and the import path want -- the registry always knows every
+    name whatever model is in force."""
     return sorted(
-        e.display for e in _REGISTRY.entries() if e.op.kind is not OpKind.KEYWORD
+        e.display
+        for e in _REGISTRY.entries()
+        if e.op.kind is not OpKind.KEYWORD and is_available_on(e.op, profile)
     )

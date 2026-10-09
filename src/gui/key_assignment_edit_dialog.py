@@ -28,6 +28,7 @@ from gui.contrast import SECONDARY_TEXT
 from gui.tab_common import MONOSPACE_FONT_FAMILY
 from memory.mnemonics import (
     assignable_display_names,
+    is_available_on,
     is_dm41x_only,
     key_bytes_for,
     resolve,
@@ -37,8 +38,11 @@ logger = logging.getLogger(__name__)
 
 PLATFORM_SYSTEM = platform.system()
 
-# Shown under the Function box when the chosen function is one the DM41X
-# added to the HP-41CX set. Assigning it is allowed on any model's state.
+# Shown under the Function box, in DM41X mode, when the chosen function
+# is one the DM41X added to the HP-41CX set: the state may still be sent
+# to a DM41L later, which would not have it. In DM41L mode such a
+# function is not offered at all (see _unavailable_message), so this hint
+# never appears there.
 _DM41X_ONLY_HINT = "DM41X only: a DM41L does not have this function."
 
 # Shown under the title when the key is assigned but its key flag is clear,
@@ -52,7 +56,19 @@ _FLAG_CLEAR_NOTE = (
 # single-byte and XROM/peripheral functions merged into one list, since
 # the picker doesn't need to distinguish them; memory/mnemonics.py
 # resolves whichever encoding a chosen name actually needs.
+# Every assignable name, whatever the model -- used only to tell a
+# genuinely unknown name from one this model happens not to have.
 _ALL_FUNCTION_NAMES = assignable_display_names()
+
+
+def _unavailable_message(name: str, profile) -> str:
+    """Why a known function cannot be assigned in this mode."""
+    return (
+        f"{name} is a DM41X function, and this state is a "
+        f"{profile.name}'s.\n\n"
+        f"A {profile.name} cannot run it, so it cannot be assigned to a "
+        "key here. Switch to DM41X mode to use it."
+    )
 
 
 def _hex_for_assignment(assignment) -> str:
@@ -103,6 +119,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         on_save,
         on_delete,
         flag_clear=False,
+        profile=None,
     ):
         super().__init__(master)
         shift_label = "shifted" if shifted else "unshifted"
@@ -119,6 +136,14 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
             assignment is not None or program_assignment is not None
         )
         self._program_names = sorted(program_names)
+        # The model this state belongs to, which decides which functions
+        # can be assigned at all. None means "do not filter", for a
+        # caller that has no profile to give.
+        self._profile = profile
+        # In DM41L mode the picker offers the HP-41CX set alone: a DM41L
+        # cannot run a DM41X function, so offering it would be a trap
+        # (Mike, 2026-10-09).
+        self._function_names = assignable_display_names(profile)
 
         if assignment is not None:
             current_text = f"Currently assigned: {assignment['name']}"
@@ -151,8 +176,8 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         # -- Function tab: pick a named built-in/peripheral function -----
         default_name = (
             assignment["name"]
-            if assignment is not None and assignment["name"] in _ALL_FUNCTION_NAMES
-            else (_ALL_FUNCTION_NAMES[0] if _ALL_FUNCTION_NAMES else "")
+            if assignment is not None and assignment["name"] in self._function_names
+            else (self._function_names[0] if self._function_names else "")
         )
         self._function_var = ctk.StringVar(value=default_name)
         ctk.CTkLabel(tabs.tab("Function"), text="Function:").pack(
@@ -160,7 +185,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         )
         ctk.CTkComboBox(
             tabs.tab("Function"),
-            values=_ALL_FUNCTION_NAMES,
+            values=self._function_names,
             variable=self._function_var,
             width=scaled(300),
         ).pack(anchor="w", padx=8, fill="x")
@@ -233,7 +258,11 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         # matching function name, or a name outside the known list) should
         # land on Raw Hex rather than silently defaulting to some
         # unrelated function.
-        if assignment is not None and assignment["name"] not in _ALL_FUNCTION_NAMES:
+        # A name this model does not have counts as unrepresentable here
+        # too, not just an unknown one: in DM41L mode a state that already
+        # has LKAOFF on a key opens on Raw Hex, which is honest -- the
+        # Function tab cannot offer that name.
+        if assignment is not None and assignment["name"] not in self._function_names:
             tabs.set("Raw Hex")
         elif assignment is None and program_assignment is not None:
             tabs.set("Program")
@@ -260,7 +289,13 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
             op = resolve(self._function_var.get().strip(), programmable_only=False)
         except ValueError:
             op = None  # empty, half-typed or unknown: Save reports it
-        dm41x_only = op is not None and is_dm41x_only(op)
+        # Only worth saying in a mode that actually has the function: in
+        # DM41L mode it is refused on Save instead, with a reason.
+        dm41x_only = (
+            op is not None
+            and is_dm41x_only(op)
+            and is_available_on(op, self._profile)
+        )
         self._dm41x_hint.configure(text=_DM41X_ONLY_HINT if dm41x_only else "")
 
     def _on_save_clicked(self):
@@ -277,6 +312,11 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
                 # (CAT, SST, ...) are assignable, so programmable_only is
                 # off. An unknown name raises with "did you mean" hints.
                 op = resolve(name, programmable_only=False)
+                # A typed name bypasses the filtered dropdown, so the
+                # availability check has to be here as well, or the filter
+                # is only cosmetic.
+                if not is_available_on(op, self._profile):
+                    raise ValueError(_unavailable_message(name, self._profile))
                 kind, value = "function", key_bytes_for(op)
             elif which == "Raw Hex":
                 text = self._hex_var.get().strip().replace(" ", "")

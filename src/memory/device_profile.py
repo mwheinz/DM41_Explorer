@@ -7,13 +7,20 @@ text format (a DM41L `.dm41` state and a DM41X `.d41` state file are the same
 format, with the same `DM41` header line), so a file cannot say which model
 wrote it. The caller says: Memory.from_string(text, profile=DM41X).
 
-A profile holds the list of extended-memory regions and the set of XROM
-functions the model has built in. Each region is (lo, hi): `lo` is the
-region's reserved pointer/link register and the usable registers are
-lo+1 .. hi inclusive -- see docs/extended_memory.md. An XROM is identified by
-its (byte1, byte2) pair, as in memory/functions.py.
+A profile holds the list of extended-memory regions, the set of XROM
+functions the model has built in, and whether the model can be reached over
+a serial console. Each region is (lo, hi): `lo` is the region's reserved
+pointer/link register and the usable registers are lo+1 .. hi inclusive --
+see docs/extended_memory.md. An XROM is identified by its (byte1, byte2)
+pair, as in memory/functions.py.
+
+DeviceMode, at the end of this module, is the user-facing choice of which
+profile the application works in (docs/dm41x_explorer_plan.md phase 6). The
+mode is the single source of truth for the active profile: not the file's
+extension, and not what is plugged in.
 '''
 
+import enum
 from dataclasses import dataclass
 from typing import FrozenSet, Tuple
 
@@ -30,11 +37,19 @@ class DeviceProfile:
     functions.XROM_FUNCTIONS, whatever profile is in use, so a program using
     a DM41X function still compiles and decompiles. Something that needs to
     know whether a given model can run it (the check before sending a state
-    to a DM41L) asks the profile.'''
+    to a DM41L) asks the profile.
+
+    `supports_serial` is whether this model has a serial console at all, and
+    so whether the application's Connect/Get/Send actions mean anything in
+    its mode. It is a property of the model, deliberately not a test against
+    `name`: the DM41XN has both a FAT disk and a serial interface, so adding
+    its profile later must not require revisiting every gating decision.
+    Defaults to False, so a new profile has to opt in.'''
 
     name: str
     xm_regions: Tuple[Tuple[int, int], ...]
     builtin_xroms: FrozenSet[Tuple[int, int]]
+    supports_serial: bool = False
 
     def __post_init__(self):
         if not self.xm_regions:
@@ -84,17 +99,71 @@ DM41L = DeviceProfile(
     "DM41L",
     ((0x40, 0xBF), (0x201, 0x2EF)),
     frozenset(CX_XROM_FUNCTIONS),
+    supports_serial=True,
 )
 
 # The DM41X adds a second Extended Memory module at 0x301-0x3EF -- confirmed
 # against tests/data/dm41x_manyfiles.dm41, a real state whose files span all
 # three regions. Its XROMs are the CX set plus its own additions (X<I>Y, TRNG
 # and the DM41X module), which is all of functions.XROM_FUNCTIONS. The
-# DM41XN is treated identically (docs/dm41x_explorer_plan.md).
+# DM41XN is treated identically (docs/dm41x_explorer_plan.md), except that
+# its newer USB interface does offer a serial console; when its own profile
+# is added it will set supports_serial=True. The DM41X is strictly
+# file-based, so its mode offers no serial actions.
 DM41X = DeviceProfile(
     "DM41X",
     ((0x40, 0xBF), (0x201, 0x2EF), (0x301, 0x3EF)),
     frozenset(XROM_FUNCTIONS),
+    supports_serial=False,
 )
 
 PROFILES = {profile.name: profile for profile in (DM41L, DM41X)}
+
+
+class DeviceMode(enum.Enum):
+    '''Which calculator the application is working as, chosen by the user
+    and persisted in the preferences file (config.py's "mode").
+
+    One mode per profile, and the mode picks the profile for everything:
+    the memory map a state is opened with, the XM capacity the Overview
+    reports, the keyboard layout the Key Assignments tab draws, the
+    functions its edit dialog offers, and whether the serial actions are
+    available at all.
+
+    A real enumerated type rather than bare strings, because this is a
+    closed set of named modes; `value` is the stored/display name, which is
+    also the profile's own `name`.'''
+
+    DM41L = "DM41L"
+    DM41X = "DM41X"
+
+    @property
+    def profile(self) -> DeviceProfile:
+        '''The DeviceProfile this mode works in.'''
+        return PROFILES[self.value]
+
+    @property
+    def supports_serial(self) -> bool:
+        '''Whether the serial actions mean anything in this mode. Asks the
+        profile; never tests the mode's name.'''
+        return self.profile.supports_serial
+
+    @classmethod
+    def from_value(cls, value, default: "DeviceMode" = None) -> "DeviceMode":
+        '''The mode named `value`, or `default` (DEFAULT_MODE when that is
+        omitted too) for anything unrecognised -- a hand-edited preferences
+        file, or a key written by a newer version. Never raises: a bad
+        setting must not stop the application starting.'''
+        if isinstance(value, cls):
+            return value
+        for mode in cls:
+            if mode.value == value:
+                return mode
+        return DEFAULT_MODE if default is None else default
+
+
+# What a user with no `mode` in their preferences file gets. The DM41X is
+# the more common device (Mike, 2026-10-09), so it is the default -- note
+# that this means an existing DM41L owner's states report the DM41X's XM
+# totals until they set the mode themselves.
+DEFAULT_MODE = DeviceMode.DM41X

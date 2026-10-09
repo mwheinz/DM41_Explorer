@@ -26,6 +26,9 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from gui.key_assignment_edit_dialog import KeyAssignmentEditDialog
+from memory import DM41L, DM41X
+from memory.functions import XROM_FUNCTIONS
+from memory.mnemonics import key_bytes_for, resolve
 
 
 @pytest.fixture
@@ -44,6 +47,7 @@ def _make_dialog(
     program_assignment=None,
     program_names=(),
     flag_clear=False,
+    profile=None,
 ):
     return KeyAssignmentEditDialog(
         root,
@@ -55,6 +59,7 @@ def _make_dialog(
         on_save=on_save or mock.Mock(),
         on_delete=on_delete or mock.Mock(),
         flag_clear=flag_clear,
+        profile=profile,
     )
 
 
@@ -276,3 +281,125 @@ def test_flag_clear_note_is_shown_only_when_the_flag_is_clear(root):
 
     assert note_shown(_make_dialog(root, flag_clear=True))
     assert not note_shown(_make_dialog(root))
+
+
+# -- The function list follows the mode (plan, phase 6) ----------------------
+#
+# In DM41L mode the picker offers only the functions a DM41L has: a DM41L
+# cannot run a DM41X function, so offering it would be a trap (Mike,
+# 2026-10-09). The 18 DM41X additions are X<I>Y, TRNG and the DM41X
+# module's 16.
+
+
+def test_the_picker_offers_every_function_in_dm41x_mode(root):
+    dialog = _make_dialog(root, profile=DM41X)
+    assert "LKAOFF" in dialog._function_names
+    assert "X<I>Y" in dialog._function_names
+    assert "COS" in dialog._function_names
+
+
+def test_the_picker_hides_dm41x_functions_in_dm41l_mode(root):
+    dialog = _make_dialog(root, profile=DM41L)
+    assert "LKAOFF" not in dialog._function_names
+    assert "X<I>Y" not in dialog._function_names
+    assert "COS" in dialog._function_names, "the CX set is still offered"
+
+
+def test_the_two_lists_differ_by_exactly_the_dm41x_additions(root):
+    """Pinned against the profiles themselves, so a function added to
+    either model's built-in set cannot silently change the picker."""
+    wide = _make_dialog(root, profile=DM41X)._function_names
+    narrow = _make_dialog(root, profile=DM41L)._function_names
+    added = {XROM_FUNCTIONS[code] for code in DM41X.builtin_xroms - DM41L.builtin_xroms}
+    assert set(wide) - set(narrow) == added
+    assert len(added) == 18
+
+
+def test_no_profile_offers_everything(root):
+    """A caller with no profile to give gets the unfiltered list, which is
+    what the import path and the mnemonic reference want."""
+    dialog = _make_dialog(root, profile=None)
+    assert "LKAOFF" in dialog._function_names
+
+
+def test_a_typed_dm41x_function_is_refused_in_dm41l_mode(root):
+    """Typing bypasses the dropdown, so the filter has to be enforced on
+    Save too, or it is only cosmetic."""
+    on_save = mock.Mock()
+    dialog = _make_dialog(root, on_save=on_save, profile=DM41L)
+    dialog._tabs.set("Function")
+    dialog._function_var.set("LKAOFF")
+
+    with mock.patch.object(messagebox, "showerror") as error:
+        dialog._on_save_clicked()
+
+    on_save.assert_not_called()
+    assert error.called
+    message = error.call_args.args[1]
+    assert "DM41X function" in message
+    assert "DM41L" in message
+
+
+def test_a_typed_dm41x_function_is_accepted_in_dm41x_mode(root):
+    on_save = mock.Mock()
+    dialog = _make_dialog(root, on_save=on_save, profile=DM41X)
+    dialog._tabs.set("Function")
+    dialog._function_var.set("LKAOFF")
+
+    with mock.patch.object(messagebox, "showerror") as error:
+        dialog._on_save_clicked()
+
+    error.assert_not_called()
+    kind, value = on_save.call_args.args
+    assert kind == "function"
+    assert value == key_bytes_for(resolve("LKAOFF", programmable_only=False))
+
+
+def test_an_unknown_name_still_reports_itself_as_unknown(root):
+    """The availability check must not swallow the "did you mean" help for
+    a name that is not a function at all."""
+    dialog = _make_dialog(root, profile=DM41L)
+    dialog._tabs.set("Function")
+    dialog._function_var.set("NOTAFUNCTION")
+
+    with mock.patch.object(messagebox, "showerror") as error:
+        dialog._on_save_clicked()
+
+    assert "DM41X function" not in error.call_args.args[1]
+
+
+def test_the_dm41x_hint_only_appears_in_a_mode_that_has_the_function(root):
+    """In DM41X mode the hint is worth saying: the state may be sent to a
+    DM41L later. In DM41L mode the function cannot be assigned at all, so
+    the hint would be the wrong message."""
+    wide = _make_dialog(root, profile=DM41X)
+    wide._function_var.set("LKAOFF")
+    assert "DM41X only" in wide._dm41x_hint.cget("text")
+
+    narrow = _make_dialog(root, profile=DM41L)
+    narrow._function_var.set("LKAOFF")
+    assert narrow._dm41x_hint.cget("text") == ""
+
+
+def test_the_hint_stays_empty_for_a_function_both_models_have(root):
+    dialog = _make_dialog(root, profile=DM41X)
+    dialog._function_var.set("COS")
+    assert dialog._dm41x_hint.cget("text") == ""
+
+
+def test_an_existing_dm41x_assignment_opens_on_raw_hex_in_dm41l_mode(root):
+    """A state can already have LKAOFF on a key (saved in DM41X mode, or
+    made on the calculator). The Function tab cannot offer that name in
+    DM41L mode, so the dialog opens on Raw Hex rather than silently
+    showing some unrelated function."""
+    byte1, byte2 = key_bytes_for(resolve("LKAOFF", programmable_only=False))
+    assignment = {
+        "name": "LKAOFF",
+        "fn_byte1": byte1,
+        "fn_byte2": byte2,
+        "key_number": 1,
+        "shifted": False,
+        "raw_key_byte": 0x01,
+    }
+    dialog = _make_dialog(root, assignment=assignment, profile=DM41L)
+    assert dialog._tabs.get() == "Raw Hex"

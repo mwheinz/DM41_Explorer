@@ -1,17 +1,27 @@
 """
-Key Assignments tab: two synchronized keypad-shaped grids ("DM41L" and
-"DM41X", docs/key_assignments.md sec 6 item 4), each on its own sub-tab
-(issue #39 -- DM41L first, DM41X second), for viewing and editing
-key assignments -- both the built-in/peripheral kind (sec 4.2, stored in
-the Key Assignment Registers) and global-label/program assignments (sec
-4.6, stored inside the program's own header instead). Both grids render
-the exact same 34 assignable keys, just laid out to match a different
-physical keyboard -- an edit made through either grid is immediately
-reflected in the other, since both are just two different arrangements of
-the same Memory calls: get_key_assignment()/set_key_assignment()/
-delete_key_assignment() for the first kind, get_program_for_key()/
-set_program_key_assignment()/clear_program_key_assignment() for the
-second (see gui/key_assignment_edit_dialog.py's "Program" tab).
+Key Assignments tab: a keypad-shaped grid of the 34 assignable keys, for
+viewing and editing key assignments -- both the built-in/peripheral kind
+(docs/key_assignments.md sec 4.2, stored in the Key Assignment Registers)
+and global-label/program assignments (sec 4.6, stored inside the
+program's own header instead), through
+get_key_assignment()/set_key_assignment()/delete_key_assignment() and
+get_program_for_key()/set_program_key_assignment()/clear_program_key_assignment()
+respectively (see gui/key_assignment_edit_dialog.py's "Program" tab).
+
+**One keyboard at a time.** Both models assign the same 34 keys, but
+their physical keyboards lay them out differently (see
+docs/key_assignments.md, "Keyboard layouts"), so there are two layout
+tables below. Issue #39 originally showed both at once, on a sub-tab
+each; phase 6 of docs/dm41x_explorer_plan.md supersedes that (Mike,
+2026-10-09): the grid shown is the one for the model the app is working
+as, and the other is not drawn at all.
+
+The layout follows the rendered state's own `profile`, which is the
+mode's profile by construction -- the application builds every Memory
+with it (gui/app.py's `profile` property). So this tab needs no mode of
+its own to consult, and cannot disagree with the rest of the app about
+which model is in force. A mode change replaces the Memory, and render()
+notices the profile has changed and rebuilds the grid.
 
 Per the real lookup order (docs sec 4.7), a Key Assignment Register entry
 always takes priority over a global-label one on the same key -- this
@@ -89,9 +99,21 @@ DM41L_LAYOUT = [
     ["ON", "SHIFT", "ALPHA", 33, 34, 41, 81, 82, 83, 84],
 ]
 
-# Sub-tab names for the two layouts (issue #39), in display order.
-DM41L_TAB = "DM41L"
-DM41X_TAB = "DM41X"
+# Which physical layout each model's grid uses, by profile name. A
+# profile whose name is missing here falls back to the DM41X's classic
+# HP-41 arrangement, which is the one every other model derives from.
+LAYOUT_BY_PROFILE = {
+    "DM41L": DM41L_LAYOUT,
+    "DM41X": DM41X_LAYOUT,
+}
+FALLBACK_LAYOUT = DM41X_LAYOUT
+
+
+def layout_for_profile(profile):
+    """The keyboard layout table to draw for `profile`."""
+    if profile is None:
+        return FALLBACK_LAYOUT
+    return LAYOUT_BY_PROFILE.get(profile.name, FALLBACK_LAYOUT)
 
 UNASSIGNED_TEXT = SECONDARY_TEXT
 UNASSIGNED_FG = ("gray85", "gray24")
@@ -287,14 +309,17 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         super().__init__(master, **kwargs)
         self._memory: Memory = None
         self._on_change = on_change
-        self._grids_built = False
-        # (key_number, shifted) -> list of CTkButton, populated once by
-        # _build_grid() and reused by _refresh_buttons() from then on. A
-        # list, not a single button, because the DM41L and DM41X layouts
-        # both reference the same 34 key numbers (just arranged
-        # differently) -- each key number maps to one button per grid, and
-        # both need to stay in sync. Order within each list follows grid
-        # build order in render(): DM41L button first, DM41X second.
+        # The layout currently built, by profile name, or None when no
+        # grid is built. Rebuilt when a state with a different profile
+        # arrives (i.e. the mode changed).
+        self._built_for = None
+        # (key_number, shifted) -> CTkButton, populated by _build_grid()
+        # and reused by _refresh_buttons() from then on. Exactly one
+        # button each: only one keyboard is drawn (phase 6), and
+        # layout_placements() merges a double-size key's repeated
+        # positions into a single cell, so ENTER is one key with one pair
+        # of buttons like any other. (It was a list of two while both
+        # grids were drawn at once -- one button per grid.)
         self._key_buttons = {}
 
         # Fonts and sizes for the keys, all from the application font
@@ -318,16 +343,14 @@ class KeyAssignmentsTab(ctk.CTkFrame):
             "assignments isn't handled here yet.",
         )
 
-        # Issue #39: one sub-tab per keyboard layout, instead of both
-        # grids stacked in a single scrolling frame. The DM41L layout comes
-        # first since it's the keyboard actually in the user's hand; the
-        # classic DM41X layout is second. CTkTabview keeps whichever sub-tab
-        # was last selected across render() calls, since render() never
-        # rebuilds the tabview itself (see the module docstring).
-        self._layout_tabs = ctk.CTkTabview(self)
-        self._layout_tabs.pack(fill="both", expand=True, padx=8, pady=(0, 8))
-        self._dm41l_frame = self._build_layout_tab(DM41L_TAB)
-        self._hp41_frame = self._build_layout_tab(DM41X_TAB)
+        # One scrolling frame holding one grid: the keyboard of the model
+        # the app is working as (phase 6). The frame scrolls because the
+        # DM41X's 8-row grid can be taller than a small window.
+        self._scroll = ctk.CTkScrollableFrame(self)
+        self._scroll.pack(fill="both", expand=True, padx=8, pady=(0, 8))
+        bind_touchpad_scroll(self._scroll)
+        self._grid_frame = ctk.CTkFrame(self._scroll, fg_color="transparent")
+        self._grid_frame.pack(anchor="w", padx=4, pady=4)
 
         # A throwaway button, never packed/gridded, just to read back
         # CustomTkinter's own theme defaults for fg_color/text_color --
@@ -339,22 +362,6 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         self._default_text_color = probe.cget("text_color")
         probe.destroy()
 
-    def _build_layout_tab(self, name: str):
-        """Adds one sub-tab to self._layout_tabs and returns the empty
-        frame its keypad grid will be built into (by _build_grid(), on the
-        first render()). Each sub-tab gets its own scrollable frame -- the
-        8-row DM41X grid can be taller than a small window. Having one
-        bind_touchpad_scroll() per frame is safe: its handler skips any
-        frame that isn't currently mapped, and CTkTabview unmaps every
-        sub-tab except the selected one."""
-        tab = self._layout_tabs.add(name)
-        scroll = ctk.CTkScrollableFrame(tab)
-        scroll.pack(fill="both", expand=True)
-        bind_touchpad_scroll(scroll)
-        grid_frame = ctk.CTkFrame(scroll, fg_color="transparent")
-        grid_frame.pack(anchor="w", padx=4, pady=4)
-        return grid_frame
-
     def _notify_change(self):
         if self._on_change:
             self._on_change()
@@ -364,7 +371,7 @@ class KeyAssignmentsTab(ctk.CTkFrame):
 
         if memory is None:
             self._header_label.configure(text="(no memory state loaded)")
-            if self._grids_built:
+            if self._built_for is not None:
                 self._teardown_grids()
             return
 
@@ -377,10 +384,13 @@ class KeyAssignmentsTab(ctk.CTkFrame):
 
         self._header_label.configure(text=self._header_text(count))
 
-        if not self._grids_built:
-            self._build_grid(self._dm41l_frame, DM41L_LAYOUT)
-            self._build_grid(self._hp41_frame, DM41X_LAYOUT)
-            self._grids_built = True
+        # A mode change hands this tab a Memory with a different profile,
+        # which means a different keyboard: rebuild rather than relabel.
+        if self._built_for != memory.profile.name:
+            if self._built_for is not None:
+                self._teardown_grids()
+            self._build_grid(self._grid_frame, layout_for_profile(memory.profile))
+            self._built_for = memory.profile.name
 
         self._refresh_buttons()
 
@@ -394,12 +404,10 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         return text
 
     def _teardown_grids(self):
-        for widget in self._dm41l_frame.winfo_children():
-            widget.destroy()
-        for widget in self._hp41_frame.winfo_children():
+        for widget in self._grid_frame.winfo_children():
             widget.destroy()
         self._key_buttons = {}
-        self._grids_built = False
+        self._built_for = None
 
     # -- Grid construction (once) -------------------------------------------
 
@@ -450,7 +458,7 @@ class KeyAssignmentsTab(ctk.CTkFrame):
                 padx=2,
                 pady=(0, 3 if shifted else 1),
             )
-            self._key_buttons.setdefault((key_number, shifted), []).append(btn)
+            self._key_buttons[(key_number, shifted)] = btn
 
     @staticmethod
     def _grid_cell(cell, placement: CellPlacement):
@@ -530,7 +538,7 @@ class KeyAssignmentsTab(ctk.CTkFrame):
 
     def _refresh_buttons(self):
         flag_clear = set(self._memory.key_assignments.flag_clear_assignments())
-        for (key_number, shifted), btns in self._key_buttons.items():
+        for (key_number, shifted), btn in self._key_buttons.items():
             assignment, program = self._resolve_key(key_number, shifted)
             prefix = "⇧" if shifted else ""
             if assignment or program:
@@ -550,10 +558,8 @@ class KeyAssignmentsTab(ctk.CTkFrame):
                 text = f"{prefix}--"
                 fg_color = UNASSIGNED_FG
                 text_color = UNASSIGNED_TEXT
-            for btn in btns:
-                btn.configure(text=text, fg_color=fg_color, text_color=text_color)
-        self._equalize_columns(self._dm41l_frame)
-        self._equalize_columns(self._hp41_frame)
+            btn.configure(text=text, fg_color=fg_color, text_color=text_color)
+        self._equalize_columns(self._grid_frame)
 
     # -- Editing ------------------------------------------------------------
 
@@ -623,4 +629,7 @@ class KeyAssignmentsTab(ctk.CTkFrame):
             delete,
             flag_clear=(key_number, shifted)
             in self._memory.key_assignments.flag_clear_assignments(),
+            # The model this state belongs to: in DM41L mode the dialog
+            # offers only the functions a DM41L has (phase 6).
+            profile=self._memory.profile,
         )

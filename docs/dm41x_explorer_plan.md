@@ -1,6 +1,6 @@
 # DM41X Support Plan
 
-2026-10-05 · revised 2026-10-07 · Michael Heinz (drafted with Claude)
+2026-10-05 · revised 2026-10-09 · Michael Heinz (drafted with Claude)
 
 Replaces the 2026-09-28 file-manager-first plan (still in git history, last committed in `ad66d8d`). That plan started from the DM41X's FAT disk. This one starts from the memory module, because everything else depends on it.
 
@@ -15,8 +15,8 @@ Replaces the 2026-09-28 file-manager-first plan (still in git history, last comm
 | Topic | Decision |
 | --- | --- |
 | Models | DM41X and DM41XN are treated identically. The extra XROMs are the same on both. |
-| Model detection | None. A `.d41` and a `.dm41` are the same text format, and nothing in the file says which model wrote it except the extension. No auto-detect, no manual override, no model selector in the web app. |
-| Executable | One app, **DM41_Explorer**, instead of separate DM41L_, DM41X_ and DM41XN_Explorer builds (supersedes the 2026-09-28 naming). Every state file opens with the DM41X profile. The only model-specific behaviour is the upload check, which uses the target profile **declared by the connection driver**: the serial driver declares the DM41L. A later DM41XN serial driver would declare its own profile without changing the check. |
+| Model detection | **Superseded 2026-10-09 by phase 6 (issue #43):** the user sets an explicit DM41L/DM41X mode, and the mode picks the profile. What still stands: a `.d41` and a `.dm41` are the same text format and nothing inside a file says which model wrote it, so there is no auto-detect *from the file*, and no model selector in the web app's first release. |
+| Executable | One app, **DM41_Explorer**, instead of separate DM41L_, DM41X_ and DM41XN_Explorer builds (supersedes the 2026-09-28 naming). **Amended 2026-10-09 (phase 6):** a state file opens with the current *mode's* profile, not always the DM41X's. The upload check still uses the target profile **declared by the connection driver** (the serial driver declares the DM41L), which is a separate thing from the app's mode. A later DM41XN serial driver would declare its own profile without changing the check. |
 | Terminology | "Memory state" replaces "memory dump" and "dump" for every model, in the UI, docs and code (phase 3, step 8). `.dm41` and `.d41` stay as file extensions. |
 | Protecting the DM41L | The check runs only when **uploading** a state/dump to a DM41L (Send Dump). XM data that does not fit a DM41L is an **error**. Any XROM the DM41L does not have built in (the DM41X's additions, or an XROM from another module) is a **warning**, because the user may mean to edit the program on the DM41L and replace it. Opening and saving files, including large states, is never restricted. |
 | Revisit | If LKAOFF or FAST turn out to change what is stored in a state file, model detection and the checks above get revisited. |
@@ -220,7 +220,7 @@ Scope is the first-release decision: the DM41L's 95 plus the DM41X's additions. 
 - **Checks.** The one-off diff of modules 25 and 26 against `hp41ucg.h`: 112 entries agree by number and canonical name, and the only extra is X<I>Y. Five deliberately wrong versions of the change (a wrong byte, no `ED$` alias, the DM41L given every XROM, the flag never set, the dialog hint not following the box) were each caught by a test. New tests are in `tests/test_dm41x_xroms.py`, with additions to `test_mnemonic_doc.py` and `test_key_assignment_edit_dialog.py`; `test_xm_three_regions.py` passes the new `builtin_xroms` argument.
 
 - Add the 18 entries (X<I>Y, TRNG and the 16 DM41X-module functions) to `memory/functions.py`. All 18 are confirmed by `dm41xn.dm41` and `xrom.d41`/`xrom.raw` (S5). Add `ED$` as an accepted spelling of 25,51 (the DM41X's name for ED, manual §3.8.4) as a Layer 2 entry in `mnemonic_dialects.py` with that manual as its source; the canonical name stays `ED`. `mnemonics.py` builds its registry from that table, so import, aliases, "did you mean" and the key-assignment name list follow automatically. At this size, with names and codes also printed in the DM41X manual, it is small enough to type by hand and check against hp41uc; no bulk import of hp41uc's table is needed.
-- **One function table, availability in the profile.** The table of names and codes stays in `functions.py` and is not split by model, because every state file opens with the DM41X profile and the registry must always resolve the additions (a text using `LKAOFF` must compile whatever profile is active). Give each entry a "since" flag (original CX modules, or DM41X). `DeviceProfile` then exposes `builtin_xroms`, derived from that flag: the DM41L's 95, and the DM41X's 95 plus the 18 additions. Phase 2 uses it, and the DM41X-only marks below come from the same flag, so nothing is stored twice.
+- **One function table, availability in the profile.** The table of names and codes stays in `functions.py` and is not split by model, because the registry must always resolve the additions whatever profile is active: a text using `LKAOFF` must still compile. (The original reason given here was that every state file opens with the DM41X profile; **phase 6 removed that**, but the conclusion is unchanged — program import warns about nothing, so DM41L mode still has to compile a DM41X name. Phase 6's one restriction is the key-assignment *list*, which filters on `profile.builtin_xroms` and not on the registry.) Give each entry a "since" flag (original CX modules, or DM41X). `DeviceProfile` then exposes `builtin_xroms`, derived from that flag: the DM41L's 95, and the DM41X's 95 plus the 18 additions. Phase 2 uses it, and the DM41X-only marks below come from the same flag, so nothing is stored twice.
 - Mark the additions as DM41X-only in the Key Assignments dropdown and in the generated mnemonic reference, grouped under their hp41uc section headers ("-DM 41X-"), taken from the same "since" flag.
 - Regenerate `docs/function_table.md` and the mnemonic reference (`mnemonic_doc.py`), and update `docs/mnemonics.md`.
 - **Tests.** `dm41xn.txt` written with names (`X<I>Y`, `TRNG`) compiles to the bytes in `dm41xn.dm41` and decompiles to `XROM 25,63 ;X<I>Y` and `XROM 26,36 ;TRNG` (already checked in a scratch copy; this makes it permanent). The 16 DM41X-module functions compile to the exact bytes in `xrom.raw` (S5) and decompile back; every new name resolves by canonical, case and space variants; a key assignment of a new XROM round-trips (S6); a one-off diff of modules 25 and 26 against `hp41ucg.h` shows agreement for every function except the new X<I>Y. `DM41L.builtin_xroms` is exactly the original 95 and `DM41X.builtin_xroms` is those plus the 18.
@@ -253,7 +253,7 @@ Tests: `test_profile_fit.py` (100: every DM41L capture, opened both ways, has no
 
 Make the existing tabs work, in this order, on `dm41x_manyfiles.dm41` and the S-samples. Each tab gets a test that fails if it still assumes two regions or 0x2EF.
 
-1. Open/Save use `.d41` as well as `.dm41` (until then, `.d41` samples are renamed to `.dm41` by hand, and nothing else about them changes) and keep the file's own extension on Save. Files open with the DM41X profile in every app, since it is a superset of the DM41L's, so a large state opens, displays and saves in DM41_Explorer without loss. A memory state read from a live DM41L over serial still uses the DM41L profile (the serial driver declares it, see phase 2). The phase 2 check applies only at upload. Whether a `.dm41` file should also display with the DM41L profile is an open question below.
+1. Open/Save use `.d41` as well as `.dm41` (until then, `.d41` samples are renamed to `.dm41` by hand, and nothing else about them changes) and keep the file's own extension on Save. Files open with the DM41X profile in every app, since it is a superset of the DM41L's, so a large state opens, displays and saves in DM41_Explorer without loss. A memory state read from a live DM41L over serial still uses the DM41L profile (the serial driver declares it, see phase 2). The phase 2 check applies only at upload. Whether a `.dm41` file should also display with the DM41L profile is an open question below. **Superseded 2026-10-09 (phase 6):** a file opens with the current mode's profile, and that open question is answered there.
 2. Replace references to “Dump” in the GUI with “State”.
 3. Rename the application to “DM41_Explorer”.
 4. **XM Files** and **Hex View**: walk three regions and show addresses up to 0x3EF (`profile.display_end`).
@@ -295,7 +295,7 @@ Still to do in phase 3: nothing in the list above; see the next block.
 
 - **No automatic connection at launch (Mike, 2026-10-06).** The app starts offline: `attempt_auto_connect()` and its 100 ms start-up call are gone, so no port is listed, opened or prompted for until the user chooses Connect > Connect / Reconnect... (Ctrl/Cmd+K). The rest of the connect sequence (battery check, console timeout, time, and reading the memory if no state is open or modified) is unchanged and runs after a manual connect. The saved port is still preselected in the dialog. `test_the_app_starts_offline_and_never_touches_the_serial_port` fails if anything touches the serial layer within 0.4 s of launch. README "Launching the app" rewritten to match.
 - **Steps 2 and 10 (Dump → State).** Menu labels are now `Open State...`, `Save State`, `Save State As...`, `Get State from DM41L`, `Send State to DM41L` (the shorter wording, per Mike). Done across the GUI text, status and error messages, log lines, docstrings and comments, identifiers (`load_state_from_file`, `save_state_to_file`, `save_state_as`, `get_state_from_calculator`, `send_state_to_calculator`, `open_state_file`, `_on_state_received`, ...), tests, README, CONTRIBUTING, `resources/dist_readme.txt`, the macOS document type name (`DM41 Memory State`) and all docs except the dated records. `docs/dump_format.md` is now `docs/state_format.md`, with links fixed (including in the dated first-look note: only the link target). Reviewed exceptions that still say "dump": `json.dump`/`json.dumps` (`config.py`, two tests), the fixture name `largedump.dm41` (two comments in `xm_file.py`), "hex dump" (the Hex View docstrings), and the dated records (`dm41x_first_look_2026-10-04.md` and the earlier sections of this plan). The calculator's own `s` command is now described as sending its memory state; no serial protocol changed.
-- **Steps 3 and 11 (one executable named DM41_Explorer).** Window title, About box, log line, preferences dialog, README, CONTRIBUTING, docs and the build chain use `DM41_Explorer`. `DM41LExplorerApp` is now `DM41ExplorerApp`. Build chain: `src/dm41l.spec` → `src/dm41explorer.spec`, generated `dm41lversion.py` → `dm41version.py` (this also fixes the spec, whose `hiddenimports` and comments already said `dm41version`), executable and folder `dm41explorer`, macOS bundle `DM41_Explorer.app`, release assets `DM41_Explorer-<tag>-<platform>.zip`, artifact names `dm41-explorer-<os>`, log file `dm41_explorer.log`. **Kept on purpose:** the preferences file `~/.dm41l_explorer.json` (existing settings live there), and the quoted title of GitHub issue #31. (The repository has since been renamed to `mwheinz/DM41_Explorer`; the README, CONTRIBUTING and `dist_readme.txt` URLs and the `git clone` / `cd` lines now use it.) The release workflow was untested when this was written (one Linux build with `build.sh`'s steps in a scratch copy produced `dist/dm41explorer/`, and the binary started, logged `DM41_Explorer v0.0.1 starting` and made no serial attempt). **Update 2026-10-07 (Mike): the release workflow works,** with one caveat: a release tag must begin with `v` (for example `v2026.10.07`), or the workflow does not run.
+- **Steps 3 and 11 (one executable named DM41_Explorer).** Window title, About box, log line, preferences dialog, README, CONTRIBUTING, docs and the build chain use `DM41_Explorer`. `DM41LExplorerApp` is now `DM41ExplorerApp`. Build chain: `src/dm41l.spec` → `src/dm41explorer.spec`, generated `dm41lversion.py` → `dm41version.py` (this also fixes the spec, whose `hiddenimports` and comments already said `dm41version`), executable and folder `dm41explorer`, macOS bundle `DM41_Explorer.app`, release assets `DM41_Explorer-<tag>-<platform>.zip`, artifact names `dm41-explorer-<os>`, log file `dm41_explorer.log`. **Kept on purpose:** the preferences file `~/.dm41l_explorer.json` (existing settings lived there), and the quoted title of GitHub issue #31. (**Update:** Mike renamed it to `~/.dm41_explorer.json` himself in `fa80a2e`; that is the path phase 6 adds the `mode` key to.) (The repository has since been renamed to `mwheinz/DM41_Explorer`; the README, CONTRIBUTING and `dist_readme.txt` URLs and the `git clone` / `cd` lines now use it.) The release workflow was untested when this was written (one Linux build with `build.sh`'s steps in a scratch copy produced `dist/dm41explorer/`, and the binary started, logged `DM41_Explorer v0.0.1 starting` and made no serial attempt). **Update 2026-10-07 (Mike): the release workflow works,** with one caveat: a release tag must begin with `v` (for example `v2026.10.07`), or the workflow does not run.
 - **Found:** a frozen build logs "Could not read .../dm41explorer/docs/flags.md, using built-in flag names" (the data file lands in `_internal/docs`, the code looks beside the executable). The built-in names are used, so nothing breaks; the same was true before the rename.
 - **Decision (Mike, 2026-10-07): DM41_Explorer always uses its built-in list of flag names.** Reading them from `docs/flags.md` at run time is an unnecessary complication, so the loader (`gui/flags_tab.py`, which reads `docs/flags.md` live) and its fallback and log message are to be removed, rather than fixing the frozen-build path. `docs/flags.md` stays as documentation. **Done 2026-10-07 (issue #45):** the names live in `gui/flag_names.py` (`FLAG_NAMES`, with the wording of `docs/flags.md`, so flags now read e.g. `timer MDY / DMY` in a frozen build too); `gui/flags_doc.py`, its fallback copy and the log message are gone, and `dm41explorer.spec` no longer bundles `docs/flags.md`. `tests/test_flag_names.py` fails if the table and `docs/flags.md` drift apart.
 
@@ -336,6 +336,131 @@ Follow the decoder's existing sync procedure (`reference/README.md`, `tests/orac
 
 **Exit gate:** `npm test` passes on the new pin, a `.d41` uploaded, edited and downloaded loads on the DM41X, and `dist/` is rebuilt.
 
+## Phase 6 · Explicit DM41L/DM41X modes (issue #43)
+
+Decided 2026-10-09 (Mike). Independent of phase 5, which is blocked on SwissMicros, and it comes before the next release tag.
+
+Phase 3 gave every state file the DM41X profile. That was right for opening a DM41X state in an app that had been DM41L-only, but it leaves the DM41L owner worse off than before: their own `.dm41` files now report 600 XM registers and a Hex View running to 0x3EF, and the only model-specific behaviour left anywhere is the upload check. Issue #43 replaces the implicit rule with an explicit mode the user sets. **The mode is the single source of truth for which profile the app uses** — not the file extension, not the connection.
+
+### What a mode is
+
+| | DM41L mode | DM41X mode |
+| --- | --- | --- |
+| Profile | `DM41L`: 2 XM regions, 362 registers, the 95 CX XROMs | `DM41X`: 3 regions, 600 registers, all 113 XROMs |
+| Serial | Enabled | Disabled |
+| Key Assignments tab | DM41L keyboard layout only | DM41X keyboard layout only |
+| Key-assignment function list | CX built-ins only | All, with the DM41X-only hint |
+| New buffer, and Save As default | `.dm41` | `.d41` |
+| 3rd-party ROM modules | Never: a DM41L cannot load them | Later release, issue #44 |
+
+Represent the mode as an **`enum.Enum`**, not module-level string constants — it is a closed set of named modes, which is where this project has settled on real enumerated types.
+
+`supports_serial` becomes a field on `DeviceProfile`, rather than any test against the profile's name, so a DM41XN profile (disk **and** serial) can be added later without touching the gating code.
+
+### The setting
+
+- Persisted in `~/.dm41_explorer.json` as `mode`. Default **DM41X** (Mike: the more common device). Existing users have no such key and so get DM41X, which means a DM41L owner's `.dm41` files jump from 362 to 600 registers until they change it. Say so in the release notes.
+- Settable in the Preferences dialog, **reorganized into three tabs** (issue #43 comment, item 5): **General** (mode, logging) first, **Appearance** second, **Connection** third. Today there are two, "Connection" and "Logging & Appearance".
+- Shown in the **status bar**, which until now only ever carried connection text ("Not connected", "Connected to <port>"). The mode indicator is its own label, not appended to that text, and sits **first**, left of it (Mike, 2026-10-09): the mode is the standing fact about the session, while the status beside it is running commentary that `_set_status()` rewrites constantly.
+- **"Not connected" is only shown in a mode that can connect** (Mike, 2026-10-09). In DM41X mode there is nothing to connect to, so the status bar starts empty and stays that way until something actually happens; `_idle_status()` returns the connection state or "" from `mode.supports_serial`, and every site that used to write "Not connected" literally now asks it. The error callbacks go through it too: they are shared, and must not report a connection state in a mode that has no connection.
+
+### Changing mode erases the state
+
+One rule in both directions: **changing mode starts a new, empty state on the new mode's profile.** `Memory` fixes its profile at construction, so this avoids rebuilding one through `to_string()`/`from_string()` and avoids carrying the modified flag across that rebuild. Narrowing cannot silently lose data, because nothing is carried over to lose.
+
+The sequence, wherever the change comes from (Preferences, or an accepted auto-switch):
+
+1. The usual "Discard unsaved changes?" guard, if the buffer is modified.
+2. A confirmation naming the consequence: switching mode erases the open state, and — when a serial connection is open — that it will be closed. Cancel leaves the mode *and* the state alone.
+3. The disconnect, if connected.
+4. The mode changes and the buffer becomes a new empty `Memory` on the new profile.
+
+**Implemented 2026-10-09** as `DM41ExplorerApp.set_mode(mode, *, persist, reason=None)`. One wording change from the draft above: the disconnect warning is a sentence *inside* the single confirmation rather than a second dialog after it, since two modal boxes in a row for one decision is worse to use and the user needs both facts before answering, not after.
+
+Moving a state from a DM41X to a DM41L is done by exporting the programs and data wanted and re-importing them into a DM41L state (Mike, 2026-10-09). **The app never shrinks a state.**
+
+### Auto-switch on load (issue #43 comment, item 4)
+
+In DM41L mode, opening a state that does not fit a DM41L offers to switch to DM41X mode. The offer is **session-only**: accepting it does **not** write `mode` to the config file, since someone who owns one calculator will rarely want the other mode permanently (Mike). So the effective mode can differ from the saved one:
+
+- The status bar shows the **effective** mode.
+- The Preferences dialog shows the **saved** mode, with no indication of the override — the status bar is where that belongs (Mike, 2026-10-09). This also means OK in Preferences cannot quietly promote a temporary override into a saved setting.
+- The override lasts until the app quits.
+
+"Does not fit" reuses phase 2's `check_profile_fit`, so there is exactly one definition of it:
+
+- The state is parsed under the **widest** profile first. Under the DM41L profile `list_files()` raises on third-region data, so a too-large file could not otherwise be examined at all.
+- **XM errors** trigger the offer: a file with data above the target's last region; a directory whose end marker falls outside it, as a data file of exactly 363 registers produces; a directory that cannot be walked.
+- **Stale data above 0x300 belonging to no file** is a warning, not an error (phase 2), so such a file loads in DM41L mode and round-trips unchanged. It does not trigger the offer.
+- **XROM findings never trigger the offer.** They are upload-time only, see below.
+- Cancel aborts the load. The mode and the previously open state are untouched.
+
+Nothing changes on Save: saving is never restricted, in either mode.
+
+### XROMs are still checked only at upload
+
+Confirmed 2026-10-09 (Mike): the only place the app warns that a DM41L lacks an XROM is **Send State** (phase 2). Program import (`.txt`, `.raw`, `.dat`) adds no warning even in DM41L mode, because a state may legitimately carry a program the user means to retype on the calculator. There is no program editor, so import and the key-assignment dialog are the only two routes by which a function name enters a state.
+
+The key-assignment dialog is the exception, and it is a restriction rather than a warning: **in DM41L mode its function list offers only the CX built-ins** (Mike, 2026-10-09), so a DM41X-only function cannot be assigned at all. Two consequences:
+
+- The existing hint, "DM41X only: a DM41L does not have this function.", can never fire in DM41L mode. It becomes a **DM41X-mode** hint, where it is still worth having, because the state may later be sent to a DM41L.
+- The dialog also accepts a **typed** name. In DM41L mode a typed DM41X-only name must be **rejected with a message**, not merely hinted, or the filtered list is cosmetic.
+
+### One keyboard layout at a time
+
+Issue #39 gave the Key Assignments tab two sub-tabs, the DM41L layout and the classic DM41X layout. The mode now picks one and the other is not shown (Mike, 2026-10-09), which **supersedes #39's two-sub-tab design**. The `CTkTabview` goes, the single scrolling frame returns, and `_key_buttons` holds one button per key instead of a list with one per layout. Note that the labels `DM41L` and `DM41X` in that tab have meant *keyboard layouts* and now follow the mode; `docs/key_assignments.md` should say so.
+
+### Serial gating in DM41X mode
+
+**Disabled, not hidden** (Mike): the Connect menu items, Get State, Send State and the Ctrl/Cmd+K shortcut are greyed out, and nothing touches the serial layer. The Connection tab of Preferences stays visible and editable, so a port can be set before switching to DM41L mode. The Help dialog's shortcut list needs a note that its serial entries are DM41L-mode only.
+
+### Where the mode lives in the code
+
+One source of truth, not a config lookup scattered through the GUI:
+
+- `evaluate_mode_switch(memory, target_profile)` in the core, returning the `ProfileFinding` list phase 2 already defines, so the load-time offer and any later caller share one notion of "fits". Pure and synchronous, like the rest of the core.
+- The app holds the effective profile; menus, tabs, dialogs and the status bar read it. Changing it goes through one method that runs the four-step sequence above.
+
+This also helps **issue #48** (the GUI suite is unusably slow): the decision logic becomes testable with no Tk window at all, and the single keyboard grid roughly halves `test_key_layout.py`, one of the issue's named worst offenders.
+
+### Fallout to fix in the same phase
+
+- Existing tests that open `dm41x_manyfiles.dm41` or the other DM41X fixtures **through the app** will meet the auto-switch dialog unless they set DM41X mode first. Every such test must also use an isolated config file, never the real `~/.dm41_explorer.json`.
+- `tools/make_screenshots.py` needs DM41X mode for most pictures, and DM41L mode for the connection dialog and the DM41L keyboard.
+- Docs: README (the shortcut table and "Launching the app"), the Help dialog, `resources/dist_readme.txt`, `docs/key_assignments.md`.
+- The web port (phase 5) has no mode in its first release, so keep `evaluate_mode_switch` and the profile plumbing free of GUI imports.
+
+### Tests
+
+- **Core:** `evaluate_mode_switch` over every fixture against both profiles — the DM41L captures fit a DM41L; `dm41x_manyfiles.dm41` and the 363-register directory-end case do not; `dm41x_retpfl_before.d41` warns but fits; XROM findings never block.
+- **Config:** the default is DM41X; a prefs file with no `mode` key loads as DM41X; an accepted auto-switch leaves the file unwritten.
+- **App:** the erase-on-switch sequence both ways, including cancel at each step and the disconnect when connected; the load-time offer accepted and cancelled; serial items disabled in DM41X mode and enabled in DM41L; the status bar text; exactly one keyboard grid present in each mode; a typed DM41X-only name rejected in DM41L mode.
+
+**Exit gate:** the full suite passes; in DM41L mode a DM41L state shows 362 registers and `dm41x_manyfiles.dm41` offers the switch; in DM41X mode the serial menu items are disabled and Send State is unreachable; the saved mode survives a restart while an auto-switch does not.
+
+### Done 2026-10-09
+
+Built as described above, with the one wording change noted under the switch sequence. **Suite: 1683 passed, 13 skipped** (1620 before), run under Xvfb; the core alone is 1287 and runs in about a second.
+
+What exists now:
+
+- `memory/device_profile.py`: `DeviceMode` (an `enum.Enum`), `DEFAULT_MODE` (DM41X), `DeviceMode.from_value()` which never raises, and `DeviceProfile.supports_serial` defaulting to False so a new profile opts in.
+- `memory/profile_fit.py`: `evaluate_mode_switch(memory, profile)`, literally a filter over `check_profile_fit` for ERROR findings, so the two cannot drift.
+- `config.py`: the `mode` key, read back as a `DeviceMode`; an unreadable value falls back to the default rather than stopping the app.
+- `gui/app.py`: `self.mode` and the derived `profile` property, `set_mode()`, `_offer_mode_switch_for_load()`, `_require_serial_mode()` on all four serial actions, `_apply_mode_to_menus()`, and the status-bar indicator.
+- `gui/preferences_dialog.py`: three tabs (General / Appearance / Connection) with the model selector. It reports the chosen mode through `on_saved(requested_mode=...)` rather than writing it, so a cancelled switch leaves the saved setting alone while the dialog's other settings still save.
+- `gui/key_assignments_tab.py`: one keyboard, chosen by the rendered state's own profile. `_key_buttons` now holds a single button per (key, shift) — `layout_placements()` already merges a double-size key's repeated positions into one cell, so ENTER is one key with one pair of buttons like any other. It was a list only because both grids were drawn at once.
+- `memory/mnemonics.py`: `is_available_on(op, profile)` and `assignable_display_names(profile=None)`; the key-assignment dialog filters on the former and refuses a typed name that fails it.
+
+**Two consequences found while building, worth recording:**
+
+1. **The Send XM-error branch is no longer reachable from the GUI.** Connecting needs DM41L mode, and opening a too-large state in DM41L mode offers DM41X mode instead — which disconnects. So a state whose XM a DM41L cannot hold can no longer be open while connected. The check is kept as defence in depth: it costs nothing, it is the same code `evaluate_mode_switch` calls, and a DM41XN over serial would make the combination reachable again. `test_app.py`'s `_send()` therefore builds such a state directly instead of opening it through the load path. The XROM *warning* branch is unaffected and still reached normally.
+2. **A DM41X-only assignment already in a state opens on the Raw Hex tab in DM41L mode**, because the Function tab cannot offer that name there. That is the honest outcome — better than showing an unrelated function — and is noted in `docs/key_assignments.md`.
+
+Also done, as fallout: `tools/make_screenshots.py` takes a mode per shot (its third field was a sub-tab name) and drives the real `set_mode()`; README gains a "Calculator model" section and a note that the Connect shortcuts are DM41L-only; the Help dialog's Connect group is labelled accordingly; `docs/key_assignments.md` gains a "Keyboard layouts" section; and `CONTRIBUTING.md`'s `dm41l-venv` was corrected to `dm41-venv`.
+
+**Still to do:** re-render the committed screenshots on a Mac (`tools/make_screenshots.py`), since the two key-assignment pictures now show one keyboard each and the status bar shows the mode.
+
 ## Later release: additional ROM modules (not in this plan)
 
 The DM41X can load ROM modules, so a later release will need XROMs beyond the built-in ones. What was found so far, so it is not lost:
@@ -359,11 +484,13 @@ The file-manager work from the earlier plan is not abandoned, just later: DM41X_
 | Re-vendoring brings in many unported modules | Divergence log grows | Port only the core listed in W1; add divergence rows for the rest |
 | DM41XN differs from the DM41X | Shared-XROM assumption fails | Partly settled: `dm41xn.dm41` confirms X<I>Y and TRNG on a DM41XN. The 16 DM41X-module functions are untested there |
 | A serial connection is not always a DM41L | A DM41XN over serial would be given DM41L limits | The connection driver declares the target profile; the check never infers it from the transport |
+| The app's mode is confused with the connection driver's declared profile | DM41X-mode gating breaks, or a DM41XN over serial is given DM41L limits | They are separate fields with separate jobs (phase 6); `supports_serial` lives on the profile, and the upload check never reads the mode |
+| Erase-on-switch loses a user's work | Data loss | The discard guard runs first, then a confirmation that names the consequence; the dialog text is tested |
 | Blind search-and-replace of "dump" | `json.dump` in `config.py`, and any other unrelated use, breaks | Step 8 goes by reading each hit; the suite runs after each batch |
 
 ## Open questions
 
-- [ ] With one executable and no model selector, a DM41L memory state opened from a `.dm41` file will show DM41X-sized XM totals (600 registers), in the desktop app and in the web app. Acceptable, or should the extension pick the display profile (`.d41` → DM41X, `.dm41` → DM41L), with the DM41L profile also used while connected over serial? Opening and saving would still never be restricted.
+- [x] A DM41L state showing DM41X-sized XM totals: answered by **phase 6** (Mike, 2026-10-09). Neither of the two options offered here was taken. The display profile comes from an explicit **mode** the user sets, not from the file's extension and not from the connection. Opening and saving are still never restricted.
 - [x] Menu labels after the rename: the shorter "Open State..." etc. (Mike, 2026-10-06).
 - [x] GPLv3 for DM41_Explorer: yes, before the tag (Mike, 2026-10-06).
 - [x] `xrom.d41` was made on a DM41X and loads with the same contents on a DM41XN (Mike, 2026-10-05), so the codes are confirmed on both.
