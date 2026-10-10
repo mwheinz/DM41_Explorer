@@ -18,7 +18,7 @@ address in that register; offset 6 = the last/rightmost byte = the
 calculation below goes through them.
 '''
 
-from typing import Optional, TYPE_CHECKING
+from typing import Optional
 
 from .registers import Register, DM41MemoryError
 from .regions import MemoryRegion
@@ -43,18 +43,12 @@ from .program_chain import (
     walk_chain,
 )
 
-if TYPE_CHECKING:
-    from .memory import Memory
-
 
 class ProgramMemory(MemoryRegion):
     '''User program storage, from `.END.` up to (but not including) R00.'''
 
     key = "program"
     label = "User Programs"
-
-    def __init__(self, memory: "Memory"):
-        super().__init__(memory)
 
     # -- Extent ----------------------------------------------------------
 

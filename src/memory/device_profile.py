@@ -156,10 +156,10 @@ class DeviceMode(enum.Enum):
         setting must not stop the application starting.'''
         if isinstance(value, cls):
             return value
-        for mode in cls:
-            if mode.value == value:
-                return mode
-        return DEFAULT_MODE if default is None else default
+        try:
+            return cls(value)
+        except (ValueError, TypeError):
+            return DEFAULT_MODE if default is None else default
 
 
 # What a user with no `mode` in their preferences file gets. The DM41X is

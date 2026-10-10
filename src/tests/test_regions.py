@@ -308,3 +308,15 @@ def test_regions_omits_program_and_data_without_a_partition():
     assert "program" not in keys
     assert "data" not in keys
     assert "unused" in keys
+
+
+def test_region_span_is_an_immutable_value():
+    import dataclasses
+
+    span = RegionSpan("key", "Key Assignments", 0xC0, 0xC3)
+    assert span == RegionSpan("key", "Key Assignments", 0xC0, 0xC3)
+    assert span != RegionSpan("key", "Key Assignments", 0xC0, 0xC4)
+    assert span.count == 4 and 0xC2 in span and 0xC4 not in span
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        span.start = 0
+    assert len({span, RegionSpan("key", "Key Assignments", 0xC0, 0xC3)}) == 1

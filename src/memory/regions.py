@@ -32,6 +32,7 @@ of getting its own module here, since it has a whole file-system-like
 structure built on top of its region.
 '''
 
+from dataclasses import dataclass
 from typing import Dict, Optional, Sequence, TYPE_CHECKING
 
 from .registers import Register
@@ -41,6 +42,7 @@ if TYPE_CHECKING:
     from .memory import Memory
 
 
+@dataclass(frozen=True, slots=True)
 class RegionSpan:
     '''
     A plain, immutable descriptor for one region's boundaries at one
@@ -53,13 +55,10 @@ class RegionSpan:
     convention (`start <= addr <= end`).
     '''
 
-    __slots__ = ("key", "label", "start", "end")
-
-    def __init__(self, key: str, label: str, start: int, end: int):
-        self.key = key
-        self.label = label
-        self.start = start
-        self.end = end
+    key: str
+    label: str
+    start: int
+    end: int
 
     @property
     def count(self) -> int:
@@ -69,16 +68,6 @@ class RegionSpan:
 
     def __contains__(self, addr: int) -> bool:
         return self.start <= addr <= self.end
-
-    def __eq__(self, other):
-        if not isinstance(other, RegionSpan):
-            return NotImplemented
-        return (
-            self.key == other.key
-            and self.label == other.label
-            and self.start == other.start
-            and self.end == other.end
-        )
 
     def __repr__(self) -> str:
         return f"RegionSpan({self.key!r}, 0x{self.start:03X}-0x{self.end:03X})"

@@ -16,14 +16,9 @@ addresses in the state are absolute. `address_for()`/`number_for()` convert
 between them.
 '''
 
-from typing import TYPE_CHECKING
-
 from .registers import Register
 from .regions import MemoryRegion
 from .constants import PRIMARY_DATA_END
-
-if TYPE_CHECKING:
-    from .memory import Memory
 
 
 class DataMemory(MemoryRegion):
@@ -31,9 +26,6 @@ class DataMemory(MemoryRegion):
 
     key = "data"
     label = "Data Memory"
-
-    def __init__(self, memory: "Memory"):
-        super().__init__(memory)
 
     # -- Extent ----------------------------------------------------------
 
@@ -51,8 +43,9 @@ class DataMemory(MemoryRegion):
 
     @property
     def end(self) -> int:
-        if not self._memory.has_program_partition():
-            return PRIMARY_DATA_END
+        '''Always PRIMARY_DATA_END: data memory runs from R00 to the top.
+        Without a sane partition `start` is past it, so the region is
+        empty.'''
         return PRIMARY_DATA_END
 
     # -- Numbered access -------------------------------------------------

@@ -126,7 +126,7 @@ class CommandEngine:
         Handles detection of the prompt sequence, indicating the current
         command has completed.
         '''
-        logger.info("_handle_completion(%s, %d)", full_text, prompt_index)
+        logger.debug("_handle_completion(%r, %d)", full_text, prompt_index)
 
         # Extract data before the prompt match index
         response_data = full_text[:prompt_index]

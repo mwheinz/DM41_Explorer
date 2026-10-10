@@ -98,3 +98,16 @@ def test_pointers_are_properties():
     before = status.R00
     status.set_R00(before - 1)
     assert status.R00 == before - 1  # read live, not cached
+
+
+def test_alpha_data_register_str_shows_the_text():
+    reg = Register.from_hex("00000000000000")
+    reg.set_alpha_text("HI")
+    assert str(reg) == '"HI"'
+
+
+def test_alpha_register_str_drops_padding_and_masks_non_printables():
+    from memory import AlphaRegister
+
+    reg = AlphaRegister(bytes([0, 0, 0x41, 0x7F, 0x42, 0x01]))
+    assert str(reg) == "A.B."  # 0x7F (DEL) is not printable

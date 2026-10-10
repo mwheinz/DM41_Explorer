@@ -97,7 +97,7 @@ class SerialManager:
         if self.is_connected:
             self.outgoing_queue.put(data)
         else:
-            logger.warning("Attempted to send command while disconnected.")
+            logger.warning("Attempted to send data while disconnected.")
 
     def get_next_message(self):
         """Public method for the UI thread to retrieve data from the queue."""

@@ -31,15 +31,12 @@ current program line" rather than jumping to a label.
 
 import datetime
 import math
-from typing import List, Optional, Tuple, TYPE_CHECKING
+from typing import List, Optional, Tuple
 
 from .registers import Register, DM41MemoryError
 from .regions import MemoryRegion
 from .constants import PRIMARY_DATA_END, REGISTER_SIZE_BYTES, zero_register
 from .trigraphs import encode_trigraphs, decode_trigraphs
-
-if TYPE_CHECKING:
-    from .memory import Memory
 
 # HP41/DM41L time fields (both the absolute trigger time and the repeat
 # interval) are BCD hundredths-of-a-second since this epoch (docs/
@@ -149,9 +146,6 @@ class Alarms(MemoryRegion):
 
     HEADER_MARKER = 0xAA
     DELIMITER_MARKER = 0xF0
-
-    def __init__(self, memory: "Memory"):
-        super().__init__(memory)
 
     @property
     def start(self) -> int:

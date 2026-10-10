@@ -72,13 +72,14 @@ class KeyAssignments(MemoryRegion):
     # which Python's divmod()/bytes indexing would silently wrap around to
     # a real (but wrong) byte instead of raising -- corrupting an
     # unrelated KEYFLAGS bit rather than failing loudly.
-    _VALID_KEY_POSITIONS = (
+    _KEY_POSITIONS_IN_ORDER = (
         [(1, n) for n in range(1, 6)]
         + [(2, n) for n in range(1, 6)]
         + [(3, n) for n in range(2, 6)]
         + [(m, n) for m in range(4, 9) for n in range(1, 5)]
     )
-    _VALID_KEY_NUMBERS = [10 * m + n for m, n in _VALID_KEY_POSITIONS]
+    _VALID_KEY_POSITIONS = frozenset(_KEY_POSITIONS_IN_ORDER)
+    _VALID_KEY_NUMBERS = tuple(10 * m + n for m, n in _KEY_POSITIONS_IN_ORDER)
 
     # For the HP41 series, row 4's ENTER^ key is physically double-width -- on
     # the real keyboard it occupies both the column-1 AND column-2 slots in

@@ -355,11 +355,8 @@ class Register:
         variable length and is byte-packed. The StatusRegisters.Alpha register
         is 25 bytes long and doesn't have the header byte.
         '''
-        if self._data[0] == 0x10:
-            text = ""
-            for b in self._data[1:]:
-                if b != 0:
-                    text += chr(b)
+        if self.is_alpha_text():
+            text = self.get_alpha_bytes().decode("latin-1")
             if text.isprintable():
                 return '"' + text + '"'
             return self._data.hex()
@@ -479,15 +476,7 @@ class AlphaRegister(Register):
     '''Represents the HP41/DM41L alpha register.'''
 
     def __str__(self):
-        skip_nulls = True
-        text = ""
-        for b in self._data:
-            if b != 0x00 and skip_nulls:
-                skip_nulls = False
-            if not skip_nulls:
-                if 32 <= b <= 127:
-                    c = chr(b)
-                else:
-                    c = "."
-                text = text + c
-        return text
+        '''The text, with the leading NUL padding dropped and any other
+        non-printable byte shown as '.', as get_ascii() does.'''
+        data = bytes(self._data).lstrip(b"\x00")
+        return "".join(chr(b) if 0x20 <= b <= 0x7E else "." for b in data)
