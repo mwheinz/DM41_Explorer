@@ -281,3 +281,28 @@ def test_plain_settings_round_trip_through_the_file(prefs_file):
     reloaded.load()
     assert reloaded.serial_port == "/dev/ttyTEST"
     assert reloaded.font_size == 15
+
+
+def test_window_size_defaults_to_none(prefs_file):
+    config = ProjectConfig()
+    config.load()
+    assert config.window_size is None
+
+
+def test_window_size_round_trips_through_the_file(prefs_file):
+    config = ProjectConfig()
+    config.window_size = (1234, 777)
+    config.save()
+    again = ProjectConfig()
+    again.load()
+    assert again.window_size == (1234, 777)
+
+
+@pytest.mark.parametrize(
+    "width,height", [(0, 0), (-1, 500), (500, 0), ("wide", "tall"), (None, None)]
+)
+def test_unusable_saved_window_sizes_read_as_none(prefs_file, width, height):
+    prefs_file.write_text(json.dumps({"window_width": width, "window_height": height}))
+    config = ProjectConfig()
+    config.load()
+    assert config.window_size is None

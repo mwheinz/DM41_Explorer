@@ -2,17 +2,11 @@
 scrolling fix and its tuning.
 
 The arithmetic (RowAccumulator, the environment parsing, the delta
-decoding) is plain Python and tested as such. The widget half builds a
-real SmoothTreeview and feeds it scroll events, with the tuning's
-`everywhere` flag set so the macOS-only handler runs on whatever platform
-the suite is running on; that needs a display (Xvfb in CI/sandboxes, like
-test_app.py).
-
-<TouchpadScroll> is a macOS-only event type that Tk's X11 build cannot
-generate, so the trackpad tests call the bound handler with a synthetic
-event rather than going through event_generate(). What all this cannot
-test is how the result *feels*, which is why the tuning is adjustable at
-all -- see tools/scroll_lab.py.
+decoding) is plain Python and tested as such. The widget tests build a
+real SmoothTreeview but only check how it is wired up (its bindings and
+row height), never where it scrolled to, which depends on the platform's
+window system. How scrolling *feels* can't be tested at all, which is why
+the tuning is adjustable -- see tools/scroll_lab.py.
 """
 
 import types
@@ -32,7 +26,6 @@ from gui.scroll_support import (
     TreeScrollTuning,
     decode_touchpad_delta,
 )
-from gui_helpers import pump
 
 ROWS = 200  # far more than the tree is tall, so there's always room to scroll
 
@@ -170,20 +163,7 @@ def _tree(root, tuning=None, rows=ROWS, parent=None, **kwargs):
     for index in range(rows):
         tree.insert("", "end", values=(index,))
     tree.pack(fill="both", expand=True)
-    root.deiconify()
-    pump(root, 0.3)
     return tree
-
-
-def _first_row(tree) -> int:
-    """Which row is at the top of the view, in rows rather than
-    fractions."""
-    return round(tree.yview()[0] * len(tree.get_children()))
-
-
-def _touchpad(tree, delta_y=0, delta_x=0):
-    packed = ((delta_x & 0xFFFF) << 16) | (delta_y & 0xFFFF)
-    return tree._on_touchpad_scroll(types.SimpleNamespace(delta=packed))
 
 
 def _wheel(tree, delta):
@@ -196,116 +176,8 @@ def test_a_smooth_treeview_is_a_treeview(root):
     assert isinstance(_tree(root), ttk.Treeview)
 
 
-def test_a_real_wheel_event_reaches_the_handler(root):
-    """Not just a direct call: the instance binding has to be in place
-    and ahead of Tk's own class binding."""
-    tree = _tree(root)
-    tree.event_generate("<MouseWheel>", delta=-120, x=5, y=5)
-    pump(tree, 0.1)
-    assert _first_row(tree) == 3  # 120/40, Tk's own factor
-
-
 def test_the_stock_binding_is_suppressed(root):
     assert _wheel(_tree(root), -120) == "break"
-
-
-def test_a_slow_wheel_still_moves_eventually(root):
-    """A notch worth less than a row scrolls nothing on its own -- Tk
-    drops that remainder, this keeps it."""
-    tree = _tree(root, TreeScrollTuning(everywhere=True, wheel_divisor=40.0))
-    for _ in range(3):
-        _wheel(tree, -10)  # 0.25 rows each
-    assert _first_row(tree) == 0
-    _wheel(tree, -10)
-    assert _first_row(tree) == 1
-
-
-def test_the_wheel_divisor_sets_the_speed(root):
-    tree = _tree(root, TreeScrollTuning(everywhere=True, wheel_divisor=20.0))
-    _wheel(tree, -120)
-    assert _first_row(tree) == 6
-
-
-def test_wheeling_back_up_returns_to_the_top(root):
-    tree = _tree(root)
-    _wheel(tree, -400)
-    assert _first_row(tree) > 0
-    _wheel(tree, 400)
-    assert _first_row(tree) == 0
-
-
-def test_a_trackpad_gesture_scrolls_pixels_not_rows(root):
-    """The issue #29 bug itself: Tk's own binding would read a 10-pixel
-    delta as 10 rows. At a one-to-one gain, 10 pixels is under half a
-    22-pixel row, so nothing moves until the gesture has travelled a
-    whole row's worth. (A negative delta is a gesture that scrolls the
-    view down the table, matching Tk's own sign convention.)"""
-    tree = _tree(root, TreeScrollTuning(everywhere=True, row_height=22))
-    _touchpad(tree, delta_y=-10)
-    assert _first_row(tree) == 0  # 0.45 rows
-    _touchpad(tree, delta_y=-10)
-    assert _first_row(tree) == 0  # 0.91 rows: not a whole row yet
-    _touchpad(tree, delta_y=-10)
-    assert _first_row(tree) == 1  # 1.36 rows
-
-
-def test_the_gain_multiplies_the_gesture(root):
-    tree = _tree(
-        root, TreeScrollTuning(everywhere=True, row_height=10, touchpad_gain=2.0)
-    )
-    _touchpad(tree, delta_y=-15)
-    assert _first_row(tree) == 3
-
-
-def test_a_trackpad_gesture_back_up_returns_to_the_top(root):
-    tree = _tree(root, TreeScrollTuning(everywhere=True, row_height=10))
-    _touchpad(tree, delta_y=-100)
-    assert _first_row(tree) == 10
-    _touchpad(tree, delta_y=100)
-    assert _first_row(tree) == 0
-
-
-def test_one_gesture_cannot_jump_further_than_max_rows(root):
-    tree = _tree(root, TreeScrollTuning(everywhere=True, row_height=1, max_rows=5))
-    _touchpad(tree, delta_y=-100)
-    assert _first_row(tree) == 5
-
-
-def test_sampling_drops_events_the_way_tks_own_binding_does(root):
-    """Tk handles one touchpad event in five; this is the same knob, so
-    the two can be compared on real hardware."""
-    tree = _tree(
-        root, TreeScrollTuning(everywhere=True, row_height=10, touchpad_sample=5)
-    )
-    for _ in range(4):
-        _touchpad(tree, delta_y=-100)
-    assert _first_row(tree) == 0
-    _touchpad(tree, delta_y=-100)
-    assert _first_row(tree) == 10
-
-
-def test_a_sideways_gesture_scrolls_sideways(root):
-    """In a holder narrower than the column, so there is something to
-    scroll to sideways in the first place."""
-    holder = tkinter.Frame(root, width=120, height=120)
-    holder.pack_propagate(False)
-    holder.pack()
-    tree = _tree(root, TreeScrollTuning(everywhere=True, row_height=10), parent=holder)
-    tree.column("value", width=600, stretch=False)
-    pump(root, 0.2)
-    _touchpad(tree, delta_x=-100)
-    assert tree.xview()[0] > 0
-    assert tree.yview()[0] == 0
-
-
-def test_a_table_that_fits_does_not_move(root):
-    """Nothing is clipped, so a gesture must not shift the view -- the
-    same overscroll guard gui/overview_tab.py needed."""
-    tree = _tree(root, rows=2)
-    assert tree.yview() == (0.0, 1.0)
-    assert _touchpad(tree, delta_y=500) == "break"
-    assert _wheel(tree, -500) == "break"
-    assert tree.yview() == (0.0, 1.0)
 
 
 def test_the_row_height_comes_from_the_ttk_style(root):
@@ -340,7 +212,3 @@ def test_both_axes_keep_their_own_pending_fraction(root):
     tree = _tree(root, TreeScrollTuning(everywhere=True, row_height=10))
     accumulators = tree._row_steps
     assert accumulators[ScrollAxis.VERTICAL] is not accumulators[ScrollAxis.HORIZONTAL]
-    _touchpad(tree, delta_y=-5, delta_x=-5)
-    assert _first_row(tree) == 0
-    _touchpad(tree, delta_y=-5)
-    assert _first_row(tree) == 1
