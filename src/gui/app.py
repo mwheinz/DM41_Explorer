@@ -10,6 +10,7 @@ from pathlib import Path
 from datetime import datetime
 import platform
 from tkinter import filedialog, messagebox, Menu
+from typing import NamedTuple, Optional
 
 import customtkinter as ctk
 
@@ -59,21 +60,42 @@ ENGINE_POLL_MS = 50
 
 PLATFORM_SYSTEM = platform.system()
 
-# Header-button methods that Cmd/Ctrl+E / Cmd/Ctrl+I forward to, for
-# whichever tab is currently active -- see _bind_keys() and
-# DM41ExplorerApp._dispatch_tab_action() below. A tab name missing
-# from one of these dicts means that shortcut is a silent no-op there
-# (e.g. Overview has no Import/Export at all).
-_EXPORTABLE_TABS = {
-    "Data Registers": "_export_registers",
-    "XM Files": "_export_selected",
-    "Programs": "_export_selected",
-}
-_IMPORTABLE_TABS = {
-    "Data Registers": "_import_registers",
-    "XM Files": "_import_file",
-    "Programs": "_import_program",
-}
+class TabSpec(NamedTuple):
+    """One of the main window's tabs. `attr` is the DM41ExplorerApp
+    attribute that holds it. `editable` tabs get the app's on_change
+    callback. `export_method`/`import_method` name the tab's own header-
+    button handlers that Cmd/Ctrl+E / Cmd/Ctrl+I forward to while it is
+    the active tab (see _dispatch_tab_action()); None means that shortcut
+    is a silent no-op there."""
+
+    name: str
+    attr: str
+    cls: type
+    editable: bool = True
+    export_method: Optional[str] = None
+    import_method: Optional[str] = None
+
+
+# The main window's tabs, in display order.
+TABS = (
+    TabSpec("Overview", "overview_tab", OverviewTab),
+    TabSpec("Flags", "flags_tab", FlagsTab),
+    TabSpec(
+        "Programs", "program_tab", ProgramTab,
+        export_method="_export_selected", import_method="_import_program",
+    ),
+    TabSpec("Key Assignments", "key_assignments_tab", KeyAssignmentsTab),
+    TabSpec("Alarms", "alarms_tab", AlarmsTab),
+    TabSpec(
+        "Data Registers", "data_registers_tab", DataRegistersTab,
+        export_method="_export_registers", import_method="_import_registers",
+    ),
+    TabSpec(
+        "XM Files", "xm_files_tab", XMFilesTab,
+        export_method="_export_selected", import_method="_import_file",
+    ),
+    TabSpec("Hex View", "hex_view_tab", HexViewTab, editable=False),
+)
 
 # File > Open Recent: long paths are shortened by keeping the tail
 # (the part that actually distinguishes files living in different
@@ -272,7 +294,6 @@ class DM41ExplorerApp(ctk.CTk):
         self.engine = CommandEngine(self.serial)
         self.memory = Memory(profile=self.profile)
         self.memory_source = None
-        self._command_pending = False
 
         self._build_layout()
         self._apply_window_size()
@@ -394,10 +415,7 @@ class DM41ExplorerApp(ctk.CTk):
         if mode is self.mode:
             return True
 
-        if self.memory.modified and not messagebox.askyesno(
-            "Unsaved Changes",
-            f"Discard unsaved changes and switch to {mode.value} mode?",
-        ):
+        if not self._confirm_discard(f"switch to {mode.value} mode"):
             return False
 
         lines = []
@@ -433,13 +451,9 @@ class DM41ExplorerApp(ctk.CTk):
             "saved" if persist else "this session only",
         )
 
-        self.memory = Memory(profile=self.profile)
-        self.memory_source = None
-        self._modified_label.configure(text="")
-        self._update_source_label()
         self._apply_mode_to_menus()
         self._refresh_mode_indicator()
-        self._render_tabs()
+        self._replace_memory(Memory(profile=self.profile))
         self._set_status(
             f"Switched to {mode.value} mode; started a new, empty memory state."
         )
@@ -473,7 +487,6 @@ class DM41ExplorerApp(ctk.CTk):
     def _handle_serial_error(self, msg: str):
         logger.error("Serial error: %s", msg)
         self._set_status(self._idle_status())
-        self._command_pending = False
         # Runs on the main Tk thread: _pump_engine() drains SerialManager's
         # error queue, which its background thread fills after it has
         # already closed its own port handle and cleared is_connected -- so
@@ -632,64 +645,16 @@ class DM41ExplorerApp(ctk.CTk):
 
         self.tabview = ctk.CTkTabview(self, command=self._on_tab_changed)
         self.tabview.pack(side="top", fill="both", expand=True, padx=8, pady=8)
-        self.tabview.add("Overview")
-        self.tabview.add("Flags")
-        self.tabview.add("Programs")
-        self.tabview.add("Key Assignments")
-        self.tabview.add("Alarms")
-        self.tabview.add("Data Registers")
-        self.tabview.add("XM Files")
-        self.tabview.add("Hex View")
-
-        self.overview_tab = OverviewTab(
-            self.tabview.tab("Overview"), on_change=self._on_memory_changed
-        )
-        self.overview_tab.pack(fill="both", expand=True)
-
-        self.flags_tab = FlagsTab(
-            self.tabview.tab("Flags"), on_change=self._on_memory_changed
-        )
-        self.flags_tab.pack(fill="both", expand=True)
-
-        self.data_registers_tab = DataRegistersTab(
-            self.tabview.tab("Data Registers"), on_change=self._on_memory_changed
-        )
-        self.data_registers_tab.pack(fill="both", expand=True)
-
-        self.hex_view_tab = HexViewTab(self.tabview.tab("Hex View"))
-        self.hex_view_tab.pack(fill="both", expand=True)
-
-        self.program_tab = ProgramTab(
-            self.tabview.tab("Programs"), on_change=self._on_memory_changed
-        )
-        self.program_tab.pack(fill="both", expand=True)
-
-        self.key_assignments_tab = KeyAssignmentsTab(
-            self.tabview.tab("Key Assignments"), on_change=self._on_memory_changed
-        )
-        self.key_assignments_tab.pack(fill="both", expand=True)
-
-        self.xm_files_tab = XMFilesTab(
-            self.tabview.tab("XM Files"), on_change=self._on_memory_changed
-        )
-        self.xm_files_tab.pack(fill="both", expand=True)
-
-        self.alarms_tab = AlarmsTab(
-            self.tabview.tab("Alarms"), on_change=self._on_memory_changed
-        )
-        self.alarms_tab.pack(fill="both", expand=True)
-
-        # Which tabs are showing stale content -- see _render_active_tab().
-        self._tabs = {
-            "Overview": self.overview_tab,
-            "Flags": self.flags_tab,
-            "Data Registers": self.data_registers_tab,
-            "Hex View": self.hex_view_tab,
-            "Programs": self.program_tab,
-            "Key Assignments": self.key_assignments_tab,
-            "XM Files": self.xm_files_tab,
-            "Alarms": self.alarms_tab,
-        }
+        # The tabs by name -- also which ones are showing stale content,
+        # see _render_active_tab().
+        self._tabs = {}
+        for spec in TABS:
+            self.tabview.add(spec.name)
+            kwargs = {"on_change": self._on_memory_changed} if spec.editable else {}
+            tab = spec.cls(self.tabview.tab(spec.name), **kwargs)
+            tab.pack(fill="both", expand=True)
+            setattr(self, spec.attr, tab)
+            self._tabs[spec.name] = tab
         self._tabs_dirty = {name: True for name in self._tabs}
 
     def _build_menus(self):
@@ -883,24 +848,23 @@ class DM41ExplorerApp(ctk.CTk):
         )
 
     def _export_current_tab(self):
-        self._dispatch_tab_action(_EXPORTABLE_TABS)
+        self._dispatch_tab_action("export_method")
 
     def _import_current_tab(self):
-        self._dispatch_tab_action(_IMPORTABLE_TABS)
+        self._dispatch_tab_action("import_method")
 
-    def _dispatch_tab_action(self, method_names_by_tab: dict):
-        """Forwards to the named method on whichever tab is currently
-        active, if that tab is in `method_names_by_tab` at all -- see
-        the module-level _EXPORTABLE_TABS/_IMPORTABLE_TABS comment
-        above. Every target method already guards against "no memory
-        loaded" / "no selection" itself (the same guards that protect
-        double-click, which also bypasses button state), so this is
-        safe to call unconditionally."""
+    def _dispatch_tab_action(self, which: str):
+        """Forwards Cmd/Ctrl+E or Cmd/Ctrl+I to the active tab's own
+        export or import handler (`which` is the TabSpec field naming it),
+        if it has one -- see TABS. Every target method already guards
+        against "no memory loaded" / "no selection" itself (the same
+        guards that protect double-click, which also bypasses button
+        state), so this is safe to call unconditionally."""
         name = self.tabview.get()
-        method_name = method_names_by_tab.get(name)
-        if method_name is None:
-            return
-        getattr(self._tabs[name], method_name)()
+        spec = next(spec for spec in TABS if spec.name == name)
+        method_name = getattr(spec, which)
+        if method_name is not None:
+            getattr(self._tabs[name], method_name)()
 
     # -- File > Open Recent ----------------------------------------------
 
@@ -929,6 +893,15 @@ class DM41ExplorerApp(ctk.CTk):
 
     def _clear_recent_files(self):
         self.config_store.clear_recent_files()
+        self._recent_files_changed()
+
+    def _remember_recent_file(self, path):
+        """Puts `path` at the top of File > Open Recent."""
+        self.config_store.add_recent_file(path)
+        self._recent_files_changed()
+
+    def _recent_files_changed(self):
+        """Saves the recent-files list and rebuilds its menu to match."""
         self._persist_config("recent files")
         self._rebuild_recent_files_menu()
 
@@ -991,6 +964,23 @@ class DM41ExplorerApp(ctk.CTk):
         for name in self._tabs_dirty:
             self._tabs_dirty[name] = True
         self._render_active_tab()
+
+    def _confirm_discard(self, action: str) -> bool:
+        """True if there are no unsaved changes, or the user agrees to
+        discard them in order to `action` (e.g. "quit")."""
+        return not self.memory.modified or messagebox.askyesno(
+            "Unsaved Changes", f"Discard unsaved changes and {action}?"
+        )
+
+    def _replace_memory(self, memory, source=None):
+        """Makes `memory` the open buffer -- read from the file `source`,
+        or None for a new buffer or one read from the calculator -- and
+        refreshes everything that shows it."""
+        self.memory = memory
+        self.memory_source = None if source is None else Path(source)
+        self._modified_label.configure(text="")
+        self._update_source_label()
+        self._render_tabs()
 
     def _update_source_label(self):
         text = (
@@ -1158,11 +1148,8 @@ class DM41ExplorerApp(ctk.CTk):
             # serial driver declares the DM41L), not the app's mode: this
             # state came off that calculator. The two agree today, since
             # only DM41L mode can connect at all.
-            self.memory = Memory.from_string(state, profile=self.serial.profile)
-            self.memory_source = None
-            self._modified_label.configure(text="")
-            self._update_source_label()
-            self._render_tabs()
+            state_memory = Memory.from_string(state, profile=self.serial.profile)
+            self._replace_memory(state_memory)
             self._set_status("Connected -- memory state loaded.")
         except Exception as e:
             self._on_command_error(f"Failed to parse memory state: {e}")
@@ -1194,7 +1181,6 @@ class DM41ExplorerApp(ctk.CTk):
 
     def _on_command_error(self, message: str):
         logger.error("%s", message)
-        self._command_pending = False
         self._set_status(self._idle_status())
         # Runs on the main Tk thread (engine callback via _pump_engine), so
         # a direct disconnect() call here is safe -- see _on_verify_failed.
@@ -1209,15 +1195,9 @@ class DM41ExplorerApp(ctk.CTk):
     # -- File menu actions --------------------------------------------------
 
     def new_memory_buffer(self):
-        if self.memory.modified and not messagebox.askyesno(
-            "Unsaved Changes", "Discard unsaved changes and start a new buffer?"
-        ):
+        if not self._confirm_discard("start a new buffer"):
             return
-        self.memory = Memory(profile=self.profile)
-        self.memory_source = None
-        self._modified_label.configure(text="")
-        self._update_source_label()
-        self._render_tabs()
+        self._replace_memory(Memory(profile=self.profile))
         self._set_status("Started a new, empty memory buffer.")
 
     # -- Tools menu actions --------------------------------------------------
@@ -1233,11 +1213,6 @@ class DM41ExplorerApp(ctk.CTk):
         lives in its own menu (rather than on the Program tab, next to
         Import) since it also touches Key Assignments/Alarms, which
         aren't shown there.'''
-        if self.memory is None:
-            messagebox.showwarning(
-                "No Memory Loaded", "Load or start a memory buffer first."
-            )
-            return
         before_count = len(self.memory.programs.list_programs())
         try:
             freed = self.memory.pack()
@@ -1298,17 +1273,7 @@ class DM41ExplorerApp(ctk.CTk):
             "Overwrite File", f"Overwrite {self.memory_source} with your changes?"
         ):
             return
-        try:
-            self.memory.to_file(self.memory_source)
-            self._modified_label.configure(text="")
-            logger.info("State saved to %s", self.memory_source)
-            self.config_store.add_recent_file(self.memory_source)
-            self._persist_config("recent files")
-            self._rebuild_recent_files_menu()
-            messagebox.showinfo("Saved", f"Memory state written to {self.memory_source}")
-        except Exception as e:
-            logger.exception("Could not save state to %s", self.memory_source)
-            messagebox.showerror("Error", f"Could not save state: {e}")
+        self._write_state(self.memory_source)
 
     def save_state_as(self):
         # A file keeps its own extension: the text format is the same. A
@@ -1325,24 +1290,26 @@ class DM41ExplorerApp(ctk.CTk):
         )
         if not path:
             return
+        self._write_state(path)
+
+    def _write_state(self, path):
+        """Writes the buffer to `path`, which then becomes its file. Shared
+        by Save and Save As; any confirmation is the caller's."""
         try:
             self.memory.to_file(path)
-            self.memory_source = Path(path)
-            self._modified_label.configure(text="")
-            self._update_source_label()
-            logger.info("State saved to %s", path)
-            self.config_store.add_recent_file(path)
-            self._persist_config("recent files")
-            self._rebuild_recent_files_menu()
-            messagebox.showinfo("Saved", f"Memory state written to {path}")
         except Exception as e:
             logger.exception("Could not save state to %s", path)
             messagebox.showerror("Error", f"Could not save state: {e}")
+            return
+        logger.info("State saved to %s", path)
+        self.memory_source = Path(path)
+        self._modified_label.configure(text="")
+        self._update_source_label()
+        self._remember_recent_file(path)
+        messagebox.showinfo("Saved", f"Memory state written to {path}")
 
     def load_state_from_file(self):
-        if self.memory.modified and not messagebox.askyesno(
-            "Unsaved Changes", "Discard unsaved changes and load a different state?"
-        ):
+        if not self._confirm_discard("load a different state"):
             return
         path = filedialog.askopenfilename(filetypes=STATE_FILETYPES)
         if not path:
@@ -1384,21 +1351,10 @@ class DM41ExplorerApp(ctk.CTk):
                 messagebox.showerror("Error", f"Could not load state: {e}")
                 return
 
-        try:
-            self.memory = loaded
-            self.memory_source = Path(path)
-            self._modified_label.configure(text="")
-            self._update_source_label()
-            self._render_tabs()
-            name = Path(path).name
-            self._set_status(f"Loaded state from {name}")
-            logger.info("State loaded from %s (%s mode)", path, self.mode.value)
-            self.config_store.add_recent_file(path)
-            self._persist_config("recent files")
-            self._rebuild_recent_files_menu()
-        except Exception as e:
-            logger.exception("Could not load state from %s", path)
-            messagebox.showerror("Error", f"Could not load state: {e}")
+        self._replace_memory(loaded, source=path)
+        self._set_status(f"Loaded state from {Path(path).name}")
+        logger.info("State loaded from %s (%s mode)", path, self.mode.value)
+        self._remember_recent_file(path)
 
     def open_state_file(self, path):
         '''Opens `path` as the app's current state, prompting to discard
@@ -1415,12 +1371,9 @@ class DM41ExplorerApp(ctk.CTk):
             logger.warning("Could not find file: %s", path)
             messagebox.showerror("Error", f"Could not find file: {path}")
             self.config_store.remove_recent_file(path)
-            self._persist_config("recent files")
-            self._rebuild_recent_files_menu()
+            self._recent_files_changed()
             return
-        if self.memory.modified and not messagebox.askyesno(
-            "Unsaved Changes", "Discard unsaved changes and load a different state?"
-        ):
+        if not self._confirm_discard("load a different state"):
             return
         self._load_state_into_buffer(path)
 
@@ -1492,7 +1445,7 @@ class DM41ExplorerApp(ctk.CTk):
         state_text = self.memory.to_string()
 
         command = LoadMemoryStringCommand([state_text], serial=self.serial)
-        if self._execute_command(command, self._on_state_sent, self._on_io_failed):
+        if self._execute_command(command, self._on_state_sent, self._on_command_error):
             command.trigger_transfer()
 
     def _on_state_sent(self, result):
@@ -1502,25 +1455,19 @@ class DM41ExplorerApp(ctk.CTk):
             lambda: messagebox.showinfo("Sent", "Memory state sent to the calculator."),
         )
 
-    def _on_io_failed(self, message):
-        self._on_command_error(message)
-
     def get_state_from_calculator(self):
         if not self._require_serial_mode():
             return
         if not self.serial.is_connected:
             messagebox.showwarning("Not Connected", "Connect to the DM41L first.")
             return
-        if self.memory.modified and not messagebox.askyesno(
-            "Unsaved Changes",
-            "Discard unsaved changes and read the calculator's memory?",
-        ):
+        if not self._confirm_discard("read the calculator's memory"):
             return
         self._set_status("Reading memory state...")
         self.after(
             10,
             lambda: self._execute_command(
-                MemoryStringCommand(), self._on_state_received, self._on_io_failed
+                MemoryStringCommand(), self._on_state_received, self._on_command_error
             ),
         )
 
@@ -1594,9 +1541,7 @@ class DM41ExplorerApp(ctk.CTk):
     def on_close(self):
         if self._closing:
             return  # e.g. Cmd+Q delivered by two routes at once
-        if self.memory.modified and not messagebox.askyesno(
-            "Unsaved Changes", "Discard unsaved changes and quit?"
-        ):
+        if not self._confirm_discard("quit"):
             return
         self._closing = True
         if self._resize_after_id is not None:
