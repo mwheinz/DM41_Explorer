@@ -8,7 +8,7 @@ Replaces the 2026-09-28 file-manager-first plan (still in git history, last comm
 
 1. Extend the memory module so it handles everything a DM41X can put in a state file: the larger XM (already done), the XROM instructions the DM41X adds (its own module, plus X<I>Y and TRNG), and any DM41X state that turns out to live in `.d41` files.
 2. Make every existing DM41L_Explorer feature work on a `.d41` state file.
-3. Port the result to `~/Work/dm41decoder`, web UI included, as pull requests to SwissMicros.
+3. Port the result to SwissMicros' dm41decoder project, web UI included, as pull requests.
 
 ## Decisions (2026-10-05)
 

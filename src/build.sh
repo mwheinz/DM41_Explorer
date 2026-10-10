@@ -29,7 +29,8 @@ pyinstaller dm41explorer.spec
 
 # macOS requires at least an ad-hoc signature for the app to launch at all
 # on Apple Silicon -- this is separate from (and needed even without) a
-# real Apple Developer ID; see docs/release_checklist.md. No-op elsewhere.
+# real Apple Developer ID, which a signed and notarized release would also
+# need. No-op elsewhere.
 if [ "$(uname)" = "Darwin" ]; then
     codesign --force --deep --sign - "dist/DM41_Explorer.app"
     cp -r ../README.md "dist/README.md"

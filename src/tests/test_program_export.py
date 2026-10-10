@@ -10,8 +10,8 @@ sources external to this project:
 
   1. docs/program.md's own worked "simple.dm41" example, itself checked
      against the real DM41L's CAT 1 listing: APPTEST occupies 26 bytes.
-  2. ~/Work/hp41uc (Leo Duran's HP-41 User-Code File Converter) compiled
-     from source (Source/Makefile) and run directly: feeding APPTEST's
+  2. hp41uc (Leo Duran's HP-41 User-Code File Converter), built from
+     source and run directly: feeding APPTEST's
      26 raw instruction bytes through `hp41uc /r=apptest.raw /d`
      reproduces the exact DAT bytes hard-coded below, byte for byte.
   3. tests/data/tower.{txt,dat,raw}: a real, much larger (1088-byte)
@@ -58,9 +58,9 @@ APPTEST_BYTES = bytes.fromhex(
     "c000f8004150505445535410021140111010468475b200c40309"
 )
 
-# hp41uc's own DAT output for exactly these bytes -- verified against a
-# locally-built hp41uc binary (~/Work/hp41uc/Source, `make` then
-# `./hp41uc /r=apptest.raw /d`), byte for byte.
+# hp41uc's own DAT output for exactly these bytes -- verified against an
+# hp41uc binary built from source (`hp41uc /r=apptest.raw /d`), byte for
+# byte.
 APPTEST_DAT_REFERENCE = (
     b"001AC000F8004150505445535410021140111010468475B200C4030948"
 )
@@ -266,7 +266,7 @@ def test_decode_program_dat_rejects_truncated_file():
 
 
 # -- PPC: a third, non-hp41uc format found alongside real RAW/DAT/TXT
-# files for the same programs (~/Work/DM41/TowerOfSkelos, given the
+# files for the same programs (the Tower of Skelos listings, given the
 # ".ppc" suffix by whoever saved them) --------------------------------
 #
 # Reverse-engineered by comparing two real *.ppc files against their own
@@ -340,8 +340,8 @@ def test_decode_program_ppc_rejects_corrupt_checksum():
         decode_program_dat(bytes(data))
 
 
-# -- TXT: the plain-text keystroke-listing format (memory/program_text.py,
-# docs/program_text_io_plan.md). encode_program_txt()/decode_program_txt()
+# -- TXT: the plain-text keystroke-listing format (memory/program_text.py).
+# encode_program_txt()/decode_program_txt()
 # here are thin UTF-8-bytes wrappers around program_text.py's own str-based
 # converters (see program_files.py's own docstring) -- the actual opcode
 # table and tokenizer are already exhaustively tested directly against

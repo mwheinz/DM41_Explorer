@@ -1,7 +1,7 @@
 """Tests for memory/mnemonics.py, the FOCAL instruction-name registry
 (docs/mnemonic_dialects_plan.md), and for how program_text.py uses it.
 
-The hp41uc tables below were transcribed from ~/Work/hp41uc/Source at
+The hp41uc tables below were transcribed from hp41uc's source at
 commit ff23b21 (hp41ucg.h single20_8F/prefix90_9F, compile.h
 alt_fcn1/alt_fcn2, compile.c) so the checks don't depend on that source
 tree being present.

@@ -1,8 +1,7 @@
 '''
 Tests for decompiling HP-41 program instruction bytes into plain text
-(memory/program_text.py's encode_program_txt()) -- phase 1 ("Opcode
-table + decompile only") of docs/program_text_io_plan.md's suggested
-phasing.
+(memory/program_text.py's encode_program_txt()), and compiling it back
+(decode_program_txt()) further down.
 
 The main test here (test_encode_program_txt_matches_tower_reference)
 round-trips the same real, third-party-generated 1088-byte program used
@@ -12,17 +11,16 @@ compares the result against tower.txt line by line -- the strongest
 available check, since tower.txt wasn't produced by any code in this
 project. Every one of tower.txt's 527 real instruction lines is expected
 to match exactly, since decompiling can't invent branch-offset math or
-guess ambiguous encodings (docs/program_text_io_plan.md sec 2.2) -- the
-opcode table is either right or it visibly isn't.
+guess ambiguous encodings -- the opcode table is either right or it
+visibly isn't.
 
 Two categories of expected, harmless divergence are accounted for rather
 than ignored outright:
 
   1. User-written prose comments (";Tower of Skelos Game Program",
      ";Append colon", etc.) can never be recovered from compiled bytes --
-     comments aren't part of the instruction stream at all -- so this
-     project's own decompile decision (docs/program_text_io_plan.md sec
-     5) is to reproduce hp41uc's own *mechanical* annotations (the XROM
+     comments aren't part of the instruction stream at all -- so the
+     decompiler reproduces only hp41uc's own *mechanical* annotations (the XROM
      name comment, the END trailer) but not arbitrary human prose. The
      comparison below strips any trailing `;...` comment from tower.txt's
      side before comparing, but NOT from this module's own output --
@@ -255,17 +253,15 @@ def test_encode_program_txt_never_raises_on_every_sample_program():
 
 
 # ===========================================================================
-# Phase 2 -- decode_program_txt(): compiling text back into instruction
-# bytes. docs/program_text_io_plan.md's own phase-2 description (sec 7):
-# "round-trip-test against the same tower.txt/tower.raw pair, and against
-# a few hand-authored short test programs covering each instruction
-# category (single-byte, postfix, global label, ALPHA text with escapes,
-# XROM, END)."
+# decode_program_txt(): compiling text back into instruction bytes,
+# round-trip-tested against the same tower.txt/tower.raw pair and against
+# short hand-authored programs covering each instruction category
+# (single-byte, postfix, global label, ALPHA text with escapes, XROM, END).
 # ===========================================================================
 
 
 def test_decode_program_txt_matches_tower_raw_bytes():
-    '''The strongest available check (plan doc sec 4.4): tower.raw is
+    '''The strongest available check: tower.raw is
     *hp41uc's own compiled output* from tower.txt, so a byte-identical
     match here confirms this module's compiler against a real,
     third-party-generated program, not just against its own decompiler.
@@ -317,7 +313,7 @@ def _normalize_memory_state_fields(data: bytes) -> bytes:
         key-assignment syntax anywhere in the program-text format to
         begin with.
       - An END's packed-status nibble -- packing is a separate,
-        already-implemented, user-invoked operation (plan doc sec 5),
+        user-invoked operation,
         not something a freshly compiled program has an opinion about.
       - A GTO/XEQ's cached jump-distance bytes (compact B1-BF's second
         byte; the long D0-EF form's low nibble, second byte, and
@@ -476,7 +472,7 @@ def test_decode_program_txt_local_letter_labels_round_trip():
 def test_decode_program_txt_numeric_literal_separator_round_trips():
     '''src/tests/data/numtest.dm41 -- a real DM41 capture built
     specifically to test the "two adjacent numeric literals need an
-    inserted 0x00 separator byte" quirk (plan doc sec 2.3). This is also
+    inserted 0x00 separator byte" quirk. This is also
     the fixture that caught a real bug during this module's own
     development: encode_program_txt() was originally *merging* the two
     separator-divided digit runs into one over-long displayed number
@@ -502,8 +498,7 @@ def test_decode_program_txt_numeric_literal_separator_round_trips():
     )
 
 
-# -- Hand-authored short test programs, one per instruction category
-# (docs/program_text_io_plan.md sec 7's own phase-2 description) --------
+# -- Hand-authored short test programs, one per instruction category ------
 
 
 def test_decode_program_txt_single_byte_category():
@@ -676,8 +671,8 @@ def test_decode_program_txt_unknown_opcode_passthrough_round_trips():
     '''A synthetic/unassigned opcode (one of the two confirmed-spare
     bytes, 0xAF -- see this module's own _SPARE_OPCODES) renders as an
     informational comment on decompile; recompiling that comment,
-    unedited, must reproduce the exact original bytes -- plan doc sec 5's
-    decompile-edit-recompile round-trip requirement.'''
+    unedited, must reproduce the exact original bytes, so a
+    decompile-edit-recompile round trip is lossless.'''
     original = bytes([0xAF, 0x03])
     text = encode_program_txt(original)
     assert text.splitlines() == ["; UNKNOWN OPCODE: AF 03"]

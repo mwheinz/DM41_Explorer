@@ -56,14 +56,14 @@ The package's modules:
                     and ProgramLabel/Program (the grouped, END-delimited
                     "real program" view built on top of that chain)
   opcode_scan.py   find_program_end() -- forward HP-41 opcode-length
-                    scanner (ported from hp41uc's seek_end(), see
-                    ~/Work/hp41uc/Source/decomp.c), used by
+                    scanner (ported from seek_end() in hp41uc's
+                    decomp.c), used by
                     ProgramMemory.get_program_bytes() to find one named
                     program's own byte range for export
   program_files.py encode_program_raw/encode_program_dat and
                     decode_program_raw/decode_program_dat -- hp41uc-
-                    compatible single-program file formats (RAW/DAT;
-                    see ~/Work/hp41uc/Source/convert.c) -- plus
+                    compatible single-program file formats (RAW/DAT,
+                    as in hp41uc's convert.c) -- plus
                     encode_program_ppc for the "PPC" format (DAT's own
                     hex text, word-wrapped) and encode_program_txt/
                     decode_program_txt, thin UTF-8-bytes wrappers around
@@ -78,8 +78,8 @@ The package's modules:
                     splicing them into program memory
   program_text.py  encode_program_txt()/decode_program_txt() -- converts
                     between a program's raw instruction bytes and
-                    hp41uc-style plain text (str, not bytes -- see
-                    docs/program_text_io_plan.md); program_files.py
+                    hp41uc-style plain text (str, not bytes);
+                    program_files.py
                     wraps these as the package's own TXT format entry,
                     matching RAW/DAT/PPC's bytes-in/bytes-out shape
   mnemonics.py     the FOCAL instruction-name registry: resolve() any

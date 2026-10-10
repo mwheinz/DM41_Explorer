@@ -1,14 +1,13 @@
 '''
 Converting between raw HP-41 program instruction bytes and a plain-text
-keystroke listing -- see docs/program_text_io_plan.md's suggested
-phasing (sec. 7): phase 1, `encode_program_txt()` (bytes -> text,
-decompile), and phase 2, `decode_program_txt()` (text -> bytes, compile).
+keystroke listing: `encode_program_txt()` (bytes -> text, decompile) and
+`decode_program_txt()` (text -> bytes, compile).
 
 `encode_program_txt()` turns a program's instruction bytes (the same
 bytes `ProgramMemory.get_program_bytes()`/`decode_program_raw()`/
 `decode_program_dat()` deal in) into text closely matching hp41uc's own
-decompiler conventions (Leo Duran's HP-41 User-Code File Converter,
-~/Work/hp41uc/Source/decomp.c) -- one instruction per line, `;` comments,
+decompiler conventions (hp41uc, Leo Duran's HP-41 User-Code File
+Converter; its decomp.c) -- one instruction per line, `;` comments,
 quoted ALPHA strings, `XROM mm,ff` with a name comment, and so on.
 
 `decode_program_txt()` is its reverse: it tokenizes that same kind of
@@ -21,11 +20,10 @@ way back in, and the "every global marker's chain-link fields are always
 zero" finding that makes `LBL "NAME"`/`END` byte-identical to hp41uc's
 own compiled output without any cross-instruction bookkeeping).
 
-The opcode table itself was derived by cross-checking three sources
-against each other, since ~/Work/hp41uc's C source isn't reachable from
-every environment this project is developed in (a fourth source, added
-later, covers the synthetic-only status-register postfixes M/N/O/P/Q/
-R/a/b/c/d/e -- see the module-level comment above _STACK_REGISTER_NAMES):
+The opcode table itself was derived by cross-checking these sources
+against each other (the fourth covers the synthetic-only status-register
+postfixes M/N/O/P/Q/R/a/b/c/d/e -- see the module-level comment above
+_STACK_REGISTER_NAMES):
 
   1. `opcode_scan.py`'s byte-length classification (itself a port of
      hp41uc's `seek_end()`) -- which byte ranges are 1/2/3-byte or
@@ -33,8 +31,7 @@ R/a/b/c/d/e -- see the module-level comment above _STACK_REGISTER_NAMES):
      those exact ranges, so it can never desync from the already-tested
      length scanner.
   2. `functions.py`'s SINGLE_BYTE_FUNCTIONS/XROM_FUNCTIONS tables --
-     already confirmed (per docs/program_text_io_plan.md sec 3) to give
-     the correct in-*program*-byte instruction for every entry at 0x40
+     which give the correct in-*program*-byte instruction for every entry at 0x40
      and above, and the correct XROM (0xA6, byte2) table for the two
      ROM modules (Extended Functions, Time) the DM41L emulates. The
      instruction *names* come from memory/mnemonics.py, which builds on
@@ -184,10 +181,9 @@ _LONG_UNRESOLVED_BYTE2 = 0x00
 _LONG_LABEL_MASK = 0x7F  # bit 7 is the jump direction, not "indirect"
 
 # 0xAF and 0xB0 -- the two bytes between GTO/XEQ IND (0xAE) and the compact
-# GTO block (0xB1-0xBF) -- are confirmed-spare, unassigned opcodes: see
-# docs/program_text_io_plan.md sec 2.3 ("hp41uc also emits informational
-# ... comments for two truly unassigned 'spare' opcode bytes (0xAF,
-# 0xB0)"). They fall in opcode_scan's 2-byte-instruction range, so each
+# GTO block (0xB1-0xBF) -- are unassigned "spare" opcodes, for which
+# hp41uc emits an informational comment rather than an instruction.
+# They fall in opcode_scan's 2-byte-instruction range, so each
 # still consumes one operand byte; see _decode_2byte() below.
 _SPARE_OPCODES = frozenset({0xAF, 0xB0})
 
@@ -342,7 +338,7 @@ def _append_mnemonic(lines, mnemonic, operand_text, data, start, length):
 def _format_unknown(data: bytes, start: int, length: int) -> str:
     '''hp41uc's own decompiler emits an informational, non-recompilable
     comment line for a synthetic/unassigned opcode byte rather than
-    silently dropping it (docs/program_text_io_plan.md sec 2.3/5) -- e.g.
+    silently dropping it -- e.g.
     the two confirmed-spare bytes 0xAF/0xB0. This module follows the same
     policy for anything else it doesn't recognize (an unexpected operand
     byte, an unassigned prefix range, etc.), rather than guessing.'''
@@ -383,10 +379,9 @@ def _encode_alpha_content(data: bytes) -> str:
     this format's own syntax: a literal double-quote (0x22) would be
     ambiguous with the closing quote, and a literal backslash (0x5C)
     would be ambiguous with an escape sequence -- both instead go through
-    the \\nnn numeric fallback, matching this project's other file
-    formats' own canonical escape spelling (docs/program_text_io_plan.md
-    sec 3.1's decision) since there's no fixture evidence favoring any
-    other spelling. Anything outside the printable range at all (control
+    the \\nnn numeric fallback, the canonical escape spelling this
+    project's other file formats use, since there's no fixture evidence
+    favoring any other spelling. Anything outside the printable range at all (control
     bytes, DEL, high bytes) also falls back to \\nnn for the same reason.'''
     out = []
     for b in data:
@@ -446,8 +441,7 @@ def encode_program_txt(data: bytes) -> str:
     conventions (see this module's docstring for how that convention was
     derived and confirmed).
 
-    Per docs/program_text_io_plan.md sec 5's round-trip decision, this is
-    *not* expected to exactly reproduce a hand-authored source file's own
+    This is *not* expected to exactly reproduce a hand-authored source file's own
     prose comments (those are discarded when a file is compiled and can
     never be recovered from the compiled bytes alone) -- only hp41uc's
     own mechanical annotations (the "XROM mm,ff" name comment, the END
@@ -676,9 +670,8 @@ _AMBIGUOUS_NUMBER_LITERAL_TEXT = "-"
 # Reverse of _STACK_REGISTER_NAMES: display name -> raw base value.
 _STACK_REGISTER_CODES = {v: k for k, v in _STACK_REGISTER_NAMES.items()}
 
-# hp41uc's own C-style single-letter escapes (docs/program_text_io_plan.md
-# sec 5's decision: "accepted on decode ... none collide with
-# trigraphs.py's shorthand table"). Accept-only -- _encode_alpha_content()
+# hp41uc's own C-style single-letter escapes, accepted on decode (none
+# collide with trigraphs.py's shorthand table). Accept-only -- _encode_alpha_content()
 # above never emits these, only the canonical \nnn form; see this
 # module's own top-of-file docstring.
 _C_STYLE_ESCAPES = {
@@ -724,7 +717,7 @@ def _tokenize_line(line: str) -> List[str]:
 
     Stops -- discarding the token that triggered it and the rest of the
     line -- at the first token, outside quotes, that begins with `;` or
-    `#` (hp41uc's own two comment markers, plan doc sec 2.1). A token can
+    `#` (hp41uc's own two comment markers). A token can
     only begin with one of those characters right at a whitespace/line
     boundary (checked here via "is `cur` still empty"), which is exactly
     what keeps a mnemonic like "X#Y?" (a single token whose first
@@ -796,8 +789,7 @@ def _decode_alpha_text_literal(text: str) -> bytes:
     character (0x20-0x7E) maps to its own byte value, matching hp41uc's
     "FOCAL's reassigned punctuation prints literally" behavior confirmed
     in this module's own docstring/`_encode_alpha_content()`. `\\` starts
-    an escape: `\\XHH` (2 hex digits, the capital-X spelling settled on
-    in docs/program_text_io_plan.md sec 3.1 to avoid colliding with
+    an escape: `\\XHH` (2 hex digits; a capital X, to avoid colliding with
     trigraphs.py's lowercase `\\x` "times" shorthand), `\\nnn` (3 decimal
     digits, this project's own canonical fallback -- what
     _encode_alpha_content() actually emits), or one of the C-style
@@ -1166,10 +1158,9 @@ def decode_program_txt(text: str) -> bytes:
     Compiles a plain-text keystroke listing (as produced by
     `encode_program_txt()`, or an hp41uc/community-authored `.txt` file
     such as `src/tests/data/tower.txt` itself) back into one program's
-    raw instruction bytes, ready for `ProgramMemory.import_program()` (per
-    docs/program_text_io_plan.md sec 4.3/sec 5: packing is a separate,
-    already-implemented, user-invoked operation and is never this
-    function's job).
+    raw instruction bytes, ready for `ProgramMemory.import_program()`.
+    Packing is a separate, user-invoked operation (Memory.pack()) and is
+    never this function's job.
 
     One line is (usually) one instruction; see _tokenize_line() for the
     quote/escape-aware tokenizer and comment handling (`;`/`#`, matching

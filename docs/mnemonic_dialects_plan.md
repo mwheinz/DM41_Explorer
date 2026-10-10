@@ -229,7 +229,7 @@ reference document (§3.8).
 ### 3.4 Canonical table from hp41uc
 
 Decision (§5, item 7): **hand-maintained tables, no extraction script.**
-Checked against `~/Work/hp41uc/Source` at commit ff23b21 on 2026-09-22.
+Checked against hp41uc's source at commit ff23b21 on 2026-09-22.
 The tables are short and hp41uc is effectively frozen, so a generator
 would be more code than the data it produces.
 
@@ -462,8 +462,7 @@ versions is not required (former R7 removed).
 
 hp41uc is GPLv3. The tables contain only instruction names, which
 are HP's own published mnemonics and common community spellings (facts),
-not hp41uc code. This keeps the tables
-clear of the concern flagged in `program_text_io_plan.md` §6.
+not hp41uc code, so copying them raises no licensing concern.
 
 ## 7. Phasing
 
@@ -501,7 +500,7 @@ test before starting the next one.
 
 ## 8. References
 
-- hp41uc (canonical mnemonic source, commit ff23b21): `~/Work/hp41uc/Source` —
+- hp41uc (canonical mnemonic source, commit ff23b21), in its source tree —
   `hp41ucg.h` (decompile tables), `compile.h` (`alt_fcn1`/`alt_fcn2`),
   `compile.c` (`GOTO`, `.END.`).
 - TkinterWeb: https://github.com/Andereoo/TkinterWeb

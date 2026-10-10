@@ -3,8 +3,7 @@ Encoders for exporting a single HP41 program file.
 
 Supports RAW, DAT, "PPC" (a DAT that's been broken into multiple lines, as
 seen in PPC Calculator Journal program listings), and TXT (a plain-text
-HP-41 keystroke listing -- see memory/program_text.py and
-docs/program_text_io_plan.md).
+HP-41 keystroke listing -- see memory/program_text.py).
 
 `encode_program_[raw, dat, ppc, txt]()` convert a program's instruction
 bytes into a file's own bytes.
@@ -209,7 +208,7 @@ def encode_program_txt(data: bytes) -> bytes:
     gui/program_tab.py's `_EXPORT_FORMATS` dispatch, `Path.write_bytes()`,
     expects -- see that module's docstring). Not an hp41uc file format of
     its own the way RAW/DAT are, but hp41uc-style text either way -- see
-    docs/program_text_io_plan.md.
+    memory/program_text.py.
     '''
     return _encode_program_txt(data).encode("utf-8")
 

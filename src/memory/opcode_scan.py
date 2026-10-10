@@ -5,7 +5,7 @@ that program occupies by walking its opcodes, up to and including its own
 terminating END marker.
 
 This is a direct Python port of `seek_end()` from hp41uc (Leo Duran's
-HP-41 User-Code File Converter, ~/Work/hp41uc/Source/decomp.c), used there
+HP-41 User-Code File Converter; its decomp.c), used there
 to find a program's length within a raw byte stream when converting
 between HP-41 file formats. It walks forward
 byte-by-byte, classifying each opcode by its length (single
