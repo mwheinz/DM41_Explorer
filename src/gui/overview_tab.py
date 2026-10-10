@@ -238,9 +238,9 @@ class OverviewTab(ctk.CTkScrollableFrame):
             return
 
         try:
-            r00 = self._memory.status_registers.R00()
-            dot_end = self._memory.status_registers.DotEnd()
-            sigma_reg = self._memory.status_registers.SigmaReg()
+            r00 = self._memory.status_registers.R00
+            dot_end = self._memory.status_registers.DotEnd
+            sigma_reg = self._memory.status_registers.SigmaReg
         except Exception as e:
             logger.warning("Could not decode register c: %s", e)
             ctk.CTkLabel(
@@ -406,7 +406,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
 
         # Memory.has_program_partition() is the single source of truth
         # for whether this state has a sane R00/.END. partition, replacing
-        # this method's old separate R00()/DotEnd()/MIN_SANE_R00 check
+        # this method's old separate R00/DotEnd/MIN_SANE_R00 check
         # (GitHub issue #25). It is also exactly what decides whether the
         # "program"/"data" spans appear in regions()'s output below, so
         # the two can't disagree. Very slightly stricter than the old

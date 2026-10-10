@@ -156,7 +156,7 @@ def test_program_and_data_regions_follow_r00():
     memory = Memory.from_file(DATA_DIR / "simple.dm41")
     programs, data = memory.programs, memory.data_memory
 
-    r00 = memory.status_registers.R00()
+    r00 = memory.status_registers.R00
     assert programs.end == r00 - 1
     assert data.start == r00
     assert data.end == PRIMARY_DATA_END
@@ -176,10 +176,10 @@ def test_program_and_data_regions_follow_r00():
 def test_program_region_follows_dot_end():
     memory = Memory.from_file(DATA_DIR / "simple.dm41")
     programs = memory.programs
-    assert programs.start == memory.status_registers.DotEnd()
+    assert programs.start == memory.status_registers.DotEnd
 
     memory.status_registers.set_DotEnd(programs.start - 4)
-    assert programs.start == memory.status_registers.DotEnd()
+    assert programs.start == memory.status_registers.DotEnd
     assert programs.count > 0
 
 
@@ -188,7 +188,7 @@ def test_free_space_shrinks_as_programs_grow():
     free = memory.free_space
     before = free.count
 
-    memory.status_registers.set_DotEnd(memory.status_registers.DotEnd() - 5)
+    memory.status_registers.set_DotEnd(memory.status_registers.DotEnd - 5)
 
     assert free.count == before - 5
     assert free.end == memory.programs.start - 1

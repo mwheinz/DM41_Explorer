@@ -254,8 +254,8 @@ arithmetic of their own:
    currently holds -- `import_program()` always zeroes a freshly-spliced
    label's own key-assignment byte (see its own docstring, step 4), so
    this has to be restored afterward rather than assumed preserved.
-2. Zero every register from `alarms_end()` up to (not including) `R00()`
-   and set `.END.` to `R00()` itself -- `list_global_chain()`'s own
+2. Zero every register from `alarms_end()` up to (not including) `R00`
+   and set `.END.` to `R00` itself -- `list_global_chain()`'s own
    definition of "no programs at all yet" (its `dend < r00` check).
 3. Re-`import_program()` each captured program in order, restoring its
    labels' key assignments (but not touching KEYFLAGS -- §4.5 -- which
@@ -281,7 +281,7 @@ arithmetic of their own:
 `ProgramMemory.remove_program(program)` calls this for the remaining
 programs. This matters for more than just the newest program: the oldest
 program in memory always starts at a fixed address (`_program_memory_top_
-addr()`, right below `R00()`), so deleting anything older than the newest can't
+addr()`, right below `R00`), so deleting anything older than the newest can't
 just erase bytes in place -- without a rebuild, the freed space would sit
 *above* wherever `.END.` making the registers of the removed program
 unreachable. Also clears the KEYFLAGS bit (§4.5) for any of the removed
@@ -297,7 +297,7 @@ explicitly re-runs the Key Assignments/Alarms repack
 already been edited, but will close any gaps that had accumulated in a state
 that was loaded from a DM41L. current as a side effect -- a no-op for a state
 this app has only ever edited itself, but self-healing for one that wasn't.
-Returns the number of registers reclaimed (`DotEnd() - alarms_end()`'s
+Returns the number of registers reclaimed (`DotEnd - alarms_end()`'s
 increase), 0 if nothing needed packing; idempotent (a second `pack()` call
 always returns 0) across every sample state in `src/tests/data/`. It is
 negative (-1) only when a newest program was closed by `.END.` directly and
@@ -354,7 +354,7 @@ Stepping through the programs (SST) after such a load has not been tried.
 `ProgramMemory._forward_scan_programs()` reads
 program memory as one flat span, from `_program_memory_top_addr()` (the oldest
 program's fixed, unmovable start) down to `.END.`'s own floor
-(`_addr_for(DotEnd(), 6)`) -- trusting `R00()`/`DotEnd()` themselves as sane
+(`_addr_for(DotEnd, 6)`) -- trusting `R00`/`DotEnd` themselves as sane
 boundary pointers, uses`opcode_scan.scan_global_markers_forward()` to
 explicitly traverse the entire memory region, and records every marker (label
 or END) it passes, in physical/forward-discovery order, using none of their
@@ -376,11 +376,11 @@ problem in the rebuilt memory. Repairing every link first, before
 grouping the (now internally self-consistent) per-program byte ranges,
 avoids that.
 
-Because this only trusts `R00()`/`DotEnd()` and the physical opcode
+Because this only trusts `R00`/`DotEnd` and the physical opcode
 bytes -- nothing about the existing chain -- it raises `DM41MemoryError`
 (and changes nothing) rather than guessing wherever it cannot be sure it
 has found every real program without risking silently dropping one: if
 real (non-zero) data is present but no marker at all can be found in it,
 if the very last marker found is a label with nothing closing it, or if
-non-zero bytes remain between the last marker found and `DotEnd()`'s own
+non-zero bytes remain between the last marker found and `DotEnd`'s own
 floor. See `src/tests/test_pack.py`'s own corruption tests for each case.

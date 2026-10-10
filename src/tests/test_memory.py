@@ -1288,8 +1288,8 @@ def test_r00_and_dotend_match_known_sample_states():
     }
     for filename, (expected_r00, expected_dotend) in cases.items():
         memory = Memory.from_file(DATA_DIR / filename)
-        assert memory.status_registers.R00() == expected_r00, filename
-        assert memory.status_registers.DotEnd() == expected_dotend, filename
+        assert memory.status_registers.R00 == expected_r00, filename
+        assert memory.status_registers.DotEnd == expected_dotend, filename
 
 
 def test_cold_start_signature_is_0x169_in_every_sample():
@@ -1297,7 +1297,7 @@ def test_cold_start_signature_is_0x169_in_every_sample():
     documented as a fixed cold-start signature; every real sample state
     should show the same value (0x169) there. There's no public accessor
     for this (it's not user-actionable), so read it via the same nibble
-    math R00()/DotEnd() use."""
+    math R00/DotEnd use."""
     for path in DATA_DIR.glob("*.dm41"):
         memory = load_fixture(path)
         nibbles = memory.status_registers._reg_c_nibbles()
@@ -1376,14 +1376,14 @@ def test_key_assignments_end_on_fresh_memory():
 
 def test_set_r00_rewrites_only_the_r00_field():
     memory = Memory.from_file(DATA_DIR / "empty.dm41")
-    sigma_before = memory.status_registers.SigmaReg()
-    dotend_before = memory.status_registers.DotEnd()
+    sigma_before = memory.status_registers.SigmaReg
+    dotend_before = memory.status_registers.DotEnd
 
     memory.status_registers.set_R00(0x150)
 
-    assert memory.status_registers.R00() == 0x150
-    assert memory.status_registers.SigmaReg() == sigma_before
-    assert memory.status_registers.DotEnd() == dotend_before
+    assert memory.status_registers.R00 == 0x150
+    assert memory.status_registers.SigmaReg == sigma_before
+    assert memory.status_registers.DotEnd == dotend_before
 
 
 def test_set_r00_rejects_out_of_range_values():

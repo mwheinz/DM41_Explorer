@@ -47,7 +47,7 @@ class DataMemory(MemoryRegion):
         '''
         if not self._memory.has_program_partition():
             return PRIMARY_DATA_END + 1
-        return self._memory.status_registers.R00()
+        return self._memory.status_registers.R00
 
     @property
     def end(self) -> int:

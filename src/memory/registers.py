@@ -31,6 +31,17 @@ class DM41MemoryError(ValueError):
 DM41LMemoryError = DM41MemoryError
 
 
+def _pack_nibbles(nibbles) -> bytes:
+    '''Packs nibbles, most significant first, two to a byte.'''
+    if len(nibbles) % 2:
+        raise ValueError(f"Need an even number of nibbles, got {len(nibbles)}.")
+    if not all(0 <= n <= 0xF for n in nibbles):
+        raise ValueError(f"Nibbles must be 0-15, got {list(nibbles)}.")
+    return bytes(
+        (nibbles[i] << 4) | nibbles[i + 1] for i in range(0, len(nibbles), 2)
+    )
+
+
 class Register:
     '''
     Represents a hardware register with arbitrary byte length.
@@ -63,6 +74,12 @@ class Register:
     def copy(self) -> "Register":
         '''An independent copy: changing one never changes the other.'''
         return Register(self._data)
+
+    @classmethod
+    def from_nibbles(cls, nibbles) -> "Register":
+        '''The inverse of get_nibbles(): a register built from `nibbles`,
+        most significant first, two to a byte.'''
+        return cls(_pack_nibbles(nibbles))
 
     def get_hex(self) -> str:
         '''This returns the data in big-endian order.'''
@@ -207,12 +224,7 @@ class Register:
         nibbles.append(exp_val // 10)  # E1
         nibbles.append(exp_val % 10)  # E2
 
-        # Pack nibbles into bytes and update _data
-        new_data = bytearray()
-        for i in range(0, len(nibbles), 2):
-            byte = (nibbles[i] << 4) | nibbles[i + 1]
-            new_data.append(byte)
-        self._data = new_data
+        self._data = bytearray(_pack_nibbles(nibbles))
 
     # Byte-0 marker for a register holding short alpha text rather than a
     # BCD number (docs/memory.md "Alpha Storage"): a register whose first

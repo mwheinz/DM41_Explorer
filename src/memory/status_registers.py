@@ -157,17 +157,19 @@ class StatusRegisters(MemoryRegion):
         nibbles[first_nibble] = (addr >> 8) & 0xF
         nibbles[first_nibble + 1] = (addr >> 4) & 0xF
         nibbles[first_nibble + 2] = addr & 0xF
-        new_bytes = bytes((nibbles[i] << 4) | nibbles[i + 1] for i in range(0, 14, 2))
-        self.set_register(self.REG_C_ADDR, Register(data=new_bytes))
+        self.set_register(self.REG_C_ADDR, Register.from_nibbles(nibbles))
 
+    @property
     def SigmaReg(self) -> int:
         '''Absolute address of SIGMA-REG, decoded from register c.'''
         return self._nibbles_to_int(self._reg_c_nibbles()[0:3])
 
+    @property
     def DotEnd(self) -> int:
         '''Absolute address of the end of loaded program memory (".END.").'''
         return self._nibbles_to_int(self._reg_c_nibbles()[11:14])
 
+    @property
     def R00(self) -> int:
         '''
         Absolute address of data register 00 -- the boundary between
@@ -205,39 +207,50 @@ class StatusRegisters(MemoryRegion):
     # -- Register d: the 56 user/system flags ----------------------------
     # See docs/flags.md for each flag's name.
 
-    def get_flag(self, n: int) -> bool:
-        if not (0 <= n < self.FLAG_COUNT):
-            raise ValueError(f"Flag number must be 0-{self.FLAG_COUNT - 1}, got {n}")
-        d = self.get_register(self.REG_D_ADDR)
-        if d.size != 7:
-            raise DM41MemoryError("Flags register is an invalid size.")
+    # -- Numbered bits ----------------------------------------------------
+    #
+    # Flags (register d) and KEYFLAGS (registers R and e) both number their
+    # bits from the most significant bit of the register's first printed
+    # byte: bit 0 is the top bit of byte 0, bit 8 the top bit of byte 1.
 
-        byte_index, bit_in_byte = divmod(n, 8)
-        return bool((d.get_bytes()[byte_index] >> (7 - bit_in_byte)) & 1)
+    def _get_bit(self, addr: int, bit: int) -> bool:
+        byte_index, bit_in_byte = divmod(bit, 8)
+        data = self.get_register(addr).get_bytes()
+        return bool((data[byte_index] >> (7 - bit_in_byte)) & 1)
 
-    def set_flag(self, n: int, value: bool):
-        if not (0 <= n < self.FLAG_COUNT):
-            raise ValueError(f"Flag number must be 0-{self.FLAG_COUNT - 1}, got {n}")
-        d = self.get_register(self.REG_D_ADDR)
-        if d.size != 7:
-           raise DM41MemoryError("Flags register is an invalid size.")
-
-        data = bytearray(d.get_bytes())
-        byte_index, bit_in_byte = divmod(n, 8)
+    def _set_bit(self, addr: int, bit: int, value: bool):
+        byte_index, bit_in_byte = divmod(bit, 8)
+        data = bytearray(self.get_register(addr).get_bytes())
         mask = 1 << (7 - bit_in_byte)
         if value:
             data[byte_index] |= mask
         else:
             data[byte_index] &= ~mask & 0xFF
-        self.set_register(self.REG_D_ADDR, Register(data=bytes(data)))
+        self.set_register(addr, Register(data=bytes(data)))
+
+    def _flags_register(self) -> Register:
+        d = self.get_register(self.REG_D_ADDR)
+        if d.size != 7:
+            raise DM41MemoryError("Flags register is an invalid size.")
+        return d
+
+    def _check_flag_number(self, n: int):
+        if not (0 <= n < self.FLAG_COUNT):
+            raise ValueError(f"Flag number must be 0-{self.FLAG_COUNT - 1}, got {n}")
+
+    def get_flag(self, n: int) -> bool:
+        self._check_flag_number(n)
+        self._flags_register()
+        return self._get_bit(self.REG_D_ADDR, n)
+
+    def set_flag(self, n: int, value: bool):
+        self._check_flag_number(n)
+        self._flags_register()
+        self._set_bit(self.REG_D_ADDR, n, value)
 
     def get_all_flags(self) -> list:
         '''Returns a list of FLAG_COUNT bools, flag 0 first.'''
-        d = self.get_register(self.REG_D_ADDR)
-        if d.size != 7:
-           raise DM41MemoryError("Flags register is an invalid size.")
-
-        bits = int.from_bytes(d.get_bytes(), "big")
+        bits = int.from_bytes(self._flags_register().get_bytes(), "big")
         binary = format(bits, f"0{self.FLAG_COUNT}b")
         return [c == "1" for c in binary]
 
@@ -252,20 +265,11 @@ class StatusRegisters(MemoryRegion):
     KEYFLAGS_UNSHIFTED_ADDR = 0x0A  # R
     KEYFLAGS_SHIFTED_ADDR = 0x0F  # e
 
+    def _keyflags_addr(self, shifted: bool) -> int:
+        return self.KEYFLAGS_SHIFTED_ADDR if shifted else self.KEYFLAGS_UNSHIFTED_ADDR
+
     def get_keyflag_bit(self, bit: int, shifted: bool) -> bool:
-        addr = self.KEYFLAGS_SHIFTED_ADDR if shifted else self.KEYFLAGS_UNSHIFTED_ADDR
-        reg = self.get_register(addr)
-        byte_index, bit_in_byte = divmod(bit, 8)
-        return bool((reg.get_bytes()[byte_index] >> (7 - bit_in_byte)) & 1)
+        return self._get_bit(self._keyflags_addr(shifted), bit)
 
     def set_keyflag_bit(self, bit: int, shifted: bool, value: bool):
-        addr = self.KEYFLAGS_SHIFTED_ADDR if shifted else self.KEYFLAGS_UNSHIFTED_ADDR
-        reg = self.get_register(addr)
-        data = bytearray(reg.get_bytes())
-        byte_index, bit_in_byte = divmod(bit, 8)
-        mask = 1 << (7 - bit_in_byte)
-        if value:
-            data[byte_index] |= mask
-        else:
-            data[byte_index] &= ~mask & 0xFF
-        self.set_register(addr, Register(data=bytes(data)))
+        self._set_bit(self._keyflags_addr(shifted), bit, value)

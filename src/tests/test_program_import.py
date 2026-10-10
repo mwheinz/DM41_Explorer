@@ -48,8 +48,8 @@ def test_import_apptest_into_empty_memory_matches_simple_dm41_exactly():
     assert imported.names_label == "APPTEST"
     assert imported.length == 26
     assert dest.programs.get_program_bytes(imported) == apptest_bytes
-    assert dest.status_registers.DotEnd() == source.status_registers.DotEnd()
-    assert dest.status_registers.R00() == source.status_registers.R00()
+    assert dest.status_registers.DotEnd == source.status_registers.DotEnd
+    assert dest.status_registers.R00 == source.status_registers.R00
 
 
 def test_import_unlabelled_program_into_empty_memory_round_trips_exactly():
@@ -87,7 +87,7 @@ def test_import_dat_and_raw_of_tower_produce_identical_results():
     imported_raw = dest_raw.programs.import_program(raw_bytes)
     imported_dat = dest_dat.programs.import_program(dat_bytes)
     assert dest_raw.programs.get_program_bytes(imported_raw) == dest_dat.programs.get_program_bytes(imported_dat)
-    assert dest_raw.status_registers.DotEnd() == dest_dat.status_registers.DotEnd()
+    assert dest_raw.status_registers.DotEnd == dest_dat.status_registers.DotEnd
 
 
 def test_import_ppc_of_tower_matches_dat_and_raw():
@@ -109,7 +109,7 @@ def test_import_ppc_of_tower_matches_dat_and_raw():
     imported_ppc = dest_ppc.programs.import_program(ppc_bytes)
     imported_dat = dest_dat.programs.import_program(dat_bytes)
     assert dest_ppc.programs.get_program_bytes(imported_ppc) == dest_dat.programs.get_program_bytes(imported_dat)
-    assert dest_ppc.status_registers.DotEnd() == dest_dat.status_registers.DotEnd()
+    assert dest_ppc.status_registers.DotEnd == dest_dat.status_registers.DotEnd
 
 
 # -- Case B: importing alongside a program that already has a real END ----
@@ -260,14 +260,14 @@ def test_import_raises_when_program_memory_is_full_and_leaves_memory_unchanged()
     dest.status_registers.set_R00(alarms_end + 2)  # ~14 bytes of free program memory
     dest.status_registers.set_DotEnd(alarms_end + 1)
 
-    before_dot_end = dest.status_registers.DotEnd()
+    before_dot_end = dest.status_registers.DotEnd
     before_programs = dest.programs.list_programs()
 
     tower_bytes = decode_program_raw((DATA_DIR / "tower.raw").read_bytes())
     with pytest.raises(DM41MemoryError):
         dest.programs.import_program(tower_bytes)
 
-    assert dest.status_registers.DotEnd() == before_dot_end
+    assert dest.status_registers.DotEnd == before_dot_end
     assert dest.programs.list_programs() == before_programs
 
 

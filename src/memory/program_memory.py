@@ -62,7 +62,7 @@ class ProgramMemory(MemoryRegion):
         values. See Memory.has_program_partition().'''
         if not self._memory.has_program_partition():
             return PRIMARY_DATA_END + 1
-        return self._memory.status_registers.DotEnd()
+        return self._memory.status_registers.DotEnd
 
     @property
     def end(self) -> int:
@@ -70,7 +70,7 @@ class ProgramMemory(MemoryRegion):
         not here.'''
         if not self._memory.has_program_partition():
             return PRIMARY_DATA_END
-        return self._memory.status_registers.R00() - 1
+        return self._memory.status_registers.R00 - 1
 
     # -- Byte addressing within program memory ---------------------------
 
@@ -90,7 +90,7 @@ class ProgramMemory(MemoryRegion):
         very first program ever written begins (see docs/program.md's
         "Addressing within program memory"). R00 itself belongs to the
         free/data-register side of the partition, not to program memory.'''
-        return self.addr_for(self._memory.status_registers.R00() - 1, 0)
+        return self.addr_for(self._memory.status_registers.R00 - 1, 0)
 
     def read_bytes_forward(self, reg: int, offset: int, count: int) -> bytes:
         '''Reads `count` bytes starting at (reg, offset) in the direction
@@ -203,8 +203,8 @@ class ProgramMemory(MemoryRegion):
         accidentally circular chain.
         '''
         status = self._memory.status_registers
-        r00 = status.R00()
-        dend = status.DotEnd()
+        r00 = status.R00
+        dend = status.DotEnd
         # MIN_SANE_R00 -- guards against an R00 value below any real
         # partition boundary. This is NOT what makes a fresh,
         # never-loaded Memory() return [] below: Memory.__init__ seeds
@@ -567,7 +567,7 @@ class ProgramMemory(MemoryRegion):
            register -- docs/program.md sec 5.1), writes a fresh `.END.`
            marker there linking back to the program's own trailing
            marker, and moves the `.END.` pointer (`set_DotEnd()`) to it.
-           `R00()` is never touched -- growing into the Key
+           `R00` is never touched -- growing into the Key
            Assignments/Alarms regions is refused outright (step 7) rather
            than silently reclaiming data-register space to make room.
 
@@ -613,7 +613,7 @@ class ProgramMemory(MemoryRegion):
                 "This doesn't decode as one well-formed HP-41 program -- "
                 "find_program_end() disagrees with the file's own length."
             )
-        if not (MIN_SANE_R00 <= status.R00() <= PRIMARY_DATA_END):
+        if not (MIN_SANE_R00 <= status.R00 <= PRIMARY_DATA_END):
             raise DM41MemoryError(
                 "No valid program memory partition is loaded -- load or "
                 "start a memory buffer first."
@@ -819,7 +819,7 @@ class ProgramMemory(MemoryRegion):
         Physically re-derives every program in this region by scanning its
         raw opcodes forward -- from `top_addr()` (the oldest program's
         fixed starting point) down to `.END.`'s own floor
-        (`self.addr_for(DotEnd(), 6)`) -- entirely independent of the
+        (`self.addr_for(DotEnd, 6)`) -- entirely independent of the
         existing backward chain-link ("backlink") fields
         `list_global_chain()`/`list_programs()` rely on. This is `repack()`'s
         primary job (below), per the user's own real-hardware
@@ -835,7 +835,7 @@ class ProgramMemory(MemoryRegion):
         rebuild the chain from scratch, the same way
         `scan_global_markers_forward()` (opcode_scan.py) does.
 
-        Trusts `R00()`/`DotEnd()` themselves as sane boundary pointers --
+        Trusts `R00`/`DotEnd` themselves as sane boundary pointers --
         confirmed by the user's own investigation to remain correct even
         when the chain *inside* that span is broken -- but nothing about
         the marker bytes within that span, including a marker's own
@@ -869,7 +869,7 @@ class ProgramMemory(MemoryRegion):
         where real content ends: if real (non-zero) bytes are found but
         no marker at all could be located in them, if the very last
         marker found is a label with nothing closing it, or if non-zero
-        bytes remain between the last marker found and `DotEnd()`'s own
+        bytes remain between the last marker found and `DotEnd`'s own
         floor. Any of these mean the scan cannot be sure it has found
         every real program without risking silently dropping one --
         matching this project's existing preference (see
@@ -877,8 +877,8 @@ class ProgramMemory(MemoryRegion):
         guessing when a state does not look well-formed.
         '''
         status = self._memory.status_registers
-        r00 = status.R00()
-        dend = status.DotEnd()
+        r00 = status.R00
+        dend = status.DotEnd
         if not (MIN_SANE_R00 <= r00 <= PRIMARY_DATA_END) or not (
             KEY_ASSIGNMENTS_RANGE[0] <= dend < r00
         ):
@@ -1011,7 +1011,7 @@ class ProgramMemory(MemoryRegion):
         validly in this Memory before the call.
 
         First clears every register from the top of the Alarms buffer up
-        to (not including) `R00()` and resets `.END.` to `R00()` itself --
+        to (not including) `R00` and resets `.END.` to `R00` itself --
         `list_global_chain()`'s own definition of "no programs at all
         yet" (its `dend < r00` check) -- then re-`import_program()`s each
         entry in order. Reusing `import_program()` here, rather than
@@ -1042,9 +1042,9 @@ class ProgramMemory(MemoryRegion):
         never does that (see `repack()`).
         '''
         status = self._memory.status_registers
-        for reg in range(self._memory.alarms.end_exclusive, status.R00()):
+        for reg in range(self._memory.alarms.end_exclusive, status.R00):
             self._memory.set_register(reg, Register(size=7))
-        status.set_DotEnd(status.R00())
+        status.set_DotEnd(status.R00)
 
         for instruction_bytes, key_assignments in programs:
             imported = self.import_program(instruction_bytes)
@@ -1078,7 +1078,7 @@ class ProgramMemory(MemoryRegion):
         This collapses the two back into that canonical single-marker
         form -- but ONLY when it's actually safe to: `.END.` is only ever
         valid register-aligned, sitting in the last 3 bytes of whatever
-        register `DotEnd()` names (docs/program.md sec 5.1), while an
+        register `DotEnd` names (docs/program.md sec 5.1), while an
         ordinary internal chain marker (what the last-imported program's
         own real END now is) can legally sit at any byte offset within
         its own register -- most of the time it won't happen to be
@@ -1104,7 +1104,7 @@ class ProgramMemory(MemoryRegion):
         because APPTEST happens to already be offset-4-aligned).
 
         Only ever called when `_rebuild()` actually imported at least one
-        program -- with none, `.END.` is already sitting at `R00()` (no
+        program -- with none, `.END.` is already sitting at `R00` (no
         separate sentinel was ever written) and there is nothing to
         collapse.
 
@@ -1133,7 +1133,7 @@ class ProgramMemory(MemoryRegion):
         # Programs grow downward, so the old, separate `.END.` register
         # sits at a LOWER address than the END that just became `.END.`:
         # it (and anything between) is the stale space to give back.
-        old_dot_end_reg = status.DotEnd()
+        old_dot_end_reg = status.DotEnd
         status.set_DotEnd(pred_reg)
         for stale in range(old_dot_end_reg, pred_reg):
             self._memory.set_register(stale, Register(size=7))
@@ -1150,10 +1150,10 @@ class ProgramMemory(MemoryRegion):
         Removing anything other than the single newest program
         (`is_last`) is not simply "erase these bytes": every OLDER
         program sits at a fixed, unmovable address (the oldest one
-        always starts exactly at `top_addr()`, right below `R00()` -- see
+        always starts exactly at `top_addr()`, right below `R00` -- see
         that method's docstring), so deleting one from the middle (or the
         very oldest one) would otherwise leave a hole of genuinely
-        unreachable register space wedged between `R00()` and whatever
+        unreachable register space wedged between `R00` and whatever
         programs remain above it -- space the `FreeSpace` region's own
         accounting would never see, since it only ever looks at the gap
         between the Alarms buffer and `.END.`. This reclaims that space by
@@ -1235,7 +1235,7 @@ class ProgramMemory(MemoryRegion):
         `pack_anomaly_investigation_2026-08-24.md` -- becomes visible
         again via `list_programs()`/`list_global_chain()`, and assignable
         to a key. Every program found is then rewritten back tightly
-        against `R00()` with `_rebuild()`, reclaiming any accumulated
+        against `R00` with `_rebuild()`, reclaiming any accumulated
         register-alignment drift the same way `remove_program()` does for
         the program it deletes.
 

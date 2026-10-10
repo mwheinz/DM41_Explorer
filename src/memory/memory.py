@@ -433,8 +433,8 @@ class Memory:
         of R00 to an illegal value.
         '''
         try:
-            r00 = self.status_registers.R00()
-            dot_end = self.status_registers.DotEnd()
+            r00 = self.status_registers.R00
+            dot_end = self.status_registers.DotEnd
         except Exception:  # pylint: disable=broad-except
             return False
         return r00 >= MIN_SANE_R00 and dot_end <= r00
@@ -525,11 +525,11 @@ class Memory:
         happens. All-or-nothing: if anything raises, nothing is changed
         (see transaction()).
         '''
-        before_free = self.status_registers.DotEnd() - self.alarms.end_exclusive
+        before_free = self.status_registers.DotEnd - self.alarms.end_exclusive
 
         with self.transaction():
             self.key_assignments.repack()
             self.programs.repack()
 
-        after_free = self.status_registers.DotEnd() - self.alarms.end_exclusive
+        after_free = self.status_registers.DotEnd - self.alarms.end_exclusive
         return after_free - before_free

@@ -136,7 +136,7 @@ def test_pack_on_twolabels_closes_the_program_with_end_and_an_empty_dot_end():
     memory = Memory.from_file(DATA_DIR / "twolabels.dm41")
     before = memory.programs.list_programs()[0]
     assert before.terminator == ".END."
-    before_dot_end = memory.status_registers.DotEnd()
+    before_dot_end = memory.status_registers.DotEnd
 
     freed = memory.pack()
 
@@ -144,7 +144,7 @@ def test_pack_on_twolabels_closes_the_program_with_end_and_an_empty_dot_end():
     assert len(after) == 1
     assert after[0].terminator == "END"
     assert freed == -1
-    assert memory.status_registers.DotEnd() == before_dot_end - 1
+    assert memory.status_registers.DotEnd == before_dot_end - 1
 
 
 # -- Key Assignments / Alarms --------------------------------------------------
@@ -192,11 +192,11 @@ def test_pack_preserves_global_label_key_assignments():
 def test_pack_on_empty_program_memory_is_a_safe_no_op():
     memory = Memory.from_file(DATA_DIR / "empty.dm41")
     assert memory.programs.list_programs() == []
-    before_dot_end = memory.status_registers.DotEnd()
+    before_dot_end = memory.status_registers.DotEnd
     freed = memory.pack()
     assert freed == 0
     assert memory.programs.list_programs() == []
-    assert memory.status_registers.DotEnd() == before_dot_end
+    assert memory.status_registers.DotEnd == before_dot_end
 
 
 def test_pack_on_a_freshly_constructed_memory_does_not_raise():
@@ -275,7 +275,7 @@ def test_pack_repaired_label_can_be_assigned_to_a_key(unpacked_name, label):
 
 
 def _zero_marker(memory, index_from_top, count=3):
-    top_addr = memory.programs.addr_for(memory.status_registers.R00() - 1, 0)
+    top_addr = memory.programs.addr_for(memory.status_registers.R00 - 1, 0)
     memory.programs.write_bytes_forward(top_addr - index_from_top, bytes(count))
 
 
@@ -284,14 +284,14 @@ def test_pack_raises_when_no_marker_can_be_found_at_all():
     # zeroed out, but real opcode bytes still sit between them -- no
     # marker at all can be found even though real content is present.
     memory = Memory.from_file(DATA_DIR / "simple.dm41")
-    before_dot_end = memory.status_registers.DotEnd()
+    before_dot_end = memory.status_registers.DotEnd
     for index in (0, 23, 32):
         _zero_marker(memory, index)
 
     with pytest.raises(DM41MemoryError):
         memory.pack()
     # Program memory itself must be untouched by a call that raises.
-    assert memory.status_registers.DotEnd() == before_dot_end
+    assert memory.status_registers.DotEnd == before_dot_end
 
 
 def test_pack_raises_when_the_last_marker_is_an_unterminated_label():
@@ -299,29 +299,29 @@ def test_pack_raises_when_the_last_marker_is_an_unterminated_label():
     # zeroed out, leaving its SECOND label as the last thing the forward
     # scan can find, with nothing closing it.
     memory = Memory.from_file(DATA_DIR / "twolabels.dm41")
-    before_dot_end = memory.status_registers.DotEnd()
+    before_dot_end = memory.status_registers.DotEnd
     program = memory.programs.list_programs()[0]
     raw = memory.programs.get_program_bytes(program)
     _zero_marker(memory, len(raw) - 3)
 
     with pytest.raises(DM41MemoryError):
         memory.pack()
-    assert memory.status_registers.DotEnd() == before_dot_end
+    assert memory.status_registers.DotEnd == before_dot_end
 
 
 def test_pack_raises_when_unrecognized_data_follows_the_last_marker():
-    # DotEnd() moved one register lower than where simple.dm41's real
+    # DotEnd moved one register lower than where simple.dm41's real
     # .END. actually sits, with a stray non-zero byte in that extra
     # register -- pack() can't tell whether that's real, unparsed
     # content or just corruption, so it refuses to guess.
     memory = Memory.from_file(DATA_DIR / "simple.dm41")
-    memory.status_registers.set_DotEnd(memory.status_registers.DotEnd() - 1)
-    before_dot_end = memory.status_registers.DotEnd()
-    extra_reg = memory.status_registers.DotEnd()
+    memory.status_registers.set_DotEnd(memory.status_registers.DotEnd - 1)
+    before_dot_end = memory.status_registers.DotEnd
+    extra_reg = memory.status_registers.DotEnd
     data = bytearray(memory.get_register(extra_reg).get_bytes())
     data[3] = 0x55
     memory.set_register(extra_reg, Register(data=bytes(data)))
 
     with pytest.raises(DM41MemoryError):
         memory.pack()
-    assert memory.status_registers.DotEnd() == before_dot_end
+    assert memory.status_registers.DotEnd == before_dot_end

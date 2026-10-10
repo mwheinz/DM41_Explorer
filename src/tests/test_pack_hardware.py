@@ -58,8 +58,8 @@ def program_area(memory) -> bytes:
     """Every byte from the oldest program's first byte down to the floor of
     the `.END.` register, in reading order."""
     status, programs = memory.status_registers, memory.programs
-    top_addr = programs.addr_for(status.R00() - 1, 0)
-    floor_addr = programs.addr_for(status.DotEnd(), 6)
+    top_addr = programs.addr_for(status.R00 - 1, 0)
+    floor_addr = programs.addr_for(status.DotEnd, 6)
     reg, offset = programs.pos_for(top_addr)
     return programs.read_bytes_forward(reg, offset, top_addr - floor_addr + 1)
 
@@ -69,7 +69,7 @@ def free_registers(memory) -> list:
     that must read as untouched zeros."""
     return [
         memory.get_register(r).get_hex()
-        for r in range(memory.alarms.end_exclusive, memory.status_registers.DotEnd())
+        for r in range(memory.alarms.end_exclusive, memory.status_registers.DotEnd)
     ]
 
 
@@ -84,12 +84,12 @@ def path(name):
 def test_pack_reproduces_a_real_hardware_pack(before_name, after_name):
     memory = load_fixture(path(before_name))
     hardware = load_fixture(path(after_name))
-    registers_before = memory.status_registers.DotEnd()
+    registers_before = memory.status_registers.DotEnd
 
     freed = memory.pack()
 
-    assert memory.status_registers.DotEnd() == hardware.status_registers.DotEnd()
-    assert freed == hardware.status_registers.DotEnd() - registers_before
+    assert memory.status_registers.DotEnd == hardware.status_registers.DotEnd
+    assert freed == hardware.status_registers.DotEnd - registers_before
     assert program_area(memory) == clear_jump_caches(program_area(hardware))
 
 
@@ -106,11 +106,11 @@ def test_pack_leaves_no_stale_bytes_in_the_registers_it_frees(before_name, after
 def test_pack_is_a_no_op_on_a_file_a_real_pack_already_packed(packed_name):
     memory = load_fixture(path(packed_name))
     before_area = program_area(memory)
-    before_dot_end = memory.status_registers.DotEnd()
+    before_dot_end = memory.status_registers.DotEnd
 
     assert memory.pack() == 0
 
-    assert memory.status_registers.DotEnd() == before_dot_end
+    assert memory.status_registers.DotEnd == before_dot_end
     assert program_area(memory) == clear_jump_caches(before_area)
 
 
@@ -238,7 +238,7 @@ def test_a_real_pack_of_an_already_packed_file_changes_nothing_in_program_memory
     packed = load_fixture(path("manyfiles-packed.dm41"))
     repacked = load_fixture(path("manyfiles-repacked.dm41"))
     assert program_area(repacked) == program_area(packed)
-    assert repacked.status_registers.DotEnd() == packed.status_registers.DotEnd()
+    assert repacked.status_registers.DotEnd == packed.status_registers.DotEnd
 
 
 def test_twolabels_costs_one_register_exactly_like_the_real_pack_did():
@@ -250,7 +250,7 @@ def test_twolabels_costs_one_register_exactly_like_the_real_pack_did():
     hardware = load_fixture(path("twolabels-packed.dm41"))
     assert memory.pack() == -1
     assert program_area(memory) == program_area(hardware)
-    assert memory.status_registers.DotEnd() == hardware.status_registers.DotEnd()
+    assert memory.status_registers.DotEnd == hardware.status_registers.DotEnd
 
 
 # Explorer-produced output (Tools > Pack Memory) that was then loaded on a

@@ -73,3 +73,28 @@ def test_register_copy_is_independent():
     duplicate[0] = 0xFF
     assert original.get_hex() == "01020304050607"
     assert duplicate == Register.from_hex("010203040506ff")
+
+
+def test_from_nibbles_is_the_inverse_of_get_nibbles():
+    reg = Register.from_hex("1a70016919c19b")
+    assert Register.from_nibbles(reg.get_nibbles()) == reg
+
+
+def test_from_nibbles_rejects_bad_input():
+    import pytest
+
+    with pytest.raises(ValueError, match="even number"):
+        Register.from_nibbles([1, 2, 3])
+    with pytest.raises(ValueError, match="0-15"):
+        Register.from_nibbles([1, 16])
+
+
+def test_pointers_are_properties():
+    memory = Memory.from_file(DATA_DIR / "6x-xm.dm41")
+    status = memory.status_registers
+    assert isinstance(status.R00, int)
+    assert isinstance(status.DotEnd, int)
+    assert isinstance(status.SigmaReg, int)
+    before = status.R00
+    status.set_R00(before - 1)
+    assert status.R00 == before - 1  # read live, not cached

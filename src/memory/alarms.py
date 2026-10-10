@@ -251,11 +251,7 @@ class Alarms(MemoryRegion):
 
     @staticmethod
     def _bcd_nibbles(data: bytes) -> List[int]:
-        nibbles = []
-        for b in data:
-            nibbles.append(b >> 4)
-            nibbles.append(b & 0xF)
-        return nibbles
+        return Register(data).get_nibbles()
 
     @classmethod
     def _decode_bcd_centiseconds(cls, reg_bytes: bytes) -> int:
@@ -274,11 +270,7 @@ class Alarms(MemoryRegion):
             raise ValueError(
                 f"{centiseconds} centiseconds doesn't fit a 12-digit BCD field."
             )
-        nibbles = [int(c) for c in digits]
-        data = bytearray(6)
-        for i in range(6):
-            data[i] = (nibbles[2 * i] << 4) | nibbles[2 * i + 1]
-        return bytes(data)
+        return Register.from_nibbles([int(c) for c in digits]).get_bytes()
 
     @classmethod
     def _decode_time(cls, reg_bytes: bytes) -> Tuple[datetime.datetime, bool]:

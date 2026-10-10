@@ -245,4 +245,4 @@ class FreeSpace(MemoryRegion):
     def end(self) -> int:
         if not self._memory.has_program_partition():
             return PRIMARY_DATA_END
-        return self._memory.status_registers.DotEnd() - 1
+        return self._memory.status_registers.DotEnd - 1

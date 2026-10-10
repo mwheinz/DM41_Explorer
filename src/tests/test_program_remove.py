@@ -43,7 +43,7 @@ def test_remove_oldest_program_keeps_the_rest_intact():
     assert _names_lengths(after) == [("XMALPHA", 51), ("PURXM", 20)]
     # R00 (the data-register boundary) is never touched by a program
     # removal -- only the program/free-memory split below it moves.
-    assert memory.status_registers.R00() == 0x19C
+    assert memory.status_registers.R00 == 0x19C
 
 
 def test_remove_newest_program_leaves_the_new_newest_dot_end_terminated():
@@ -82,7 +82,7 @@ def test_remove_the_only_program_leaves_program_memory_genuinely_empty():
     assert memory.programs.list_global_chain() == []
     # .END. collapses all the way back to R00 -- list_global_chain()'s
     # own definition of "no programs at all yet".
-    assert memory.status_registers.DotEnd() == memory.status_registers.R00()
+    assert memory.status_registers.DotEnd == memory.status_registers.R00
 
 
 # -- Content integrity of what's left behind ---------------------------------
@@ -233,5 +233,5 @@ def test_remove_newest_program_leaves_no_stale_marker_in_the_space_it_frees():
 
     memory.programs.remove_program(programs[-1])
 
-    free = range(memory.alarms.end_exclusive, memory.status_registers.DotEnd())
+    free = range(memory.alarms.end_exclusive, memory.status_registers.DotEnd)
     assert all(memory.get_register(r).get_hex() == "0" * 14 for r in free)
