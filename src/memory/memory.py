@@ -184,10 +184,17 @@ class Memory:
                 phase = 2
 
                 # This section can have a varying number of registers per
-                # line, but they should be in pairs.
+                # line, but they should be in "<letter>: <hex>" pairs.
+                if len(token) % 2 != 0:
+                    raise ValueError(
+                        f"Malformed line (expected label/value pairs): {line}"
+                    )
                 for i in range(0, len(token), 2):
-                    if ":" != token[i][1]:
-                        raise ValueError(f"Malformed line {line}")
+                    if len(token[i]) != 2 or token[i][1] != ":":
+                        raise ValueError(
+                            f"Malformed line ({token[i]!r} is not a "
+                            f"'<letter>:' label): {line}"
+                        )
                     label = token[i][0]
                     if label not in SPECIAL_REGISTER_LABELS:
                         raise ValueError(

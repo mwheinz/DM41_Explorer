@@ -436,6 +436,26 @@ def test_memory_from_string_rejects_wrong_length_special_register():
         Memory.from_string(state)
 
 
+@pytest.mark.parametrize(
+    "special_line, message",
+    [
+        # A label with no value after it (odd token count).
+        ("A: c000f50046494c B:", "expected label/value pairs"),
+        # A bare one-character token where a label should be.
+        ("A: c000f50046494c X 00000000000000", "'X' is not a '<letter>:' label"),
+        # The value glued onto its label.
+        ("A:c000f50046494c B:", "'A:c000f50046494c' is not"),
+        # A two-letter label.
+        ("AB: c000f50046494c", "'AB:' is not"),
+    ],
+)
+def test_memory_from_string_rejects_malformed_special_line(special_line, message):
+    """A malformed special-register line is reported as a ValueError (what
+    every load path catches and shows the user), never an IndexError."""
+    with pytest.raises(ValueError, match=message):
+        Memory.from_string("DM41\n" + special_line)
+
+
 @pytest.mark.parametrize("label", ["X", "a"])
 def test_memory_from_string_rejects_unknown_special_register(label):
     """Only A/B/C/S/M/N/G exist. Any other letter is reported as invalid
