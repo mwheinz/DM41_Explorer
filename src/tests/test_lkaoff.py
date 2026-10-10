@@ -6,11 +6,10 @@ assignments alone, so the OS treats those keys as unassigned and falls back
 to the auto-assigned local labels. tests/data/lkaoff3.d41 and lkaon3.d41
 differ in just that: each has global label LKATST on key 11 (unshifted) and
 BBB on key 12 (shifted); the flags are set in the LKAON file only.
+test_golden.py checks what each decodes to; these cover editing them.
 """
 
 from pathlib import Path
-
-import pytest
 
 from memory import DM41X, Memory
 from memory.mnemonics import key_bytes_for, resolve
@@ -24,44 +23,6 @@ def _load(name):
 
 def _normalised(memory):
     return " ".join(memory.to_string().split())
-
-
-def test_lkaoff_state_has_assignments_whose_flags_are_clear():
-    memory = _load("lkaoff3.d41")
-    keys = memory.key_assignments
-
-    assert keys.flag_clear_assignments() == [(11, False), (12, True)]
-    assert keys.is_lkaoff_like()
-    # The assignments themselves are all there.
-    assert memory.programs.get_program_for_key(11, False).name == "LKATST"
-    assert memory.programs.get_program_for_key(12, True).name == "BBB"
-
-
-def test_lkaon_state_has_nothing_clear():
-    memory = _load("lkaon3.d41")
-
-    assert memory.key_assignments.flag_clear_assignments() == []
-    assert not memory.key_assignments.is_lkaoff_like()
-    assert memory.programs.get_program_for_key(11, False).name == "LKATST"
-
-
-@pytest.mark.parametrize(
-    "name",
-    [
-        "dm41x_lkan.d41",
-        "dm41x_base.d41",
-        "dm41x_xrom_keys.d41",
-        "keyassigns.dm41",
-        "global-key-assignments.dm41",
-        "manyfiles.dm41",
-        "xrom-keyassignments.dm41",
-    ],
-)
-def test_ordinary_states_have_no_flag_clear_assignments(name):
-    memory = _load(name)
-
-    assert memory.key_assignments.flag_clear_assignments() == []
-    assert not memory.key_assignments.is_lkaoff_like()
 
 
 def test_function_assignment_with_a_clear_flag_is_found_too():

@@ -29,10 +29,9 @@ from memory import (
 DATA_DIR = Path(__file__).parent / "data"
 DM41X_STATE = DATA_DIR / "dm41x_manyfiles.dm41"
 
-# -- FIXTURE FACTS (decoded from dm41x_manyfiles.dm41) ---------------------
+# -- Facts about dm41x_manyfiles.dm41 that the editing tests below rely on
+# (test_golden.py checks everything it decodes to) ------------------------
 FILE_COUNT = 59
-FIRST_FILE = "XM0.   "
-LAST_FILE = "XM46.  "
 EOM_ADDR = 0x309  # the FF-filled end-of-directory register, in region 2
 
 # The three region pointer registers, exactly as the real DM41X wrote them.
@@ -107,92 +106,13 @@ def test_profile_is_part_of_memory_equality():
 # -- Reading the real three-region state --------------------------------------
 
 
-def test_dm41x_state_lists_all_files():
-    files = _x_memory().extended_memory.list_files()
-    assert len(files) == FILE_COUNT
-    assert files[0].name == FIRST_FILE
-    assert files[-1].name == LAST_FILE
-    # Names are unique.
-    assert len({f.name_bytes for f in files}) == FILE_COUNT
-
-
-def test_dm41x_state_files_use_all_three_regions():
-    memory = _x_memory()
-    regions = DM41X.xm_regions
-    used = set()
-    for f in memory.extended_memory.list_files():
-        for start, end in f.segments:
-            if end < start:
-                continue
-            for i, (lo, hi) in enumerate(regions):
-                if lo < start <= hi:
-                    assert end <= hi, f"{f.name}: segment crosses a region ceiling"
-                    used.add(i)
-    assert used == {0, 1, 2}
-
-
-def test_dm41x_state_has_exactly_two_spanning_files():
-    files = _x_memory().extended_memory.list_files()
-    spanning = {f.name.strip(): f for f in files if f.spans_regions}
-    assert set(spanning) == {"XMA2.", "XMA16."}
-    assert spanning["XMA2."].segments == [[0x41, 0x45], [0x2ED, 0x2EF]]
-    assert spanning["XMA16."].segments == [[0x202, 0x204], [0x3EB, 0x3EF]]
-    # A spanning file still has exactly its declared number of registers.
-    for f in spanning.values():
-        assert f.num_registers == f.declared_length == 8
-
-
-def test_dm41x_state_directory_ends_at_the_eom_marker():
-    memory = _x_memory()
-    files = memory.extended_memory.list_files()
-    last = files[-1]
-    assert _hex(memory, last.data_start - 1) == EOM_REGISTER_HEX
-    assert last.data_start - 1 == EOM_ADDR
-
-
-def test_dm41x_state_files_do_not_overlap():
-    files = _x_memory().extended_memory.list_files()
-    claimed = {}
-    for f in files:
-        addrs = [f.header_addr, f.header_addr + 1]  # header + name registers
-        for start, end in f.segments:
-            addrs.extend(range(start, end + 1))
-        for a in addrs:
-            assert a not in claimed, f"0x{a:x}: {f.name} overlaps {claimed[a]}"
-            claimed[a] = f.name
-
-
-def test_dm41x_state_file_contents_decode():
-    files = _x_memory().extended_memory.list_files()
-    by_name = {f.name.strip(): f for f in files}
-    # The file that crosses from region 1 into region 2 reads as one
-    # continuous record stream.
-    assert by_name["XMA16."].get_records() is not None
-    assert len(by_name["XMA16."].data_registers()) == 8
-    assert len(by_name["XMA2."].data_registers()) == 8
-
-
 def test_dm41x_state_loaded_as_a_dm41l_is_a_clean_error_not_an_indexerror():
     memory = Memory.from_file(DM41X_STATE)  # default DM41L profile
     with pytest.raises(DM41MemoryError, match="past the last XM region"):
         memory.extended_memory.list_files()
 
 
-def test_dm41x_state_round_trips_through_text():
-    memory = _x_memory()
-    again = Memory.from_string(memory.to_string(), profile=DM41X)
-    assert again == memory
-    assert _snapshot(again.extended_memory) == _snapshot(memory.extended_memory)
-
-
 # -- Region pointer registers ------------------------------------------------
-
-
-def test_dm41x_state_pointer_registers_are_as_decoded():
-    memory = _x_memory()
-    assert _hex(memory, 0x40) == R40
-    assert _hex(memory, 0x201) == R201
-    assert _hex(memory, 0x301) == R301
 
 
 def test_build_region_pointer_reproduces_the_real_registers():

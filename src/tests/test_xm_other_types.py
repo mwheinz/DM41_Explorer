@@ -33,36 +33,6 @@ def _with_type_nibble(nibble):
     return memory
 
 
-def test_the_retyped_state_lists_every_file():
-    _, before = _files("dm41x_retpfl_before.d41")
-    _, after = _files("dm41x_retpfl_after.d41")
-
-    assert len(after) == len(before) == 22
-    assert list(after) == list(before)
-
-
-def test_retyped_files_are_other_types_with_the_calculators_label():
-    _, after = _files("dm41x_retpfl_after.d41")
-
-    for name, file_type in RETYPED.items():
-        file = after[name]
-        assert file.file_type == file_type
-        assert file.is_other_type
-        assert file.type_label == f"@ (type {file_type})"
-        assert file.num_registers == 8
-
-
-def test_the_other_files_keep_their_types():
-    _, before = _files("dm41x_retpfl_before.d41")
-    _, after = _files("dm41x_retpfl_after.d41")
-
-    for name, file in after.items():
-        if name not in RETYPED:
-            assert not file.is_other_type
-            assert file.file_type == before[name].file_type
-            assert file.segments == before[name].segments
-
-
 def test_retyping_leaves_the_data_where_it_was():
     _, before = _files("dm41x_retpfl_before.d41")
     _, after = _files("dm41x_retpfl_after.d41")
@@ -120,13 +90,6 @@ def test_removing_another_file_keeps_the_retyped_ones():
     for name, file_type in RETYPED.items():
         assert after[name].file_type == file_type
         assert [r.get_hex() for r in after[name].data_registers()] == data[name]
-
-
-def test_retyped_state_round_trips_byte_for_byte():
-    text = (DATA_DIR / "dm41x_retpfl_after.d41").read_text()
-    memory = Memory.from_string(text, profile=DM41X)
-
-    assert " ".join(memory.to_string().split()) == " ".join(text.split())
 
 
 def test_other_type_constants_cover_exactly_4_to_15():

@@ -4,7 +4,6 @@ Covers Register class (BCD, ASCII, hex) and Memory class (parsing, access).
 """
 
 import pytest
-from decimal import Decimal
 from memory import (
     Register,
     Memory,
@@ -14,9 +13,7 @@ from memory import (
     Alarms,
     format_data_line,
     parse_data_line,
-    encode_trigraphs,
-    decode_trigraphs,
-)  # Assuming memory.py is in the same directory or installable
+)
 
 # --- Register Tests ---
 
@@ -598,7 +595,6 @@ def test_status_registers_invalid_address(status_memory):
 
 from pathlib import Path
 from memory import ExtendedMemory, DM41MemoryError, DM41L, zero_register
-from fixture_loading import load_fixture
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -606,68 +602,6 @@ DATA_DIR = Path(__file__).parent / "data"
 def _load_xm(filename: str) -> ExtendedMemory:
     memory = Memory.from_file(DATA_DIR / filename)
     return ExtendedMemory(memory, address_range=[0x40, 0x2EF])
-
-
-def test_xm_6x_finds_all_six_files():
-    """6x-xm.dm41 has 4 Data files, 1 ASCII file, and 1 Program file (PURXM)."""
-    xm = _load_xm("6x-xm.dm41")
-    files = xm.list_files()
-    assert len(files) == 6
-
-    by_name = {f.name: f for f in files}
-    # Names are the raw, space-padded 7-character header field (see
-    # docs/memory.md sec. 4.3): only PURXM is shorter than 7 characters.
-    assert set(by_name) == {
-        "XM1.000", "XM2.000", "XM3.000", "XM4.000", "XMALPHA", "PURXM  ",
-    }
-
-    for name in ("XM1.000", "XM2.000", "XM3.000"):
-        assert by_name[name].file_type == xm.TYPE_DATA
-        assert by_name[name].num_registers == 32
-
-    # XM4.000 declares 32 registers but only 23 fit below it within region 0
-    # -- the remaining 9 continue at the top of region 1 (0x2e7-0x2ef, just
-    # above XMALPHA's header), confirmed by the BCD values there picking up
-    # exactly where region 0's data leaves off (see docstring on
-    # ExtendedMemory.list_files()).
-    xm4 = by_name["XM4.000"]
-    assert xm4.file_type == xm.TYPE_DATA
-    assert xm4.declared_length == 32
-    assert xm4.num_registers == 32
-    assert xm4.spans_regions is True
-    assert xm4.segments == [[0x041, 0x057], [0x2E7, 0x2EF]]
-    numbers = xm4.get_numbers()
-    assert len(numbers) == 32
-    assert numbers == pytest.approx([64.095 + i * 1.0 for i in range(32)])
-
-    assert by_name["XMALPHA"].file_type == xm.TYPE_ASCII
-    assert by_name["XMALPHA"].num_registers == 128
-    # Only some of the 128 allocated registers hold actual records; the
-    # rest are unused/zero-filled, so get_records() legitimately returns
-    # fewer entries than num_registers.
-    assert len(by_name["XMALPHA"].get_records()) > 0
-
-    assert by_name["PURXM  "].file_type == xm.TYPE_PROGRAM
-    assert by_name["PURXM  "].num_registers == 3
-    assert by_name["PURXM  "].byte_length == 20
-    assert by_name["PURXM  "].checksum_valid is True
-    assert len(by_name["PURXM  "].get_instruction_bytes()) == 20
-
-
-def test_xm_3x_purxm_program_detected():
-    """3x-xm.dm41 also contains a saved PURXM program between XMBCD and
-    XMALPHA; before Program-header detection, its registers were wrongly
-    counted as part of XMALPHA's data (133 registers instead of 128)."""
-    xm = _load_xm("3x-xm.dm41")
-    files = xm.list_files()
-    by_name = {f.name: f for f in files}
-
-    # XMBCD and PURXM are shorter than 7 characters, so their names carry
-    # the raw space padding from the header field; XMALPHA fills all 7.
-    assert set(by_name) == {"XMBCD  ", "XMALPHA", "PURXM  "}
-    assert by_name["PURXM  "].file_type == xm.TYPE_PROGRAM
-    assert by_name["PURXM  "].checksum_valid is True
-    assert by_name["XMALPHA"].num_registers == 128
 
 
 def test_xm_program_header_rejects_non_signature_type1_nibble():
@@ -706,71 +640,6 @@ def test_xm_header_does_not_require_aaa_match_own_address():
         ExtendedMemory._parse_header(phantom_header)
 
 
-def test_xm_delfl_purfl_delete_relocates_file_with_stale_aaa():
-    """tests/data/delfl-xm.dm41: 6x-xm.dm41 loaded into the DM41L emulator,
-    then XM4.000 deleted with the emulator's own PURFL command (not this
-    tool's remove_file()) and the result saved back out -- the real-world
-    bug report that prompted _parse_header() to stop enforcing
-    AAA == addr (see its docstring and the class docstring above).
-
-    A real PURFL delete repacks extended memory using the very same
-    top-down/cross-region-spanning layout this tool already models for its
-    own add_file()/list_files(): it closes the gap XM4.000 left behind by
-    relocating XMALPHA into it (from header 0x2e5 down to 0x058 -- exactly
-    where XM4.000's own header used to sit, and PURXM down with it) -- but
-    it does NOT refresh XMALPHA's AAA field to match its new address (it's
-    still 0x2e5). Confirms every surviving file still loads, in its
-    relocated position, with byte-for-byte identical content to
-    6x-xm.dm41 -- despite that stale AAA."""
-    orig_files = {f.name: f for f in _load_xm("6x-xm.dm41").list_files()}
-    delfl_files = _load_xm("delfl-xm.dm41").list_files()
-    by_name = {f.name: f for f in delfl_files}
-
-    assert set(by_name) == {
-        "XM1.000", "XM2.000", "XM3.000", "XMALPHA", "PURXM  ",
-    }
-
-    # XM1-3 sit above XM4.000 in the stack and are untouched by its removal.
-    for name in ("XM1.000", "XM2.000", "XM3.000"):
-        assert by_name[name].header_addr == orig_files[name].header_addr
-
-    # XMALPHA is relocated into XM4.000's old slot -- header 0x2e5 -> 0x058
-    # -- and now spans regions itself (it didn't before).
-    xmalpha = by_name["XMALPHA"]
-    assert xmalpha.header_addr == 0x058
-    assert xmalpha.spans_regions is True
-    assert xmalpha.segments == [[0x041, 0x057], [0x287, 0x2EF]]
-
-    # PURXM (a Program file, found by its fixed signature rather than by
-    # AAA, so it was never at risk from this bug) shifts down with it.
-    purxm = by_name["PURXM  "]
-    assert purxm.header_addr == 0x285
-    assert purxm.segments == [[0x282, 0x284]]
-
-    # Every surviving file's content round-trips byte-for-byte through the
-    # relocation, regardless of file type.
-    for f in delfl_files:
-        orig_f = orig_files[f.name]
-        if f.file_type == ExtendedMemory.TYPE_DATA:
-            assert f.get_data_lines() == orig_f.get_data_lines()
-        elif f.file_type == ExtendedMemory.TYPE_ASCII:
-            assert f.get_records() == orig_f.get_records()
-        else:
-            assert f.get_program_bytes() == orig_f.get_program_bytes()
-            assert f.checksum_valid is True
-
-
-def test_xm_register_length_reads_full_three_nibble_field():
-    """declared_length must read the full 3-nibble SSS field, not just the
-    header's last byte -- fillextended.dm41's FILLMEM file is declared as
-    362 registers (spanning multiple XM regions), which a single-byte read
-    would truncate to 106 (362 mod 256)."""
-    xm = _load_xm("fillextended.dm41")
-    files = xm.list_files()
-    assert len(files) == 1
-    assert files[0].declared_length == 362
-
-
 def test_xm_get_program_bytes_wrong_type_raises():
     xm = _load_xm("6x-xm.dm41")
     data_file = next(f for f in xm.list_files() if f.file_type == xm.TYPE_DATA)
@@ -781,8 +650,8 @@ def test_xm_get_program_bytes_wrong_type_raises():
 # --- ExtendedMemory.add_file() ---
 #
 # Each test round-trips through list_files() rather than asserting on raw
-# register bytes -- that's the strongest available check, since list_files()
-# is independently tested against real captured states above.
+# register bytes; list_files() itself is checked against every real capture
+# by test_golden.py.
 
 
 def test_xm_add_file_bootstraps_empty_extended_memory():
@@ -859,28 +728,6 @@ def test_xm_edit_file_keeping_same_name_does_not_self_collide():
     xm.remove_file(added.header_addr)
     edited = xm.add_file("NOTES", xm.TYPE_ASCII, records=["hello", "world"])
     assert edited.get_records() == ["hello", "world"]
-
-
-def test_xm_list_files_preserves_raw_name_bytes_even_when_display_collides():
-    """manyfiles.dm41 has five ASCII files whose raw directory-entry names
-    differ only in an unprintable byte (0x01, 0x02, 0x03, 0x04, 0x06) --
-    Register.get_ascii() (which produces the display-only `.name`) renders
-    any byte outside 0x20-0x7E as '.', so all five show the identical
-    'XMA.   ' display name. `.name_bytes` (the raw 7 bytes, unaffected by
-    that sanitization) must still tell them apart -- add_file()'s
-    duplicate check and remove_file()'s rebuild both depend on this to
-    avoid mistaking these for the same file (see the tests below)."""
-    xm = _load_xm("manyfiles.dm41")
-    xma_files = [f for f in xm.list_files() if f.name == "XMA.   "]
-    assert len(xma_files) == 5
-    assert all(f.file_type == xm.TYPE_ASCII for f in xma_files)
-    assert {f.name_bytes for f in xma_files} == {
-        b"XMA\x01   ",
-        b"XMA\x02   ",
-        b"XMA\x03   ",
-        b"XMA\x04   ",
-        b"XMA\x06   ",
-    }
 
 
 def test_xm_edit_file_with_colliding_display_name_does_not_corrupt_state():
@@ -1262,112 +1109,6 @@ def test_xm_add_file_ascii_matches_real_device_encoding():
 
 
 # ---- R00 / .END. / Flags (register c / register d) ----
-#
-# Expected R00/.END. values below were read directly off register c
-# (address 0x0d) in each sample state and cross-checked two ways: against
-# the old (pre-rewrite) Project Voyager memory.py, which had independently
-# arrived at the same nibble math for R00/.END., and against the filename
-# of empty-128.dm41 (0x200 - 0x180 = 128 data registers).
-
-
-def test_r00_and_dotend_match_known_sample_states():
-    cases = {
-        "empty.dm41": (0x19C, 0x19B),
-        "empty-128.dm41": (0x180, 0x17F),
-        "helloworld.dm41": (0x19C, 0x19B),
-        "3x-xm.dm41": (0x19C, 0x187),
-        # 0x188, not 0x182 -- 6x-xm.dm41 was regenerated after this
-        # expectation was written (it briefly had an extra unnamed/empty
-        # program, just an END instruction, while its author was testing
-        # program-memory research; that shifted .END. and confused the
-        # chain walk in list_global_chain() until the fixture was fixed).
-        # 0x188 matches the file as it exists now and is what
-        # test_list_global_chain_6x_finds_xmbcd_xmalpha_purxm_their_ends_and_the_global_end
-        # already relies on below.
-        "6x-xm.dm41": (0x19C, 0x188),
-    }
-    for filename, (expected_r00, expected_dotend) in cases.items():
-        memory = Memory.from_file(DATA_DIR / filename)
-        assert memory.status_registers.R00 == expected_r00, filename
-        assert memory.status_registers.DotEnd == expected_dotend, filename
-
-
-def test_cold_start_signature_is_0x169_in_every_sample():
-    """The 3-nibble field between 'printer use' and R00 in register c is
-    documented as a fixed cold-start signature; every real sample state
-    should show the same value (0x169) there. There's no public accessor
-    for this (it's not user-actionable), so read it via the same nibble
-    math R00/DotEnd use."""
-    for path in DATA_DIR.glob("*.dm41"):
-        memory = load_fixture(path)
-        nibbles = memory.status_registers._reg_c_nibbles()
-        cold_start = memory.status_registers._nibbles_to_int(nibbles[5:8])
-        assert cold_start == 0x169, path.name
-
-
-def test_key_assignments_end_detects_f0_marked_registers():
-    """keyassigns.dm41 has 22 real assignments packed two-per-register into
-    registers 0xc0-0xca, each starting with the 0xf0 marker byte Wickes'
-    "Synthetic Programming on the HP-41C" (Section 2E) documents. Register
-    0xcb (203) is free/zeroed, so the scan should stop there."""
-    memory = Memory.from_file(DATA_DIR / "keyassigns.dm41")
-    assert memory.key_assignments.end_exclusive == 0xCB
-
-
-def test_key_assignments_end_is_start_when_no_assignments():
-    """Every other sample fixture has no Key Assignment Register entries,
-    so register 0xc0 itself shouldn't carry the 0xf0 marker and the scan
-    should report an empty region. keyassigns.dm41 and xrom-
-    keyassignments.dm41 are excluded -- both were purpose-built to
-    exercise the Key Assignment Registers and have real 0xf0-marked
-    entries there. (Two other fixtures once needed the same exclusion --
-    keyassigntest.dm41, referenced in memory/functions.py's module note,
-    and assigntest.dm41, a real device capture used while diagnosing the
-    2026-08-18 row-4 key-byte bug -- but both have since been retired from
-    tests/data/, so they're no longer in this set at all.)
-    global-key-assignments.dm41 is NOT excluded: its two assignments are
-    global-label ones (sec 4.6), which never touch the Key Assignment
-    Registers at all -- register 0xc0 there is correctly empty.
-
-    The alarmtest*.dm41/4alarmtest.dm41/repeater.dm41 fixtures are also
-    excluded: each one carries a real ALMCAT/XYZALM (and, in
-    4alarmtest.dm41, CLRALMS/TIME) Key Assignment Register pair captured
-    alongside their alarm data -- found 2026-08-20 while adding
-    Alarms-buffer-relocation tests, which is what first exercised this
-    check against them. badalarms.dm41 (2026-09-02, the user's own
-    add/delete/edit repro that turned up the FOCAL-literal-character bug,
-    docs/alarms.md sec 11) carries the same ALMCAT/XYZALM pair, inherited
-    from the 4alarmtest.dm41 buffer it was edited from -- excluded for the
-    same reason. goodalarms.dm41 (2026-09-02, the user's clean re-run of
-    the same add/delete/edit repro -- same 4 alarms as badalarms.dm41,
-    just with the first three retimed so none are past due -- confirming
-    the sec 12 repeats-flag fix on real hardware) carries the identical
-    inherited pair for the same reason. past-due.dm41 (2026-09-04,
-    alarmtest3.dm41's content with 4 of its 5 alarms forced past due to
-    confirm the past-due high-nibble marker on a repeating alarm for the
-    first time) is excluded for the same reason too -- it's built from
-    alarmtest3.dm41's own buffer, ALMCAT/XYZALM pair included.
-    tenthsofasecond.dm41 (2026-09-04, a single alarm deliberately set to
-    tenth-of-a-second trigger-time precision, used to correct the sec 12
-    repeats-flag digit to the last BCD nibble only rather than the last
-    two) carries the same inherited ALMCAT/XYZALM pair and is excluded
-    for the same reason. So do manyfiles-packed.dm41 and the
-    dm41x_pack_dotend pair (2026-10-04, real before/after PACK captures
-    taken from the same calculators)."""
-    excluded = {
-        "keyassigns.dm41", "xrom-keyassignments.dm41",
-        "manyfiles.dm41", "dm41x_manyfiles.dm41", "manyfiles-packed.dm41",
-        "dm41x_pack_dotend.dm41", "dm41x_pack_dotend-packed.dm41",
-        "manyfiles-repacked.dm41",
-        "alarmtest.dm41", "alarmtest2.dm41", "alarmtest3.dm41",
-        "4alarmtest.dm41", "repeater.dm41", "badalarms.dm41",
-        "goodalarms.dm41", "past-due.dm41", "tenthsofasecond.dm41",
-    }
-    for path in DATA_DIR.glob("*.dm41"):
-        if path.name in excluded:
-            continue
-        memory = load_fixture(path)
-        assert memory.key_assignments.end_exclusive == 0xC0, path.name
 
 
 def test_key_assignments_end_on_fresh_memory():
@@ -1569,457 +1310,60 @@ def test_xm_remove_file_then_add_new_file_still_works():
     assert "NEWFILE" in names
 
 
-# ---- Program memory: the raw global chain (docs/program.md sec 5) ----
+# ---- Program memory (docs/program.md sec 5) ----
 #
-# list_global_chain() is the raw, per-marker walk: expected names/counts
-# below were derived by walking the chain by hand against the raw hex in
-# each sample state (see docs/program.md sec 5.1 for simple.dm41 and
-# 6x-xm.dm41 specifically) and cross-checked against the real device's
-# CAT 1 listing for XMBCD/XMALPHA/PURXM, already recorded in project notes
-# from an earlier session.
-#
-# Entries here are NOT grouped into "programs" -- the user's own testing
-# (against a modified copy of 6x-xm.dm41) found a single END can have zero,
-# one, or several LBLs chained to it, so each entry is just one independent
-# chain link (a LBL header or an END marker). `distance_bytes` below is
-# that entry's own raw marker distance to the next chain link the walk
-# visits from it -- confirmed against the exact address arithmetic in
-# docs/program.md's worked examples, not a program size. For the grouped,
-# "one row per real program" view (what the Program tab and program export
-# actually use), see the list_programs() tests further below and
-# docs/program.md sec 5.3.
-#
-# The permanent `.END.` itself (kind == ".END.") is included as the newest
-# (last-listed) entry whenever program memory has any real content -- the
-# user found comparing an earlier Program tab's output against a real CAT 1
-# listing that omitting it (an even earlier version of this method silently
-# dropped it) was hiding bytes CAT 1 counts as part of the newest program.
-
-
-def test_list_global_chain_empty_memory_returns_nothing():
-    for filename in ("empty.dm41", "empty-128.dm41", "helloworld.dm41"):
-        memory = Memory.from_file(DATA_DIR / filename)
-        assert memory.programs.list_global_chain() == [], filename
+# What each real capture's global chain and programs decode to is checked
+# by test_golden.py; these cover a fresh Memory and the display labels.
 
 
 def test_list_global_chain_fresh_memory_returns_nothing():
-    """A brand new, never-loaded Memory() has R00 decoded as 0 -- not a
-    real partition -- so list_global_chain() should bail out to []
-    rather than trying to walk a nonsensical chain."""
     assert Memory().programs.list_global_chain() == []
-
-
-def test_list_global_chain_simple_finds_apptest_lbl_its_end_and_the_global_end():
-    """simple.dm41 (docs/program.md's second worked example) has one LBL
-    header (APPTEST), one plain END marker, and -- since this program is
-    also the newest thing in memory -- the permanent `.END.` itself as a
-    third, distinct chain link. Oldest (nearest R00, i.e. created first)
-    is listed first, matching CAT 1's display order."""
-    memory = Memory.from_file(DATA_DIR / "simple.dm41")
-    chain = memory.programs.list_global_chain()
-
-    assert len(chain) == 3
-
-    assert chain[0].name == "APPTEST"
-    assert chain[0].kind == "LBL"
-    assert chain[0].header_addr == 0x19B
-    assert chain[0].header_offset == 0
-    assert chain[0].key_assignment == 0x00
-    assert chain[0].is_named is True
-    # The oldest/first-ever chain link has no predecessor to point to.
-    assert chain[0].distance_bytes == 0
-
-    assert chain[1].name is None
-    assert chain[1].kind == "END"
-    assert chain[1].is_named is False
-    assert chain[1].display_name == "END"
-    # This END's own marker points 23 bytes onward to APPTEST's header.
-    assert chain[1].distance_bytes == 23
-    assert chain[1].distance_label == "23 bytes"
-    assert chain[1].end_type == 0x0
-
-    assert chain[2].name is None
-    assert chain[2].kind == ".END."
-    assert chain[2].is_named is False
-    assert chain[2].end_type == 0x2
-    assert chain[2].distance_bytes == 9
-
-
-def test_list_global_chain_6x_finds_xmbcd_xmalpha_purxm_their_ends_and_the_global_end():
-    """6x-xm.dm41 (docs/program.md's third worked example) has three LBL
-    headers, each followed in the chain by its own separate END marker,
-    plus the permanent `.END.` itself as the seventh and newest entry --
-    but the LBL/END pairing is NOT guaranteed in general (see module-level
-    note above), just what this specific fixture happens to contain."""
-    memory = Memory.from_file(DATA_DIR / "6x-xm.dm41")
-    chain = memory.programs.list_global_chain()
-
-    names_in_order = [p.name for p in chain]
-    assert names_in_order == ["XMBCD", None, "XMALPHA", None, "PURXM", None, None]
-
-    kinds_in_order = [p.kind for p in chain]
-    assert kinds_in_order == ["LBL", "END", "LBL", "END", "LBL", "END", ".END."]
-
-    # Each entry's raw distance, confirmed against the address arithmetic
-    # worked out by hand for this exact fixture.
-    distances_in_order = [p.distance_bytes for p in chain]
-    assert distances_in_order == [0, 58, 3, 48, 3, 17, 8]
-
-    by_name = {p.name: p for p in chain if p.is_named}
-    assert by_name["XMBCD"].header_addr == 0x19B
-    assert by_name["XMALPHA"].header_addr == 0x193
-    assert by_name["PURXM"].header_addr == 0x18B
-    # Key-assignment byte (0x00 = unassigned) -- decoded but not otherwise
-    # asserted elsewhere in this file.
-    assert by_name["XMBCD"].key_assignment == 0x01
-
-    end_entries = [p for p in chain if not p.is_named]
-    assert [p.end_type for p in end_entries] == [0x0, 0x0, 0x0, 0x2]
-    assert all(p.key_assignment is None for p in end_entries)
-
-    assert chain[-1].kind == ".END."
-
-
-def test_list_global_chain_address_label_format():
-    memory = Memory.from_file(DATA_DIR / "simple.dm41")
-    assert memory.programs.list_global_chain()[0].address_label == "0x19b:0"
-
-
-def test_list_global_chain_terminates_on_every_sample_state():
-    """Defensive/regression coverage: list_global_chain() should never
-    raise or hang on any real fixture, regardless of whether it has
-    programs."""
-    for path in DATA_DIR.glob("*.dm41"):
-        memory = load_fixture(path)
-        chain = memory.programs.list_global_chain()
-        assert isinstance(chain, list)
-        for p in chain:
-            assert p.header_addr >= 0xC0
-            assert 0 <= p.header_offset <= 6
-
-
-# ---- Program memory: real, END-delimited programs (docs/program.md sec
-# 5.3) ----
-#
-# list_programs() groups list_global_chain()'s raw entries into what CAT 1
-# actually shows as one program: programs are told apart by explicit plain
-# END markers, NOT by global labels (a program can have zero, one, or
-# several -- see Program's docstring). The two purpose-built fixtures below
-# (unlabelled.dm41, twolabels.dm41) were created by the user specifically to
-# pin this down against a real DM41L's CAT 1 listing, and caught a real bug
-# in an earlier version of this grouping: it mistook the zero-padding
-# bytes that keep the permanent `.END.` marker aligned to a register
-# boundary (docs/program.md sec 5.1) for a small extra unnamed program.
-
-
-def test_list_programs_empty_memory_returns_nothing():
-    for filename in ("empty.dm41", "empty-128.dm41", "helloworld.dm41"):
-        memory = Memory.from_file(DATA_DIR / filename)
-        assert memory.programs.list_programs() == [], filename
 
 
 def test_list_programs_fresh_memory_returns_nothing():
     assert Memory().programs.list_programs() == []
 
 
-def test_list_programs_simple_is_one_program_not_two():
-    """simple.dm41 has exactly one program, APPTEST (26 bytes) -- NOT a
-    second "nameless" program as an earlier (buggy) reading of this state
-    assumed. The bytes after APPTEST's own explicit END are entirely zero
-    padding in front of the permanent `.END.` marker, confirmed by the same
-    all-zero-gap check the unlabelled.dm41 fixture below exercises
-    directly."""
-    memory = Memory.from_file(DATA_DIR / "simple.dm41")
-    programs = memory.programs.list_programs()
+def test_program_and_chain_display_labels():
+    simple = Memory.from_file(DATA_DIR / "simple.dm41").programs
+    [apptest] = simple.list_programs()
+    assert (apptest.names_label, apptest.address_label) == ("APPTEST", "0x19b:0")
+    assert (apptest.length_label, apptest.is_last) == ("26 bytes", False)
+    label, end, dot_end = simple.list_global_chain()
+    assert [label.kind, end.kind, dot_end.kind] == ["LBL", "END", ".END."]
+    assert label.address_label == "0x19b:0"
+    assert (end.display_name, end.distance_label) == ("END", "23 bytes")
 
-    assert len(programs) == 1
-    assert programs[0].names_label == "APPTEST"
-    assert programs[0].is_named is True
-    assert programs[0].length == 26
-    assert programs[0].terminator == "END"
-    assert programs[0].is_last is False
-    assert programs[0].address_label == "0x19b:0"
-    assert programs[0].length_label == "26 bytes"
-
-
-def test_list_programs_6x_finds_three_named_programs():
-    """6x-xm.dm41 has three named programs (XMBCD, XMALPHA, PURXM), each
-    closed by its own explicit END -- the trailing gap before the
-    permanent `.END.` is (like simple.dm41's) pure alignment padding, not
-    a fourth program."""
-    memory = Memory.from_file(DATA_DIR / "6x-xm.dm41")
-    programs = memory.programs.list_programs()
-
-    assert [p.names_label for p in programs] == ["XMBCD", "XMALPHA", "PURXM"]
-    assert [p.length for p in programs] == [61, 51, 20]
-    assert all(p.terminator == "END" for p in programs)
-    assert all(not p.is_last for p in programs)
-
-
-def test_list_programs_unlabelled_finds_two_unnamed_programs_matching_cat_1():
-    """tests/data/unlabelled.dm41: two programs, NEITHER named (one holds
-    only an ALPHA string "NO LABEL", the other only a local numbered
-    label) -- confirmed against the real DM41L's own CAT 1 listing: 16 and
-    20 bytes. An earlier version of this grouping miscounted this as
-    THREE programs (16, 20, and a phantom 6-byte one made of nothing but
-    the zero-padding in front of the permanent `.END.` marker) -- this is
-    the fixture that caught that bug."""
-    memory = Memory.from_file(DATA_DIR / "unlabelled.dm41")
-    programs = memory.programs.list_programs()
-
-    assert len(programs) == 2
-    assert [p.is_named for p in programs] == [False, False]
-    assert [p.names_label for p in programs] == ["(unlabelled)", "(unlabelled)"]
-    assert [p.length for p in programs] == [16, 20]
-    assert [p.terminator for p in programs] == ["END", "END"]
-
-
-def test_list_programs_twolabels_is_one_program_with_two_labels():
-    """tests/data/twolabels.dm41: ONE program with TWO global labels
-    ("FIRST", "SECOND") and no explicit END at all -- legal for the single
-    newest program in memory, terminated instead by the permanent `.END.`
-    sentinel. CAT 1 would show two catalog entries here, but the user's
-    own real-hardware testing confirmed this is one program: it should be
-    counted as such, with both labels listed against the one program."""
-    memory = Memory.from_file(DATA_DIR / "twolabels.dm41")
-    programs = memory.programs.list_programs()
-
-    assert len(programs) == 1
-    program = programs[0]
-    assert [label.name for label in program.labels] == ["FIRST", "SECOND"]
-    assert program.names_label == "FIRST, SECOND"
-    assert program.is_named is True
-    assert program.length == 28
-    assert program.terminator == ".END."
-    assert program.is_last is True
-
-
-def test_list_programs_address_label_format():
-    memory = Memory.from_file(DATA_DIR / "simple.dm41")
-    assert memory.programs.list_programs()[0].address_label == "0x19b:0"
-
-
-def test_list_programs_terminates_on_every_sample_state():
-    """Defensive/regression coverage: list_programs() should never raise
-    or hang on any real fixture, regardless of whether it has programs,
-    and every program's length should be positive."""
-    for path in DATA_DIR.glob("*.dm41"):
-        memory = load_fixture(path)
-        programs = memory.programs.list_programs()
-        assert isinstance(programs, list)
-        for p in programs:
-            assert p.start_addr >= 0xC0
-            assert 0 <= p.start_offset <= 6
-            assert p.length > 0
+    [both] = Memory.from_file(DATA_DIR / "twolabels.dm41").programs.list_programs()
+    assert (both.names_label, both.is_last) == ("FIRST, SECOND", True)
+    unnamed = Memory.from_file(DATA_DIR / "unlabelled.dm41").programs.list_programs()
+    assert [p.names_label for p in unnamed] == ["(unlabelled)", "(unlabelled)"]
 
 
 # ---- Key Assignments (docs/key_assignments.md sec 4) ----
 #
-# key_byte_for()/_keyflags_bit() below are confirmed against three real
-# captured states (keyassigns.dm41, xrom-keyassignments.dm41,
-# global-key-assignments.dm41) -- see the key-assignment research notes for
-# the full derivation, including how an earlier (wrong) formula
-# (bit = 37 - M - 8*(N-1)) looked validated against a subset of the data
-# due to a numeric aliasing coincidence, and was only caught by testing
-# all three fixtures' independently-known key numbers simultaneously.
+# Real captures' key bytes and KEYFLAGS bits are checked by test_golden.py.
 
 
-def test_key_byte_for_matches_known_assignments():
-    """keyassigns.dm41's 14 assignments span 8 different physical keys in
-    both shift states; the formula must reproduce every stored key byte
-    exactly (docs sec 4.3)."""
-    cases = [
-        (11, False, 0x01), (21, True, 0x0A),
-        (12, False, 0x11), (22, True, 0x1A),
-        (13, False, 0x21), (23, True, 0x2A),
-        (14, False, 0x31), (24, True, 0x3A),
-        (53, False, 0x25), (52, False, 0x15),
-        (62, True, 0x1E), (54, False, 0x35),
-        (64, True, 0x3E), (63, True, 0x2E),
-    ]
-    for key_number, shifted, expected_byte in cases:
-        assert KeyAssignments.key_byte_for(key_number, shifted) == expected_byte, (
-            key_number, shifted
-        )
+@pytest.mark.parametrize(
+    "key_number, shifted, key_byte",
+    [
+        (11, False, 0x01), (21, True, 0x0A), (12, False, 0x11), (22, True, 0x1A),
+        (53, False, 0x25), (52, False, 0x15), (62, True, 0x1E), (64, True, 0x3E),
+        # Row 4: the double-width ENTER^ takes physical columns 1-2, so keys
+        # 42/43/44 sit at physical columns 3/4/5 (docs sec 4.3).
+        (41, False, 0x04), (41, True, 0x0C), (42, False, 0x24), (42, True, 0x2C),
+        (43, False, 0x34), (44, True, 0x4C),
+    ],
+)
+def test_key_byte_for(key_number, shifted, key_byte):
+    assert KeyAssignments.key_byte_for(key_number, shifted) == key_byte
+    assert KeyAssignments.key_number_for_byte(key_byte) == (key_number, shifted)
 
 
-def test_key_byte_for_row4_uses_physical_column_not_key_number():
-    """Row 4's ENTER^ key is physically double-width and eats the
-    physical-column-2 slot, so keys 42/43/44 sit at physical columns
-    3/4/5 -- NOT 2/3/4, unlike every other row where the key-number
-    column digit is the physical column directly (docs sec 4.3's row-4
-    correction). Found 2026-08-18 via real-hardware testing: the old
-    (unmapped) formula wrote key 42's assignment to the byte for the
-    unused phantom column-2 slot instead. Key 42's expected bytes here
-    are independently confirmed against a real device capture in
-    test_key_42_row4_matches_real_device_capture below; 41/43/44 are
-    hand-derived from the same corrected formula (Wickes' Figure 4-2
-    diagram), not yet independently cross-checked against a real capture
-    the way 42 is."""
-    cases = [
-        (41, False, 0x04), (41, True, 0x0C),
-        (42, False, 0x24), (42, True, 0x2C),
-        (43, False, 0x34), (43, True, 0x3C),
-        (44, False, 0x44), (44, True, 0x4C),
-    ]
-    for key_number, shifted, expected_byte in cases:
-        assert KeyAssignments.key_byte_for(key_number, shifted) == expected_byte, (
-            key_number, shifted
-        )
-
-
-def test_key_42_row4_matches_real_device_capture():
-    """xrom-keyassignments.dm41 has real two-byte XROM assignments on all
-    four row-4 keys (41-44), both shift states -- decoding all eight and
-    checking their raw_key_byte against the corrected physical-column-3
-    formula (see test_key_byte_for_row4_uses_physical_column_not_key_
-    number above) confirms row 4 decodes correctly end-to-end, not just
-    at the formula level.
-
-    Historical note: this test originally cross-checked assigntest.dm41,
-    a real device capture the user made while diagnosing the row-4 bug --
-    it had a genuine key-42 assignment (TIME-module `T+X`/`TIME`, raw key
-    byte 0x24/0x2C) plus a leftover `COS`/`ACOS` entry at raw byte
-    0x14/0x1C, the phantom physical-column-2 slot under `ENTER^` that the
-    pre-fix buggy formula would have produced. That fixture was retired
-    when tests/data/ was pared down, so the stray-phantom-byte check no
-    longer has data to run against; test_key_byte_for_row4_uses_physical_
-    column_not_key_number is the test that still directly proves the
-    formula rejects the old column-2 mapping."""
-    memory = Memory.from_file(DATA_DIR / "xrom-keyassignments.dm41")
-    all_entries = memory.key_assignments.list_assignments()
-    assignments = {
-        (a.key_number, a.shifted): a
-        for a in all_entries
-        if a.key_number is not None
-    }
-
-    key_unshifted = assignments[(41, False)]
-    assert key_unshifted.raw_key_byte == 0x04
-    assert key_unshifted.name == "ALENG"
-
-    key_shifted = assignments[(41, True)]
-    assert key_shifted.raw_key_byte == 0x0C
-    assert key_shifted.name == "APPCHR"
-
-    key_unshifted = assignments[(42, False)]
-    assert key_unshifted.raw_key_byte == 0x24
-    assert key_unshifted.name == "ANUM"
-
-    key_shifted = assignments[(42, True)]
-    assert key_shifted.raw_key_byte == 0x2C
-    assert key_shifted.name == "APPREC"
-
-    key_unshifted = assignments[(43, False)]
-    assert key_unshifted.raw_key_byte == 0x34
-    assert key_unshifted.name == "ADATE"
-
-    key_shifted = assignments[(43, True)]
-    assert key_shifted.raw_key_byte == 0x3C
-    assert key_shifted.name == "ALMCAT"
-
-    key_unshifted = assignments[(44, False)]
-    assert key_unshifted.raw_key_byte == 0x44
-    assert key_unshifted.name == "TIME"
-
-    key_shifted = assignments[(44, True)]
-    assert key_shifted.raw_key_byte == 0x4C
-    assert key_shifted.name == "CLOCK"
-
-
-def test_keyflags_bit_row4_matches_wickes_figure_4_2():
-    """Bit positions for row 4 read directly off Wickes' Figure 4-2 ("Key
-    Assignment Flag Bits") diagram, which draws a single wide box spanning
-    physical columns 1-2 for ENTER^ (labeled bit 33, 1-indexed -> 0-indexed
-    32) and separate boxes for the other three keys at physical columns
-    3/4/5 (labeled 17/9/1 1-indexed -> 0-indexed 16/8/0) -- with no box at
-    all for physical column 2, confirming that position is never a real
-    key (the "imaginary 42nd key under ENTER", docs sec 4.5)."""
-    cases = [(41, 32), (42, 16), (43, 8), (44, 0)]
-    for key_number, expected_bit in cases:
-        assert KeyAssignments._keyflags_bit(key_number) == expected_bit, key_number
-
-
-def test_keyflags_bit_matches_all_three_real_fixtures():
-    """The KEYFLAGS bit formula (docs sec 4.5, bit = 36 - M - 8*(N-1)) and
-    register mapping (F = unshifted, e = shifted) must reproduce exactly
-    the bits set in every real fixture -- no extra bits, no missing ones."""
-
-    def bits_set(register_bytes) -> set:
-        # Only the first 36 bits are the KEYFLAGS bitmap (docs sec 4.5) --
-        # the remaining 20 bits of the 56-bit register hold something else
-        # entirely (confirmed non-zero, e.g. bits 40-54, in real captures
-        # like keyassigns.dm41's register R), so comparing the whole
-        # register would spuriously fail against real, correct data.
-        bits = set()
-        for byte_index, byte in enumerate(register_bytes):
-            for bit_in_byte in range(8):
-                bit = byte_index * 8 + bit_in_byte
-                if bit >= 36:
-                    continue
-                if (byte >> (7 - bit_in_byte)) & 1:
-                    bits.add(bit)
-        return bits
-
-    cases = {
-        "keyassigns.dm41": {
-            "unshifted": [11, 12, 13, 14, 15, 21, 22, 23, 24, 25, 84],
-            "shifted": [11, 12, 13, 14, 15, 21, 22, 23, 24, 25, 84],
-        },
-        "xrom-keyassignments.dm41": {
-            "unshifted": [41, 42, 43, 44],
-            "shifted": [41, 42, 43, 44],
-        },
-        "global-key-assignments.dm41": {
-            "unshifted": [11, 12],
-            "shifted": [],
-        },
-    }
-    for filename, expected in cases.items():
-        memory = Memory.from_file(DATA_DIR / filename)
-        f_reg = memory.get_register(StatusRegisters.KEYFLAGS_UNSHIFTED_ADDR)
-        e_reg = memory.get_register(StatusRegisters.KEYFLAGS_SHIFTED_ADDR)
-
-        expected_f_bits = {KeyAssignments._keyflags_bit(k) for k in expected["unshifted"]}
-        expected_e_bits = {KeyAssignments._keyflags_bit(k) for k in expected["shifted"]}
-
-        assert bits_set(f_reg.get_bytes()) == expected_f_bits, filename
-        assert bits_set(e_reg.get_bytes()) == expected_e_bits, filename
-
-        for k in expected["unshifted"]:
-            assert memory.key_assignments.get_key_flag(k, False) is True, (filename, k)
-        for k in expected["shifted"]:
-            assert memory.key_assignments.get_key_flag(k, True) is True, (filename, k)
-
-
-def test_list_key_assignments_decodes_keyassigns_dm41():
-    """keyassigns.dm41's 22 real assignments, filler-first single-byte
-    entries only (docs sec 4.2/4.8) -- newest-first order (sec 4.4)."""
-    memory = Memory.from_file(DATA_DIR / "keyassigns.dm41")
-    assignments = memory.key_assignments.list_assignments()
-    assert len(assignments) == 22
-    for a in assignments:
-        assert a.fn_byte2 is None
-        assert a.name in {"%", "%CH", "+", "-", "*", "/", "1/X", "10↑X",
-                             "ABS", "ACOS", "BEEP", "TONE" }
-        # Every decoded assignment's KEYFLAGS bit must also be set.
-        assert memory.key_assignments.get_key_flag(a.key_number, a.shifted) is True
-
-
-def test_list_key_assignments_decodes_xrom_two_byte_entries():
-    """xrom-keyassignments.dm41's four assignments are all real two-byte
-    XROM entries (docs sec 4.8) -- confirms fn_byte2 is populated (not
-    None) and the function names resolve via memory/functions.py."""
-    memory = Memory.from_file(DATA_DIR / "xrom-keyassignments.dm41")
-    assignments = memory.key_assignments.list_assignments()
-    by_key = {a.key_number: a for a in assignments}
-
-    assert by_key[41].name == "ALENG"
-    assert by_key[42].name == "ANUM"
-    assert by_key[43].name == "ADATE"
-    assert by_key[44].name == "TIME"
-    for a in assignments:
-        assert a.fn_byte2 is not None
+@pytest.mark.parametrize("key_number, bit", [(41, 32), (42, 16), (43, 8), (44, 0)])
+def test_keyflags_bit_for_row_4_matches_wickes_figure_4_2(key_number, bit):
+    assert KeyAssignments._keyflags_bit(key_number) == bit
 
 
 def test_set_key_assignment_single_byte_function():
@@ -2112,32 +1456,6 @@ def test_delete_key_assignment_on_unassigned_key_is_a_noop():
 
 # ---- Alarms region: bounds (alarms_end()) and relocation on Key
 # Assignments edits (docs/alarms.md sec 3/4) ----
-
-
-def test_alarms_end_reports_buffer_bounds_from_real_fixture():
-    """4alarmtest.dm41 has 2 Key Assignment registers (0xc0-0xc1) followed
-    immediately by a real 4-alarm buffer: a header at 0xc2 declaring 14
-    total registers (header + entries + delimiter), so the buffer runs
-    through 0xcf inclusive -- alarms_end() should report 0xd0. (This
-    fixture was regenerated by the user 2026-09-01 to also cover control/
-    conditional/past-due alarms -- see [[alarms_tab_planning_2026-09-01]]
-    in project memory -- so its exact register count differs from the
-    13-register buffer this test originally pinned.)"""
-    memory = Memory.from_file(DATA_DIR / "4alarmtest.dm41")
-    assert memory.key_assignments.end_exclusive == 0xC2
-    header = memory.get_register(0xC2).get_bytes()
-    assert header[0] == Alarms.HEADER_MARKER
-    assert header[1] == 0x0E
-    assert memory.alarms.end_exclusive == 0xD0
-
-
-def test_alarms_end_equals_key_assignments_end_when_no_alarms():
-    """keyassigns.dm41 has real Key Assignment Register entries but no
-    Alarms buffer above them -- the register right after Key Assignments
-    doesn't start with the 0xAA header marker, so alarms_end() should
-    report an empty Alarms region (same value as key_assignments_end())."""
-    memory = Memory.from_file(DATA_DIR / "keyassigns.dm41")
-    assert memory.alarms.end_exclusive == memory.key_assignments.end_exclusive
 
 
 def test_alarms_end_on_fresh_memory():
@@ -2277,55 +1595,10 @@ def test_get_key_assignment_single_key_lookup():
     assert memory.key_assignments.get_assignment(42, False) is None
 
 
-def test_list_key_assignments_matches_all_real_fixtures_key_flags():
-    """Every fixture with real key-assignment-register content: every
-    decoded entry's KEYFLAGS bit must be set, and conversely every set
-    KEYFLAGS bit not backed by a global label must be explained by a
-    decoded entry. (global-key-assignments.dm41 sets flags for two
-    global-label assignments with nothing in the Key Assignment
-    Registers -- excluded here, see sec 4.6.)"""
-    for filename in ("keyassigns.dm41", "xrom-keyassignments.dm41"):
-        memory = Memory.from_file(DATA_DIR / filename)
-        assignments = memory.key_assignments.list_assignments()
-        flagged = {
-            (k, s)
-            for k in KeyAssignments._VALID_KEY_NUMBERS
-            for s in (False, True)
-            if memory.key_assignments.get_key_flag(k, s)
-        }
-        decoded = {(a.key_number, a.shifted) for a in assignments}
-        assert flagged == decoded, filename
-
-
 # ---- Global label (program) key assignments (docs/key_assignments.md
-# sec 4.6) -- a completely separate storage mechanism from the Key
-# Assignment Registers above: the key byte lives in the program's own
-# global-label header rather than a shared buffer, and a label can hold
-# only one key assignment at a time (unlike a physical key's independent
-# unshifted/shifted slots). manyfiles.dm41 mixes both kinds of assignment
-# in one real state -- three global labels (XMBCD/XMALPHA/PURXM, keys
-# 11/12/13 unshifted) plus two built-in/peripheral ones (EMROOM/XTOA,
-# keys 14/15 unshifted) -- so it's used below alongside
-# global-key-assignments.dm41 (AAA/BBB, program-only) and simple.dm41
-# (APPTEST, unassigned) for the synthetic move/mutual-exclusion cases.
-
-
-def test_get_program_for_key_decodes_global_key_assignments_dm41():
-    memory = Memory.from_file(DATA_DIR / "global-key-assignments.dm41")
-    assert memory.programs.get_program_for_key(11, False).name == "AAA"
-    assert memory.programs.get_program_for_key(12, False).name == "BBB"
-    assert memory.programs.get_program_for_key(11, True) is None
-    assert memory.programs.get_program_for_key(13, False) is None
-
-
-def test_get_program_for_key_decodes_manyfiles_dm41_mixed_state():
-    memory = Memory.from_file(DATA_DIR / "manyfiles.dm41")
-    assert memory.programs.get_program_for_key(11, False).name == "XMBCD"
-    assert memory.programs.get_program_for_key(12, False).name == "XMALPHA"
-    assert memory.programs.get_program_for_key(13, False).name == "PURXM"
-    # 14/15 are built-in/peripheral assignments (sec 4.2), not programs.
-    assert memory.programs.get_program_for_key(14, False) is None
-    assert memory.programs.get_program_for_key(15, False) is None
+# sec 4.6): the key byte lives in the label's own header, and a label holds
+# one assignment at a time. manyfiles.dm41 mixes program and built-in
+# assignments in one state.
 
 
 def test_set_program_key_assignment_assigns_unassigned_program():

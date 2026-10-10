@@ -79,10 +79,6 @@ def _xrom_number(byte1, byte2):
     return ((byte1 & 0x07) << 2) | (byte2 >> 6), byte2 & 0x3F
 
 
-def _whitespace_normalised(text):
-    return " ".join(text.split())
-
-
 def _program_bytes(fixture):
     """The only program in tests/data/<fixture>, as the instruction bytes
     in memory."""
@@ -242,22 +238,6 @@ def _assignments(memory):
         (a.key_number, a.shifted, a.name)
         for a in memory.key_assignments.list_assignments()
     ]
-
-
-def test_s6_state_file_shows_the_new_xroms_by_name():
-    memory = Memory.from_file(DATA_DIR / "dm41x_xrom_keys.d41", profile=DM41X)
-    # Newest first. The buffer's first slot is an empty leftover.
-    assert _assignments(memory) == [
-        (13, False, "ED"),
-        (12, False, "LKAOFF"),
-        (11, False, "LKAON"),
-    ]
-
-
-def test_s6_state_file_round_trips_through_load_and_save():
-    text = (DATA_DIR / "dm41x_xrom_keys.d41").read_text()
-    memory = Memory.from_string(text, profile=DM41X)
-    assert _whitespace_normalised(memory.to_string()) == _whitespace_normalised(text)
 
 
 def test_assigning_new_xroms_to_keys_round_trips():
