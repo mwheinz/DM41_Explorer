@@ -9,7 +9,7 @@ from typing import NamedTuple, Optional, TYPE_CHECKING
 
 from .registers import Register, DM41MemoryError, format_data_line, parse_data_line
 from .trigraphs import encode_trigraphs, decode_trigraphs
-from .constants import zero_register, eom_register
+from .constants import REGISTER_SIZE_BYTES, zero_register, eom_register
 from .regions import MemoryRegion
 
 if TYPE_CHECKING:
@@ -378,7 +378,7 @@ class ExtendedMemory(MemoryRegion):
         delete can relocate a surviving file's header without refreshing
         AAA, leaving a perfectly valid header with a stale self-address.
         """
-        if len(raw) != 7:
+        if len(raw) != REGISTER_SIZE_BYTES:
             raise ValueError("Not a 7-byte register.")
 
         file_type = raw[0] >> 4
@@ -634,7 +634,7 @@ class ExtendedMemory(MemoryRegion):
         4.3, inverting the exact formulas _parse_header() uses to read
         them back -- so a file written this way is guaranteed to
         round-trip through list_files()."""
-        data = bytearray(7)
+        data = bytearray(REGISTER_SIZE_BYTES)
         if file_type == XMFile.TYPE_PROGRAM:
             data[0] = 0x10
             data[4] = (byte_length >> 4) & 0xFF
@@ -686,7 +686,7 @@ class ExtendedMemory(MemoryRegion):
         nnn = 0
         if next_region_active and next_region < len(regions):
             nnn = regions[next_region][1]
-        data = bytearray(7)
+        data = bytearray(REGISTER_SIZE_BYTES)
         data[1] = (ww >> 4) & 0x0F
         data[2] = ((ww & 0x0F) << 4) | ((pp >> 8) & 0x0F)
         data[3] = pp & 0xFF
@@ -848,7 +848,7 @@ class ExtendedMemory(MemoryRegion):
             if numbers is not None:
                 if not numbers:
                     raise ValueError("Data files require at least one number")
-                data_registers = [Register(size=7) for _ in numbers]
+                data_registers = [zero_register() for _ in numbers]
                 for reg, n in zip(data_registers, numbers):
                     reg.set_bcd_number(n)
             else:
@@ -879,11 +879,11 @@ class ExtendedMemory(MemoryRegion):
                 stream.append(len(encoded))
                 stream += encoded
             stream.append(0xFF)  # Explicit end-of-records marker.
-            while len(stream) % 7 != 0:
+            while len(stream) % REGISTER_SIZE_BYTES != 0:
                 stream.append(0)
             data_registers = [
-                Register(data=bytes(stream[i : i + 7]))
-                for i in range(0, len(stream), 7)
+                Register(data=bytes(stream[i : i + REGISTER_SIZE_BYTES]))
+                for i in range(0, len(stream), REGISTER_SIZE_BYTES)
             ]
 
         elif file_type == self.TYPE_PROGRAM:
@@ -900,11 +900,11 @@ class ExtendedMemory(MemoryRegion):
             checksum = sum(instruction_bytes) % 256
             stream = bytearray(instruction_bytes)
             stream.append(checksum)
-            while len(stream) % 7 != 0:
+            while len(stream) % REGISTER_SIZE_BYTES != 0:
                 stream.append(0)
             data_registers = [
-                Register(data=bytes(stream[i : i + 7]))
-                for i in range(0, len(stream), 7)
+                Register(data=bytes(stream[i : i + REGISTER_SIZE_BYTES]))
+                for i in range(0, len(stream), REGISTER_SIZE_BYTES)
             ]
 
         else:
@@ -1039,7 +1039,7 @@ class ExtendedMemory(MemoryRegion):
 
         for lo, hi in self._xm_regions:
             for addr in range(lo, hi + 1):
-                self.set_register(addr, Register(size=7))
+                self.set_register(addr, zero_register())
 
         for name_bytes, file_type, data_registers, byte_length in rebuild:
             self._place_file(name_bytes, file_type, data_registers, byte_length)

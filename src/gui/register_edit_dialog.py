@@ -8,7 +8,7 @@ import platform
 from tkinter import messagebox
 import customtkinter as ctk
 
-from memory import Register
+from memory import Register, zero_register
 from gui.dialog_common import build_dialog_button_row, scaled
 from gui.tab_common import MONOSPACE_FONT_FAMILY
 
@@ -118,7 +118,7 @@ class RegisterEditDialog(ctk.CTkToplevel):
         try:
             if which == "Number":
                 value = float(self._number_var.get())
-                reg = Register(size=7)
+                reg = zero_register()
                 reg.set_bcd_number(value)
             elif which == "Text":
                 text = self._text_var.get()

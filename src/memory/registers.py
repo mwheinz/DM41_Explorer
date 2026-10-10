@@ -17,6 +17,11 @@ from decimal import Decimal, Context, ROUND_HALF_EVEN
 from .trigraphs import encode_trigraphs, decode_trigraphs
 
 
+# Every hardware register (HP41/DM41L) is exactly 7 bytes long -- see
+# docs/memory.md Sec.2 ("Word Size").
+REGISTER_SIZE_BYTES = 7
+
+
 class DM41MemoryError(ValueError):
     '''
     Raised when a register in the data state contains an illegal value.
@@ -107,7 +112,7 @@ class Register:
 
     def get_bcd_number(self) -> float:
         '''Reads the BCD-encoded number from this register.'''
-        if self.size != 7:
+        if self.size != REGISTER_SIZE_BYTES:
             raise ValueError(
                 "BCD operations require a 7-byte register, " f"got {self.size} bytes."
             )
@@ -165,7 +170,7 @@ class Register:
 
     def set_bcd_number(self, number: float):
         '''Writes a float to this register in BCD format.'''
-        if self.size != 7:
+        if self.size != REGISTER_SIZE_BYTES:
             raise ValueError(
                 "BCD operations require a 7-byte register, " f"got {self.size} bytes."
             )
@@ -242,7 +247,10 @@ class Register:
         rather than a BCD number. Note a BCD register can never produce a
         false positive here: 0x10's high nibble (1) is not a legal BCD
         sign nibble (only 0/9 are), so the two encodings can't collide.'''
-        return self.size == 7 and self._data[0] == self.ALPHA_TEXT_MARKER
+        return (
+            self.size == REGISTER_SIZE_BYTES
+            and self._data[0] == self.ALPHA_TEXT_MARKER
+        )
 
     def get_alpha_bytes(self) -> bytes:
         '''Decodes this register as short alpha *bytes* -- the raw
@@ -269,14 +277,14 @@ class Register:
         using the hardware's alpha-text encoding (see ALPHA_TEXT_MARKER
         above). Requires a 7-byte register, matching every real data
         register this format is used with.'''
-        if self.size != 7:
+        if self.size != REGISTER_SIZE_BYTES:
             raise ValueError(
                 f"Alpha-text encoding requires a 7-byte register, got {self.size} bytes."
             )
         if not 1 <= len(data) <= 6:
             raise ValueError(f"Alpha content must be 1-6 characters, got {len(data)}.")
 
-        new_data = bytearray(7)
+        new_data = bytearray(REGISTER_SIZE_BYTES)
         new_data[0] = self.ALPHA_TEXT_MARKER
         new_data[1 + (6 - len(data)) :] = data
         self._data = new_data
@@ -451,7 +459,7 @@ def parse_data_line(line: str) -> "Register":
     if number is not None:
         if not math.isfinite(number):
             raise ValueError(f"{line!r} is not a finite number.")
-        reg = Register(size=7)
+        reg = Register(size=REGISTER_SIZE_BYTES)
         reg.set_bcd_number(number)
         return reg
 
@@ -468,7 +476,7 @@ def parse_data_line(line: str) -> "Register":
             f"{line!r} decodes to {len(decoded)} character(s) after "
             "trigraph expansion -- alpha text must be 1-6 characters."
         )
-    reg = Register(size=7)
+    reg = Register(size=REGISTER_SIZE_BYTES)
     reg.set_alpha_bytes(decoded)
     return reg
 

@@ -13,7 +13,11 @@ from typing import Optional, TYPE_CHECKING
 
 from .registers import Register, AlphaRegister, DM41MemoryError
 from .regions import MemoryRegion
-from .constants import STATUS_REGISTERS_RANGE, STATUS_REGISTER_LABELS
+from .constants import (
+    REGISTER_SIZE_BYTES,
+    STATUS_REGISTERS_RANGE,
+    STATUS_REGISTER_LABELS,
+)
 
 if TYPE_CHECKING:
     from .memory import Memory
@@ -230,7 +234,7 @@ class StatusRegisters(MemoryRegion):
 
     def _flags_register(self) -> Register:
         d = self.get_register(self.REG_D_ADDR)
-        if d.size != 7:
+        if d.size != REGISTER_SIZE_BYTES:
             raise DM41MemoryError("Flags register is an invalid size.")
         return d
 

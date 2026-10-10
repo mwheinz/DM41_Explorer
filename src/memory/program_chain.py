@@ -31,6 +31,8 @@ ProgramMemory.import_program().
 from dataclasses import dataclass, replace
 from typing import Optional
 
+from .registers import REGISTER_SIZE_BYTES
+
 
 @dataclass(frozen=True)
 class ChainMarker:
@@ -55,7 +57,7 @@ class ChainMarker:
     @property
     def distance_bytes(self) -> int:
         '''The link back to the previous marker, in bytes (0 = none).'''
-        return self.distance_registers * 7 + self.bbb
+        return self.distance_registers * REGISTER_SIZE_BYTES + self.bbb
 
 
 def decode_chain_marker(data: bytes, index: int) -> Optional[ChainMarker]:

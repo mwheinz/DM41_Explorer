@@ -22,7 +22,13 @@ from typing import Optional, TYPE_CHECKING
 
 from .registers import Register, DM41MemoryError
 from .regions import MemoryRegion
-from .constants import PRIMARY_DATA_END, KEY_ASSIGNMENTS_RANGE, MIN_SANE_R00
+from .constants import (
+    KEY_ASSIGNMENTS_RANGE,
+    MIN_SANE_R00,
+    PRIMARY_DATA_END,
+    REGISTER_SIZE_BYTES,
+    zero_register,
+)
 from .program_info import ProgramInfo, ProgramLabel, Program
 from .opcode_scan import (
     compact_program_stream,
@@ -77,13 +83,13 @@ class ProgramMemory(MemoryRegion):
     @staticmethod
     def addr_for(reg: int, offset: int) -> int:
         '''Absolute byte address of (register, offset).'''
-        return 7 * reg + (6 - offset)
+        return REGISTER_SIZE_BYTES * reg + (REGISTER_SIZE_BYTES - 1 - offset)
 
     @staticmethod
     def pos_for(addr: int) -> tuple:
         '''(register, offset) for an absolute byte address.'''
-        reg, remainder = divmod(addr, 7)
-        return reg, 6 - remainder
+        reg, remainder = divmod(addr, REGISTER_SIZE_BYTES)
+        return reg, REGISTER_SIZE_BYTES - 1 - remainder
 
     def top_addr(self) -> int:
         '''Address just below R00 -- the top of program memory, where the
@@ -669,7 +675,9 @@ class ProgramMemory(MemoryRegion):
             self.write_bytes_forward(next_free_addr, bytes(padding))
 
         trailing_dest_addr = insertion_addr - trailing.index
-        end_dr, end_bbb = divmod(trailing_dest_addr - end_marker_addr, 7)
+        end_dr, end_bbb = divmod(
+            trailing_dest_addr - end_marker_addr, REGISTER_SIZE_BYTES
+        )
         end_marker_bytes = encode_chain_marker(end_bbb, end_dr, 0x20)
         self.write_bytes_forward(end_marker_addr, end_marker_bytes)
 
@@ -777,7 +785,9 @@ class ProgramMemory(MemoryRegion):
             new_bbb, new_dr = 0, 0
         else:
             outermost_dest_addr = insertion_addr - outermost.index
-            new_dr, new_bbb = divmod(link_addr - outermost_dest_addr, 7)
+            new_dr, new_bbb = divmod(
+                link_addr - outermost_dest_addr, REGISTER_SIZE_BYTES
+            )
             if new_dr > 0x1FF:
                 raise DM41MemoryError(
                     "This program lands too far from the existing program "
@@ -799,7 +809,7 @@ class ProgramMemory(MemoryRegion):
         floor_reg = self._memory.alarms.end_exclusive
         program_end_addr = insertion_addr - data_len + 1
         next_free_addr = program_end_addr - 1
-        end_marker_addr = next_free_addr - ((next_free_addr - 2) % 7)
+        end_marker_addr = next_free_addr - ((next_free_addr - 2) % REGISTER_SIZE_BYTES)
         end_marker_last_addr = end_marker_addr - 2
         end_marker_reg, _ = self.pos_for(end_marker_last_addr)
         if end_marker_reg < floor_reg:
@@ -935,7 +945,7 @@ class ProgramMemory(MemoryRegion):
             distance_bytes = (
                 0 if i == 0 else marker.index - markers[i - 1].index
             )
-            distance_registers, bbb = divmod(distance_bytes, 7)
+            distance_registers, bbb = divmod(distance_bytes, REGISTER_SIZE_BYTES)
             if distance_registers > 0x1FF:
                 # Defensive only -- dead in practice, same reasoning as
                 # _relink_outermost_marker()'s docstring: this region's
@@ -1043,7 +1053,7 @@ class ProgramMemory(MemoryRegion):
         '''
         status = self._memory.status_registers
         for reg in range(self._memory.alarms.end_exclusive, status.R00):
-            self._memory.set_register(reg, Register(size=7))
+            self._memory.set_register(reg, zero_register())
         status.set_DotEnd(status.R00)
 
         for instruction_bytes, key_assignments in programs:
@@ -1136,7 +1146,7 @@ class ProgramMemory(MemoryRegion):
         old_dot_end_reg = status.DotEnd
         status.set_DotEnd(pred_reg)
         for stale in range(old_dot_end_reg, pred_reg):
-            self._memory.set_register(stale, Register(size=7))
+            self._memory.set_register(stale, zero_register())
 
     def remove_program(self, program: Program):
         '''

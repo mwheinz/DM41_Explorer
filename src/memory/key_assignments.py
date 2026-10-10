@@ -24,7 +24,12 @@ from typing import List, Optional, TYPE_CHECKING
 
 from .registers import Register
 from .regions import MemoryRegion
-from .constants import KEY_ASSIGNMENTS_RANGE, PRIMARY_DATA_END
+from .constants import (
+    KEY_ASSIGNMENTS_RANGE,
+    PRIMARY_DATA_END,
+    REGISTER_SIZE_BYTES,
+    zero_register,
+)
 from .mnemonics import display_for_key_bytes
 
 if TYPE_CHECKING:
@@ -334,7 +339,7 @@ class KeyAssignments(MemoryRegion):
         addr = base
         i = 0
         while i < len(entries):
-            data = bytearray(7)
+            data = bytearray(REGISTER_SIZE_BYTES)
             data[0] = self.MARKER
             for slot in range(2):
                 if i >= len(entries):
@@ -361,7 +366,7 @@ class KeyAssignments(MemoryRegion):
         # isn't updated to new_end until the line right after this loop.
         clear_from = alarms.span_end_at(new_end)
         for stale in range(clear_from, old_end):
-            self._memory.set_register(stale, Register(size=7))
+            self._memory.set_register(stale, zero_register())
         self._end = new_end
 
     def repack(self):

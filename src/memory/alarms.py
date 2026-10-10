@@ -35,7 +35,7 @@ from typing import List, Optional, Tuple, TYPE_CHECKING
 
 from .registers import Register, DM41MemoryError
 from .regions import MemoryRegion
-from .constants import PRIMARY_DATA_END
+from .constants import PRIMARY_DATA_END, REGISTER_SIZE_BYTES, zero_register
 from .trigraphs import encode_trigraphs, decode_trigraphs
 
 if TYPE_CHECKING:
@@ -245,7 +245,7 @@ class Alarms(MemoryRegion):
         if delta < 0:
             new_end = new_start + count
             for addr in range(new_end, old_end):
-                memory.set_register(addr, Register(size=7))
+                memory.set_register(addr, zero_register())
 
     # -- BCD time/duration codec (docs/alarms.md sec 4) -------------------
 
@@ -344,7 +344,7 @@ class Alarms(MemoryRegion):
         Original docstring, for that narrower use: byte 6 == 0x00,
         all-BCD digits in bytes 0-5, and a plausible magnitude (see
         _MAX_PLAUSIBLE_REPEAT).'''
-        if len(reg_bytes) < 7 or reg_bytes[6] != 0x00:
+        if len(reg_bytes) < REGISTER_SIZE_BYTES or reg_bytes[6] != 0x00:
             return False
         nibbles = cls._bcd_nibbles(reg_bytes[:6])
         if not all(0 <= n <= 9 for n in nibbles):
@@ -481,7 +481,7 @@ class Alarms(MemoryRegion):
                 f"{noun} is too long: {len(body)} character(s), "
                 f"{24 - len(prefix)} max for a {alarm_type} alarm."
             )
-        msg_regs = math.ceil(len(field) / 7) if field else 0
+        msg_regs = math.ceil(len(field) / REGISTER_SIZE_BYTES) if field else 0
 
         time_bytes = bytearray(
             cls._encode_time(trigger_time, repeats=repeat_interval is not None) + b"\x00"
@@ -494,9 +494,11 @@ class Alarms(MemoryRegion):
             registers.append(Register(data=repeat_bytes))
 
         if msg_regs:
-            padded = field.rjust(msg_regs * 7, b"\x00")
-            for i in range(msg_regs):
-                registers.append(Register(data=padded[i * 7 : (i + 1) * 7]))
+            padded = field.rjust(msg_regs * REGISTER_SIZE_BYTES, b"\x00")
+            for start in range(0, len(padded), REGISTER_SIZE_BYTES):
+                registers.append(
+                    Register(data=padded[start : start + REGISTER_SIZE_BYTES])
+                )
 
         return registers
 
@@ -643,11 +645,11 @@ class Alarms(MemoryRegion):
         new_count = old_count - n
         if new_count <= 2:
             for addr in range(self.start, old_delim_addr + 1):
-                self._memory.set_register(addr, Register(size=7))
+                self._memory.set_register(addr, zero_register())
         else:
             new_header = Register(
                 data=bytes([self.HEADER_MARKER, new_count]) + bytes(old_header[2:7])
             )
             self._memory.set_register(self.start, new_header)
             for addr in range(self.start + new_count, old_delim_addr + 1):
-                self._memory.set_register(addr, Register(size=7))
+                self._memory.set_register(addr, zero_register())

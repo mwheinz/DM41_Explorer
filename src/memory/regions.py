@@ -35,7 +35,7 @@ structure built on top of its region.
 from typing import Dict, Optional, Sequence, TYPE_CHECKING
 
 from .registers import Register
-from .constants import PRIMARY_DATA_END, VOID_RANGE
+from .constants import PRIMARY_DATA_END, VOID_RANGE, zero_register
 
 if TYPE_CHECKING:
     from .memory import Memory
@@ -204,7 +204,7 @@ class MemoryRegion:
         contents (`KeyAssignments`, `Alarms`) will report itself empty
         afterward as a consequence, not because this said so.'''
         for addr in self:
-            self._memory.set_register(addr, Register(size=7))
+            self._memory.set_register(addr, zero_register())
 
 
 class VoidRegion(MemoryRegion):
