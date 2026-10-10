@@ -49,7 +49,6 @@ Modules, by area (each module's docstring has the details):
 
 from .registers import (
     DM41MemoryError,
-    DM41LMemoryError,
     Register,
     AlphaRegister,
     format_data_line,
@@ -74,7 +73,6 @@ from .constants import (
     zero_register,
     eom_register,
     STATUS_REGISTER_LABELS,
-    XM_REGIONS,
     MIN_SANE_R00,
 )
 from .regions import MemoryRegion, RegionSpan, VoidRegion, FreeSpace
@@ -115,7 +113,6 @@ from .profile_fit import (
 
 __all__ = [
     "DM41MemoryError",
-    "DM41LMemoryError",
     "Register",
     "AlphaRegister",
     "format_data_line",
@@ -132,7 +129,6 @@ __all__ = [
     "zero_register",
     "eom_register",
     "STATUS_REGISTER_LABELS",
-    "XM_REGIONS",
     "DeviceProfile",
     "DeviceMode",
     "DEFAULT_MODE",

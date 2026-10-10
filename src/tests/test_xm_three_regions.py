@@ -23,7 +23,6 @@ from memory import (
     DeviceProfile,
     DM41MemoryError,
     Register,
-    XM_REGIONS,
     EOM_REGISTER_HEX,
 )
 
@@ -71,8 +70,6 @@ def _snapshot(xm) -> list:
 def test_profiles_describe_the_regions_of_each_model():
     assert DM41L.xm_regions == ((0x40, 0xBF), (0x201, 0x2EF))
     assert DM41X.xm_regions == ((0x40, 0xBF), (0x201, 0x2EF), (0x301, 0x3EF))
-    # XM_REGIONS stays as the DM41L's list for existing callers.
-    assert XM_REGIONS == list(DM41L.xm_regions)
 
 
 def test_profile_derived_sizes():

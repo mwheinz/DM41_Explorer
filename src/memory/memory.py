@@ -11,7 +11,6 @@ has the map) and is reached through `Memory.region()` or one of the named
 region properties below.
 '''
 
-import re
 from contextlib import contextmanager
 from typing import Dict, Optional, Union
 from pathlib import Path
@@ -38,10 +37,6 @@ from .xm_file import ExtendedMemory
 class Memory:
     '''A complete DM41-series memory state (a DM41L `.dm41` state or a DM41X
     `.d41` state file -- the text format is identical).'''
-
-    # Pattern to capture a capital letter followed by any hex string of 1
-    # or more chars
-    SPECIAL_PATTERN = re.compile(r"([A-Z]:\s*)([0-9a-fA-F]+)")
 
     def __init__(self, header: str = "DM41", profile: DeviceProfile = DM41L):
         self._header = header

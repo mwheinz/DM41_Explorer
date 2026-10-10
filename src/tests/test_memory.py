@@ -597,7 +597,7 @@ def test_status_registers_invalid_address(status_memory):
 # --- Extended Memory / XMFile Tests ---
 
 from pathlib import Path
-from memory import ExtendedMemory, DM41MemoryError, XM_REGIONS, zero_register
+from memory import ExtendedMemory, DM41MemoryError, DM41L, zero_register
 from fixture_loading import load_fixture
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -1035,13 +1035,13 @@ def test_xm_add_file_updates_region0_nnn_when_a_later_file_first_spans():
         "NOTES10", xm.TYPE_ASCII, records=[f"RECORD{n}" for n in range(1, 10)]
     )
     assert tenth.spans_regions is True
-    assert nnn() == XM_REGIONS[1][1]
+    assert nnn() == DM41L.xm_regions[1][1]
 
     # Ten more Data files land entirely within region 1 and must still be
     # visible.
     for i in range(1, 11):
         xm.add_file(f"DATA{i}", xm.TYPE_DATA, numbers=list(range(1, 14)))
-        assert nnn() == XM_REGIONS[1][1]
+        assert nnn() == DM41L.xm_regions[1][1]
 
     files = xm.list_files()
     assert len(files) == 20
@@ -1065,17 +1065,17 @@ def test_xm_add_file_one_register_over_total_capacity_raises_cleanly():
     a header.
 
     Root cause: _allocate_segments()'s spanning-into-region-1 capacity
-    check was `cursor + 1 <= XM_REGIONS[next_region][0]` (equivalent to
-    `cursor < XM_REGIONS[next_region][0]`), one register too permissive
+    check was `cursor + 1 <= DM41L.xm_regions[next_region][0]` (equivalent to
+    `cursor < DM41L.xm_regions[next_region][0]`), one register too permissive
     -- it let a file's data land so that its own successor (another
     file's name register, or list_files()'s EOM sentinel) would have to
     go exactly ON region 1's own reserved pointer register, which
     _place_file() then correctly refuses to overwrite with a bogus EOM,
     but leaves with NO terminator at all. Fixed to `cursor <=
-    XM_REGIONS[next_region][0]`, so add_file() now rejects this case up
+    DM41L.xm_regions[next_region][0]`, so add_file() now rejects this case up
     front -- before any registers are written -- instead of writing a
     directory with no way to signal its own end."""
-    region0, region1 = XM_REGIONS
+    region0, region1 = DM41L.xm_regions
 
     # The largest single file (as the very first thing ever written to
     # an empty extended memory) that still leaves room for a directory
@@ -1115,7 +1115,7 @@ def test_xm_add_file_exact_single_region_fill_does_not_falsely_span():
     like this reports spans_regions is False while a file that
     genuinely does spill data into the next region still reports True
     (see test_xm_add_file_spans_regions_when_it_does_not_fit)."""
-    region0, region1 = XM_REGIONS
+    region0, region1 = DM41L.xm_regions
 
     # Every usable register in region 0 after this file's own
     # name+header, with nothing left over -- the exact boundary that

@@ -26,14 +26,8 @@ class DM41MemoryError(ValueError):
     '''
     Raised when a register in the data state contains an illegal value.
 
-    Shared by every DM41 model's memory code (DM41L, DM41X, ...). It was
-    originally named DM41LMemoryError; that name is kept below as an alias
-    so existing imports keep working.
+    Shared by every DM41 model's memory code (DM41L, DM41X, ...).
     '''
-
-
-# Backward-compatible alias for the original name.
-DM41LMemoryError = DM41MemoryError
 
 
 def _pack_nibbles(nibbles) -> bytes:

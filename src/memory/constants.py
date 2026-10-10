@@ -4,7 +4,6 @@ memory package.
 '''
 
 from .registers import Register, REGISTER_SIZE_BYTES  # re-exported
-from .device_profile import DM41L
 
 STATUS_REGISTERS_RANGE = (0x00, 0x0F)
 VOID_RANGE = (0x10, 0x3F)
@@ -52,9 +51,3 @@ STATUS_REGISTER_LABELS = [
     "P", "Q", "R", "a",
     "b", "c", "d / Flags", "e",
 ]
-
-# The DM41L's extended-memory regions, kept as a plain list for existing
-# callers and tests. The authoritative, per-model definitions (including the
-# DM41X's third region) live in device_profile.py; code that needs "the
-# regions of THIS memory" must use `memory.profile.xm_regions`, not this.
-XM_REGIONS = list(DM41L.xm_regions)
