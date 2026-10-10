@@ -436,6 +436,20 @@ def test_memory_from_string_rejects_wrong_length_special_register():
         Memory.from_string(state)
 
 
+@pytest.mark.parametrize("label", ["X", "a"])
+def test_memory_from_string_rejects_unknown_special_register(label):
+    """Only A/B/C/S/M/N/G exist. Any other letter is reported as invalid
+    rather than loaded, since to_string() would silently drop it on save."""
+    state = (
+        "DM41\n"
+        "A: c000f50046494c B: 8000000000c196 C: 0000002c0480fd "
+        "S: 00101100100000 M: 00011cd5ff73cb N: 00000000000000 G: 00\n"
+        f"{label}: 00000000000000"
+    )
+    with pytest.raises(ValueError, match=f"Unknown special register '{label}'"):
+        Memory.from_string(state)
+
+
 def test_memory_from_string_accepts_one_byte_g_register():
     """G is a documented exception -- a single status byte, not a full
     hardware register -- so it must stay accepted at its real 1-byte

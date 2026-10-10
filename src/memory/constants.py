@@ -27,6 +27,11 @@ REGISTER_SIZE_BYTES = 7
 # (see Memory.__init__'s special-register defaults).
 SPECIAL_REGISTER_SIZE_OVERRIDES = {"G": 1}
 
+# Every special register a state can contain, in the order to_string()
+# writes them. A state naming any other letter is rejected rather than
+# loaded, since to_string() would silently drop it on save.
+SPECIAL_REGISTER_LABELS = ("A", "B", "C", "S", "M", "N", "G")
+
 ZERO_REGISTER_HEX = "00000000000000"
 EOM_REGISTER_HEX = "ffffffffffffff"
 

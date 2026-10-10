@@ -22,6 +22,7 @@ from .constants import (
     zero_register,
     REGISTER_SIZE_BYTES,
     SPECIAL_REGISTER_SIZE_OVERRIDES,
+    SPECIAL_REGISTER_LABELS,
 )
 from .regions import RegionSpan, VoidRegion, FreeSpace
 from .status_registers import StatusRegisters
@@ -188,6 +189,12 @@ class Memory:
                     if ":" != token[i][1]:
                         raise ValueError(f"Malformed line {line}")
                     label = token[i][0]
+                    if label not in SPECIAL_REGISTER_LABELS:
+                        raise ValueError(
+                            f"Unknown special register {label!r} (expected "
+                            f"one of {', '.join(SPECIAL_REGISTER_LABELS)}): "
+                            f"{line}"
+                        )
                     register = Register.from_hex(token[i + 1])
                     expected_size = SPECIAL_REGISTER_SIZE_OVERRIDES.get(
                         label, REGISTER_SIZE_BYTES
