@@ -30,7 +30,7 @@ def test_restore_undoes_register_and_special_register_changes():
     saved = memory.snapshot()
 
     memory.set_register(0x100, Register.from_hex("01020304050607"))
-    memory.get_register(0x03)[0] = 0x55  # in-place change to a live register
+    memory.set_register(0x03, Register.from_hex("55000000000000"))
     memory.set_register("A", Register.from_hex("ffffffffffffff"))
     memory.restore(saved)
 
@@ -44,7 +44,7 @@ def test_a_snapshot_can_be_restored_more_than_once():
 
     memory.set_register(0x100, Register.from_hex("01020304050607"))
     memory.restore(saved)
-    memory.get_register(0x03)[0] = 0x55
+    memory.set_register(0x03, Register.from_hex("55000000000000"))
     memory.restore(saved)
 
     assert memory.to_string() == before

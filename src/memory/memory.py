@@ -298,21 +298,28 @@ class Memory:
     # -- Raw register access ---------------------------------------------
 
     def get_register(self, key: Union[int, str]) -> Optional[Register]:
+        '''A copy of the register at address `key` (an int), or of the
+        special register named `key` (a str).
+
+        Registers are values: changing the returned copy never changes
+        this Memory -- write it back with set_register(). A core address
+        with nothing stored reads as zero; a special register that is
+        absent reads as None.'''
         if isinstance(key, int):
-            # Check if the address exists in our sparse core memory mapping
             reg = self._core_memory.get(key)
-            if reg is None:
-                # Return a default 56-bit (7 byte) register of zeroes if
-                # the address is missing
-                return Register(7)
-            return reg
-        return self._special_registers.get(key)
+            # Memory is sparse: an address with nothing stored is zero.
+            return zero_register() if reg is None else reg.copy()
+        reg = self._special_registers.get(key)
+        return None if reg is None else reg.copy()
 
     def set_register(self, key: Union[int, str], register: Register):
+        '''Stores a copy of `register` at address `key` (an int), or as the
+        special register named `key` (a str). Changing `register`
+        afterwards does not change this Memory.'''
         if isinstance(key, int):
-            self._core_memory[key] = register
+            self._core_memory[key] = register.copy()
         else:
-            self._special_registers[key] = register
+            self._special_registers[key] = register.copy()
 
     def region(self, key: str):
         '''Return the MemoryRegion registered under `key` Raises KeyError for
@@ -338,8 +345,8 @@ class Memory:
         Assignments extent, see KeyAssignments.end -- so a restore puts
         this Memory back exactly as it was.'''
         return (
-            {addr: Register(reg.get_bytes()) for addr, reg in self._core_memory.items()},
-            {key: Register(reg.get_bytes()) for key, reg in self._special_registers.items()},
+            {addr: reg.copy() for addr, reg in self._core_memory.items()},
+            {key: reg.copy() for key, reg in self._special_registers.items()},
             self.key_assignments._end,
             self._modified,
         )
@@ -348,10 +355,8 @@ class Memory:
         '''Puts this Memory back to the contents captured by snapshot().
         The snapshot can be restored more than once.'''
         core, special, key_end, modified = snapshot
-        self._core_memory = {a: Register(r.get_bytes()) for a, r in core.items()}
-        self._special_registers = {
-            k: Register(r.get_bytes()) for k, r in special.items()
-        }
+        self._core_memory = {a: r.copy() for a, r in core.items()}
+        self._special_registers = {k: r.copy() for k, r in special.items()}
         self.key_assignments._end = key_end
         self._modified = modified
 

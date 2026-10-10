@@ -60,6 +60,10 @@ class Register:
         except ValueError as e:
             raise ValueError(f"Invalid hexadecimal data: {e}") from e
 
+    def copy(self) -> "Register":
+        '''An independent copy: changing one never changes the other.'''
+        return Register(self._data)
+
     def get_hex(self) -> str:
         '''This returns the data in big-endian order.'''
         return self._data.hex()
