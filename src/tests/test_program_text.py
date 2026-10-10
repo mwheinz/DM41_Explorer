@@ -337,13 +337,13 @@ def _normalize_memory_state_fields(data: bytes) -> bytes:
     below) check it directly instead.'''
     out = bytearray(data)
     for marker in scan_global_markers_forward(data):
-        idx = marker["index"]
+        idx = marker.index
         out[idx] = 0xC0
         out[idx + 1] = 0x00
-        if marker["is_label"]:
+        if marker.is_label:
             out[idx + 3] = 0x00  # key assignment byte
         else:
-            end_type_nibble = marker["third_byte"] & 0xF0
+            end_type_nibble = marker.third_byte & 0xF0
             out[idx + 2] = end_type_nibble  # packed-status nibble -> 0
     _zero_cached_jump_bytes(data, out)
     return bytes(out)
@@ -449,11 +449,11 @@ def test_decode_program_txt_cannot_recover_permanent_end_marker():
     )
     instruction_bytes = memory.programs.get_program_bytes(program)
     original_end = decode_chain_marker(instruction_bytes, len(instruction_bytes) - 3)
-    assert original_end["end_type"] == 2  # confirms this fixture exercises .END.
+    assert original_end.end_type == 2  # confirms this fixture exercises .END.
 
     recompiled = decode_program_txt(encode_program_txt(instruction_bytes))
     recompiled_end = decode_chain_marker(recompiled, len(recompiled) - 3)
-    assert recompiled_end["end_type"] == 0  # always a plain END, never .END.
+    assert recompiled_end.end_type == 0  # always a plain END, never .END.
 
 
 def test_decode_program_txt_local_letter_labels_round_trip():

@@ -77,9 +77,9 @@ def _hex_for_assignment(assignment) -> str:
     default from."""
     if assignment is None:
         return ""
-    if assignment["fn_byte2"] is None:
-        return f"{assignment['fn_byte1']:02X}"
-    return f"{assignment['fn_byte1']:02X}{assignment['fn_byte2']:02X}"
+    if assignment.fn_byte2 is None:
+        return f"{assignment.fn_byte1:02X}"
+    return f"{assignment.fn_byte1:02X}{assignment.fn_byte2:02X}"
 
 
 class KeyAssignmentEditDialog(ctk.CTkToplevel):
@@ -146,7 +146,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         self._function_names = assignable_display_names(profile)
 
         if assignment is not None:
-            current_text = f"Currently assigned: {assignment['name']}"
+            current_text = f"Currently assigned: {assignment.name}"
         elif program_assignment is not None:
             current_text = f'Currently assigned: program "{program_assignment.name}"'
         else:
@@ -175,8 +175,8 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
 
         # -- Function tab: pick a named built-in/peripheral function -----
         default_name = (
-            assignment["name"]
-            if assignment is not None and assignment["name"] in self._function_names
+            assignment.name
+            if assignment is not None and assignment.name in self._function_names
             else (self._function_names[0] if self._function_names else "")
         )
         self._function_var = ctk.StringVar(value=default_name)
@@ -262,7 +262,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         # too, not just an unknown one: in DM41L mode a state that already
         # has LKAOFF on a key opens on Raw Hex, which is honest -- the
         # Function tab cannot offer that name.
-        if assignment is not None and assignment["name"] not in self._function_names:
+        if assignment is not None and assignment.name not in self._function_names:
             tabs.set("Raw Hex")
         elif assignment is None and program_assignment is not None:
             tabs.set("Program")

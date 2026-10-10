@@ -571,8 +571,8 @@ def encode_program_txt(data: bytes) -> str:
             if marker is None:
                 lines.append(_format_unknown(data, i, n - i))
                 break
-            if marker["is_label"]:
-                length = marker["label_length"]
+            if marker.is_label:
+                length = marker.label_length
                 header_len = 4 + max(length, 0)
                 if i + header_len > n:
                     lines.append(_format_unknown(data, i, n - i))

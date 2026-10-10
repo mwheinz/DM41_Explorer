@@ -239,7 +239,7 @@ def test_xrom_program_decompiles_to_hp41ucs_canonical_names():
 
 def _assignments(memory):
     return [
-        (a["key_number"], a["shifted"], a["name"])
+        (a.key_number, a.shifted, a.name)
         for a in memory.key_assignments.list_assignments()
     ]
 
@@ -267,10 +267,10 @@ def test_assigning_new_xroms_to_keys_round_trips():
         keys.set_assignment(key_number, False, key_bytes_for(resolve(name)))
 
     # The calculator's own bytes for them, from the S6 sample.
-    assert keys.get_assignment(12, False)["fn_byte1"] == 0xA6
-    assert keys.get_assignment(12, False)["fn_byte2"] == 0xB0
-    assert keys.get_assignment(11, False)["fn_byte2"] == 0xB1
-    assert keys.get_assignment(13, False)["fn_byte2"] == 0xA4
+    assert keys.get_assignment(12, False).fn_byte1 == 0xA6
+    assert keys.get_assignment(12, False).fn_byte2 == 0xB0
+    assert keys.get_assignment(11, False).fn_byte2 == 0xB1
+    assert keys.get_assignment(13, False).fn_byte2 == 0xA4
 
     reloaded = Memory.from_string(memory.to_string(), profile=DM41X)
     assert _assignments(reloaded) == [

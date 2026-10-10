@@ -19,7 +19,8 @@ no gap, so every edit here that changes the register count moves it as
 well -- see `_encode_entries()`.
 '''
 
-from typing import Optional, TYPE_CHECKING
+from dataclasses import dataclass
+from typing import List, Optional, TYPE_CHECKING
 
 from .registers import Register
 from .regions import MemoryRegion
@@ -28,6 +29,25 @@ from .mnemonics import display_for_key_bytes
 
 if TYPE_CHECKING:
     from .memory import Memory
+
+
+@dataclass(frozen=True)
+class KeyAssignment:
+    '''One built-in/peripheral function assignment from the Key
+    Assignment Registers (docs/key_assignments.md sec 4.2).
+
+    `fn_byte2` is None for a single-byte built-in function. `name` is the
+    function's HP-41 display name (memory/mnemonics.py), or a "0xNN"-style
+    fallback if the byte(s) match no known function. `key_number` and
+    `shifted` are None when `raw_key_byte` doesn't decode to one of the 34
+    real assignable keys (a corrupt or hand-crafted state).'''
+
+    key_number: Optional[int]
+    shifted: Optional[bool]
+    fn_byte1: int
+    fn_byte2: Optional[int]
+    name: str
+    raw_key_byte: int
 
 
 class KeyAssignments(MemoryRegion):
@@ -229,8 +249,8 @@ class KeyAssignments(MemoryRegion):
         the global-label paths is all that ever touches them.'''
         assigned = set()
         for entry in self.list_assignments():
-            if entry["key_number"] is not None:
-                assigned.add((entry["key_number"], entry["shifted"]))
+            if entry.key_number is not None:
+                assigned.add((entry.key_number, entry.shifted))
         for label in self._memory.programs.list_global_chain():
             if label.is_named and label.key_assignment:
                 try:
@@ -405,10 +425,10 @@ class KeyAssignments(MemoryRegion):
             self._encode_entries(filtered)
         self.set_key_flag(key_number, shifted, False)
 
-    def get_assignment(self, key_number: int, shifted: bool) -> Optional[dict]:
+    def get_assignment(self, key_number: int, shifted: bool) -> Optional[KeyAssignment]:
         '''Looks up the single Key Assignment Register entry (if any) for
-        `key_number`/`shifted` -- same dict shape as one entry from
-        list_assignments(), or None if that key/shift-state has no entry
+        `key_number`/`shifted` -- a KeyAssignment, as list_assignments()
+        returns, or None if that key/shift-state has no entry
         there (unassigned, or assigned via a global label instead, sec
         4.6). Intended for a GUI rendering one keypad cell at a time (docs
         sec 6 item 4), where scanning the full decoded list per cell would
@@ -417,23 +437,19 @@ class KeyAssignments(MemoryRegion):
         key_byte = self.key_byte_for(key_number, shifted)
         for fn1, fn2, kb in self.decode_entries():
             if kb == key_byte:
-                return {
-                    "key_number": key_number,
-                    "shifted": shifted,
-                    "fn_byte1": fn1,
-                    "fn_byte2": fn2,
-                    "name": display_for_key_bytes(fn1, fn2),
-                    "raw_key_byte": kb,
-                }
+                return KeyAssignment(
+                    key_number=key_number,
+                    shifted=shifted,
+                    fn_byte1=fn1,
+                    fn_byte2=fn2,
+                    name=display_for_key_bytes(fn1, fn2),
+                    raw_key_byte=kb,
+                )
         return None
 
-    def list_assignments(self) -> list:
+    def list_assignments(self) -> List[KeyAssignment]:
         '''Returns every built-in/peripheral key assignment currently in
-        the Key Assignment Registers as a list of dicts:
-        `{"key_number": int, "shifted": bool, "fn_byte1": int,
-        "fn_byte2": int|None, "name": str}` -- `name` is the function's
-        HP-41 display name (memory/mnemonics.py), or a "0xNN"-style fallback
-        string if the byte(s) don't match any known function. Order
+        the Key Assignment Registers, as KeyAssignments. Order
         matches the buffer's own newest-first order (sec 4.4); global
         label assignments (sec 4.6) are NOT included here -- see
         ProgramMemory.list_global_chain()'s `key_assignment` field for
@@ -451,12 +467,12 @@ class KeyAssignments(MemoryRegion):
                 # whole listing, with enough raw detail (the key byte
                 # itself) that a caller/GUI can flag it distinctly.
                 key_number, shifted = None, None
-            results.append({
-                "key_number": key_number,
-                "shifted": shifted,
-                "fn_byte1": fn1,
-                "fn_byte2": fn2,
-                "name": display_for_key_bytes(fn1, fn2),
-                "raw_key_byte": key_byte,
-            })
+            results.append(KeyAssignment(
+                key_number=key_number,
+                shifted=shifted,
+                fn_byte1=fn1,
+                fn_byte2=fn2,
+                name=display_for_key_bytes(fn1, fn2),
+                raw_key_byte=key_byte,
+            ))
         return results

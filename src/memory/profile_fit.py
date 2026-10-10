@@ -321,16 +321,16 @@ def _check_key_assignments(
 ) -> List[ProfileFinding]:
     findings = []
     for assignment in view.key_assignments.list_assignments():
-        byte1, byte2 = assignment["fn_byte1"], assignment["fn_byte2"]
+        byte1, byte2 = assignment.fn_byte1, assignment.fn_byte2
         if byte2 is None or byte1 not in _XROM_FIRST_BYTES:
             continue
         if (byte1, byte2) in profile.builtin_xroms:
             continue
-        key_number = assignment["key_number"]
+        key_number = assignment.key_number
         if key_number is None:
-            where = f"Key assignment (key byte 0x{assignment['raw_key_byte']:02X})"
+            where = f"Key assignment (key byte 0x{assignment.raw_key_byte:02X})"
         else:
-            shift = "shifted" if assignment["shifted"] else "unshifted"
+            shift = "shifted" if assignment.shifted else "unshifted"
             where = f"Key {key_number:02d} ({shift})"
         findings.append(
             ProfileFinding(WARNING, where, _xrom_message((byte1, byte2), profile))

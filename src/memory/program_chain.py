@@ -26,10 +26,37 @@ logic except to flip a `.END.`-turned-real-`END`'s high nibble -- see
 Memory.import_program().
 '''
 
+from dataclasses import dataclass, replace
 from typing import Optional
 
 
-def decode_chain_marker(data: bytes, index: int) -> Optional[dict]:
+@dataclass(frozen=True)
+class ChainMarker:
+    '''One decoded 3-byte global-chain marker (see the module docstring).
+
+    `end_type` is set only for an END (0 = normal END, 2 = the permanent
+    `.END.`), `label_length` only for a global label. `index`, `name` and
+    `key_assignment` are filled in by walk_chain() and
+    opcode_scan.scan_global_markers_forward(), which know where in their
+    buffer the marker sits; `name`/`key_assignment` only for a label.'''
+
+    bbb: int
+    distance_registers: int
+    is_label: bool
+    end_type: Optional[int]
+    label_length: Optional[int]
+    third_byte: int
+    index: Optional[int] = None
+    name: Optional[str] = None
+    key_assignment: Optional[int] = None
+
+    @property
+    def distance_bytes(self) -> int:
+        '''The link back to the previous marker, in bytes (0 = none).'''
+        return self.distance_registers * 7 + self.bbb
+
+
+def decode_chain_marker(data: bytes, index: int) -> Optional[ChainMarker]:
     '''
     Decodes the 3-byte marker at `data[index:index+3]`. Returns None if
     `index` is out of bounds or the byte there doesn't start with the
@@ -48,14 +75,14 @@ def decode_chain_marker(data: bytes, index: int) -> Optional[dict]:
         return None
     val = (raw[0] << 16) | (raw[1] << 8) | raw[2]
     is_label = (raw[2] >> 4) == 0xF
-    return {
-        "bbb": (val >> 17) & 0x7,
-        "distance_registers": (val >> 8) & 0x1FF,
-        "is_label": is_label,
-        "end_type": None if is_label else (raw[2] >> 4),
-        "label_length": (raw[2] & 0x0F) - 1 if is_label else None,
-        "third_byte": raw[2],
-    }
+    return ChainMarker(
+        bbb=(val >> 17) & 0x7,
+        distance_registers=(val >> 8) & 0x1FF,
+        is_label=is_label,
+        end_type=None if is_label else (raw[2] >> 4),
+        label_length=(raw[2] & 0x0F) - 1 if is_label else None,
+        third_byte=raw[2],
+    )
 
 
 def decode_label_name(data: bytes, index: int, length: int) -> tuple:
@@ -67,6 +94,23 @@ def decode_label_name(data: bytes, index: int, length: int) -> tuple:
     key_assignment = combined[3]
     name = "".join(chr(b) if 0x20 <= b <= 0x7E else "?" for b in combined[4:])
     return name, key_assignment
+
+
+def located_marker(data: bytes, index: int) -> Optional[ChainMarker]:
+    '''decode_chain_marker() plus where it sits: the marker at `index`
+    with `index` set and, for a global label, its `name` and
+    `key_assignment` too. None if there is no marker at `index`, or if a
+    label's header/name would run past the end of `data` (truncated or
+    corrupt input, not a real label).'''
+    marker = decode_chain_marker(data, index)
+    if marker is None:
+        return None
+    if not marker.is_label:
+        return replace(marker, index=index)
+    if index + 4 + max(marker.label_length, 0) > len(data):
+        return None
+    name, key = decode_label_name(data, index, marker.label_length)
+    return replace(marker, index=index, name=name, key_assignment=key)
 
 
 def encode_chain_marker(bbb: int, distance_registers: int, third_byte: int) -> bytes:
@@ -105,8 +149,8 @@ def walk_chain(data: bytes) -> list:
     in the same forward-reading direction `Memory._read_bytes_forward()`
     uses, i.e. toward the *end* of `data`).
 
-    Returns a list of dicts (each `decode_chain_marker()`'s own dict, plus
-    `"index"`, and for a label also `"name"`/`"key_assignment"`), ordered
+    Returns a list of ChainMarkers with `index` (and, for a label,
+    `name`/`key_assignment`) filled in, ordered
     newest-to-oldest: `result[0]` is always the trailing marker itself,
     and `result[-1]` is the *outermost* one -- the marker whose own
     distance field pointed *outside* `data` (or reported no predecessor at
@@ -140,27 +184,17 @@ def walk_chain(data: bytes) -> list:
             break
         visited.add(index)
 
-        marker = decode_chain_marker(data, index)
+        # None also covers a label whose header/name runs past data's
+        # end -- truncated/corrupt input, not a real label here.
+        marker = located_marker(data, index)
         if marker is None:
             break
+        entries.append(marker)
 
-        entry = dict(marker)
-        entry["index"] = index
-        if marker["is_label"]:
-            label_end = index + 4 + max(marker["label_length"], 0)
-            if label_end > len(data):
-                break  # label's own header/name runs past data's end --
-                       # truncated/corrupt input, not a real label here
-            name, key = decode_label_name(data, index, marker["label_length"])
-            entry["name"] = name
-            entry["key_assignment"] = key
-        entries.append(entry)
-
-        distance_bytes = marker["distance_registers"] * 7 + marker["bbb"]
-        if distance_bytes == 0:
+        if marker.distance_bytes == 0:
             break  # no predecessor -- outermost by construction
 
-        target_index = index - distance_bytes
+        target_index = index - marker.distance_bytes
         if target_index < 0:
             break  # points outside `data` -- this entry is outermost
         index = target_index

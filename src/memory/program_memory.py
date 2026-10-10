@@ -29,7 +29,12 @@ from .opcode_scan import (
     find_program_end,
     scan_global_markers_forward,
 )
-from .program_chain import walk_chain, encode_chain_marker
+from .program_chain import (
+    ChainMarker,
+    decode_chain_marker,
+    encode_chain_marker,
+    walk_chain,
+)
 
 if TYPE_CHECKING:
     from .memory import Memory
@@ -134,30 +139,12 @@ class ProgramMemory(MemoryRegion):
 
     # -- The global chain (docs/program.md sec 5) ------------------------
 
-    def _decode_chain_marker(self, reg: int, offset: int) -> Optional[dict]:
-        '''Decodes the 3-byte '1100 bbb rrrrrrrrr eeeeffff' marker at
-        (reg, offset) -- docs/program.md sec 5.1. Returns None if the byte
-        at (reg, offset) doesn't start with the 0xC0-0xCD marker range --
-        `bbb` is a byte offset within a 7-byte register and so is only
-        ever 0-6 for a real marker; `0xCE`/`0xCF` (bbb == 7) are ordinary
-        2-byte opcodes elsewhere in FOCAL code, never markers (see
-        `program_chain.decode_chain_marker()`, the byte-buffer twin of
-        this method).'''
-        raw = self.read_bytes_forward(reg, offset, 3)
-        if not 0xC0 <= raw[0] <= 0xCD:
-            return None
-        val = (raw[0] << 16) | (raw[1] << 8) | raw[2]
-        is_label = (raw[2] >> 4) == 0xF
-        return {
-            "bbb": (val >> 17) & 0x7,
-            "distance_registers": (val >> 8) & 0x1FF,
-            "is_label": is_label,
-            # High nibble of the third byte, when this isn't a label: 0 =
-            # normal END, 2 = the permanent `.END.` itself (docs/program.md
-            # sec 5.1). None for a label, where that nibble is always F.
-            "end_type": None if is_label else (raw[2] >> 4),
-            "label_length": (raw[2] & 0x0F) - 1 if is_label else None,
-        }
+    def _decode_chain_marker(self, reg: int, offset: int) -> Optional[ChainMarker]:
+        '''Decodes the 3-byte marker at (reg, offset) -- docs/program.md
+        sec 5.1 -- by reading those bytes forward and handing them to
+        `program_chain.decode_chain_marker()`. None if there is no marker
+        there.'''
+        return decode_chain_marker(self.read_bytes_forward(reg, offset, 3), 0)
 
     def _decode_label_name(self, reg: int, offset: int, length: int) -> tuple:
         '''Decodes a global label's key-assignment byte and name, given
@@ -251,16 +238,15 @@ class ProgramMemory(MemoryRegion):
             # the next chain link the walk visits from here -- see
             # ProgramInfo's docstring for why this is exposed raw rather
             # than interpreted as a program size.
-            distance_bytes = marker["distance_registers"] * 7 + marker["bbb"]
+            distance_bytes = marker.distance_bytes
 
-            if marker["is_label"]:
-                name, key = self._decode_label_name(
-                    reg, offset, marker["label_length"]
-                )
-                entries.append((
-                    reg, offset, name, key,
-                    distance_bytes, marker["bbb"], marker["distance_registers"],
-                    None,
+            if marker.is_label:
+                name, key = self._decode_label_name(reg, offset, marker.label_length)
+                entries.append(ProgramInfo(
+                    header_addr=reg, header_offset=offset, name=name,
+                    key_assignment=key, distance_bytes=distance_bytes,
+                    bbb=marker.bbb, distance_registers=marker.distance_registers,
+                    end_type=None,
                 ))
             else:
                 # The very first marker examined is always this partition's
@@ -277,18 +263,18 @@ class ProgramMemory(MemoryRegion):
                 # comparing this tab's output against a real CAT 1 listing).
                 is_empty_partition_marker = (
                     len(entries) == 0
-                    and marker["end_type"] == 2
-                    and marker["bbb"] == 0
-                    and marker["distance_registers"] == 0
+                    and marker.end_type == 2
+                    and distance_bytes == 0
                 )
                 if not is_empty_partition_marker:
-                    entries.append((
-                        reg, offset, None, None,
-                        distance_bytes, marker["bbb"], marker["distance_registers"],
-                        marker["end_type"],
+                    entries.append(ProgramInfo(
+                        header_addr=reg, header_offset=offset, name=None,
+                        key_assignment=None, distance_bytes=distance_bytes,
+                        bbb=marker.bbb, distance_registers=marker.distance_registers,
+                        end_type=marker.end_type,
                     ))
 
-            if marker["bbb"] == 0 and marker["distance_registers"] == 0:
+            if distance_bytes == 0:
                 break  # no predecessor -- first global line in memory
 
             addr = self.addr_for(reg, offset)
@@ -300,15 +286,8 @@ class ProgramMemory(MemoryRegion):
                 break  # defensive: shouldn't walk past R00 or below 0xC0
             reg, offset = next_reg, next_offset
 
-        programs = [
-            ProgramInfo(
-                header_addr=r, header_offset=o, name=n, key_assignment=k,
-                distance_bytes=d, bbb=b, distance_registers=dr, end_type=et,
-            )
-            for r, o, n, k, d, b, dr, et in entries
-        ]
-        programs.reverse()
-        return programs
+        entries.reverse()
+        return entries
 
     def list_programs(self) -> list:
         '''
@@ -656,8 +635,8 @@ class ProgramMemory(MemoryRegion):
 
         # Step 4: zero every label's own key-assignment byte in the copy.
         for entry in chain_entries:
-            if entry["is_label"]:
-                data[entry["index"] + 3] = 0x00
+            if entry.is_label:
+                data[entry.index + 3] = 0x00
 
         # Step 5: where this goes, and what the outermost marker should
         # now link back to. `dot_end_to_convert` records whether Case A
@@ -667,8 +646,8 @@ class ProgramMemory(MemoryRegion):
 
         # Step 6: force a copied `.END.`-type trailing marker to a real END.
         trailing = chain_entries[0]
-        if not trailing["is_label"] and trailing["end_type"] == 2:
-            data[trailing["index"] + 2] &= 0x0F
+        if not trailing.is_label and trailing.end_type == 2:
+            data[trailing.index + 2] &= 0x0F
 
         # Step 2 (continued): recompute the outermost marker's own link.
         self._relink_outermost_marker(data, chain_entries[-1], insertion_addr, link_addr)
@@ -691,7 +670,7 @@ class ProgramMemory(MemoryRegion):
         if padding > 0:
             self.write_bytes_forward(next_free_addr, bytes(padding))
 
-        trailing_dest_addr = insertion_addr - trailing["index"]
+        trailing_dest_addr = insertion_addr - trailing.index
         end_dr, end_bbb = divmod(trailing_dest_addr - end_marker_addr, 7)
         end_marker_bytes = encode_chain_marker(end_bbb, end_dr, 0x20)
         self.write_bytes_forward(end_marker_addr, end_marker_bytes)
@@ -714,9 +693,9 @@ class ProgramMemory(MemoryRegion):
         `import_program()`'s step 3.'''
         existing_names = {p.name for p in self.list_global_chain() if p.is_named}
         for entry in chain_entries:
-            if entry["is_label"] and entry["name"] in existing_names:
+            if entry.is_label and entry.name in existing_names:
                 raise ValueError(
-                    f"A global label named {entry['name']!r} already exists "
+                    f"A global label named {entry.name!r} already exists "
                     "in this memory -- rename or delete the existing "
                     "program before importing this one."
                 )
@@ -779,7 +758,7 @@ class ProgramMemory(MemoryRegion):
     def _relink_outermost_marker(
         cls,
         data: bytearray,
-        outermost: dict,
+        outermost: ChainMarker,
         insertion_addr: int,
         link_addr: Optional[int],
     ):
@@ -799,7 +778,7 @@ class ProgramMemory(MemoryRegion):
         if link_addr is None:
             new_bbb, new_dr = 0, 0
         else:
-            outermost_dest_addr = insertion_addr - outermost["index"]
+            outermost_dest_addr = insertion_addr - outermost.index
             new_dr, new_bbb = divmod(link_addr - outermost_dest_addr, 7)
             if new_dr > 0x1FF:
                 raise DM41MemoryError(
@@ -807,7 +786,7 @@ class ProgramMemory(MemoryRegion):
                     "chain to encode -- program memory may be unusually "
                     "large or fragmented."
                 )
-        index = outermost["index"]
+        index = outermost.index
         third = data[index + 2]
         data[index : index + 3] = encode_chain_marker(new_bbb, new_dr, third)
 
@@ -935,13 +914,13 @@ class ProgramMemory(MemoryRegion):
             return []
 
         last_marker = markers[-1]
-        if last_marker["is_label"]:
+        if last_marker.is_label:
             raise DM41MemoryError(
                 "Program memory ends with a global label that's never "
                 "closed by an END -- pack() can't safely determine where "
                 "that program ends."
             )
-        tail_start = last_marker["index"] + 3
+        tail_start = last_marker.index + 3
         if any(data[tail_start:]):
             raise DM41MemoryError(
                 "Program memory has unrecognized data after its last "
@@ -956,7 +935,7 @@ class ProgramMemory(MemoryRegion):
         # re-imported.
         for i, marker in enumerate(markers):
             distance_bytes = (
-                0 if i == 0 else marker["index"] - markers[i - 1]["index"]
+                0 if i == 0 else marker.index - markers[i - 1].index
             )
             distance_registers, bbb = divmod(distance_bytes, 7)
             if distance_registers > 0x1FF:
@@ -971,9 +950,9 @@ class ProgramMemory(MemoryRegion):
                     "re-link -- program memory may be unusually large or "
                     "fragmented."
                 )
-            start = marker["index"]
-            third_byte = marker["third_byte"]
-            if not marker["is_label"]:
+            start = marker.index
+            third_byte = marker.third_byte
+            if not marker.is_label:
                 # Every END comes out of a real PACK marked "packed" (low
                 # nibble 9, versus d/f for "needs packing"), and a `.END.`
                 # that was closing the newest program directly becomes a
@@ -990,15 +969,15 @@ class ProgramMemory(MemoryRegion):
         group_start_index = 0
 
         for marker in markers:
-            if marker["is_label"]:
-                pending_labels.append((marker["name"], marker["key_assignment"]))
+            if marker.is_label:
+                pending_labels.append((marker.name, marker.key_assignment))
                 continue
 
-            marker_last_byte_index = marker["index"] + 2
+            marker_last_byte_index = marker.index + 2
             if (
                 marker is last_marker
                 and not pending_labels
-                and not any(data[group_start_index : marker["index"]])
+                and not any(data[group_start_index : marker.index])
             ):
                 break  # pure register-alignment padding -- not a program
 

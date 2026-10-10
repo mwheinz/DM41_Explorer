@@ -198,7 +198,7 @@ def test_edit_key_assign_function_clears_conflicting_program(tab):
     dlg._hex_var.set("40")  # '+'
     dlg._on_save_clicked()
 
-    assert memory.key_assignments.get_assignment(11, False)["name"] == "+"
+    assert memory.key_assignments.get_assignment(11, False).name == "+"
     assert memory.programs.get_program_for_key(11, False) is None
     assert _button_text(tab, 11, False) == "+"
 

@@ -141,11 +141,11 @@ from .constants import (
 )
 from .regions import MemoryRegion, RegionSpan, VoidRegion, FreeSpace
 from .status_registers import StatusRegisters
-from .key_assignments import KeyAssignments
+from .key_assignments import KeyAssignment, KeyAssignments
 from .alarms import Alarm, Alarms
 from .program_memory import ProgramMemory
 from .data_memory import DataMemory
-from .xm_file import XMFile, ExtendedMemory, NAME_MIN_CHAR, NAME_MAX_CHAR
+from .xm_file import XMFile, XMHeader, ExtendedMemory, NAME_MIN_CHAR, NAME_MAX_CHAR
 from .program_info import ProgramInfo, ProgramLabel, Program
 from .opcode_scan import find_program_end, scan_global_markers_forward
 from .program_files import (
@@ -158,6 +158,7 @@ from .program_files import (
     decode_program_txt,
 )
 from .program_chain import (
+    ChainMarker,
     walk_chain,
     decode_chain_marker,
     decode_label_name,
@@ -206,12 +207,14 @@ __all__ = [
     "VoidRegion",
     "FreeSpace",
     "StatusRegisters",
+    "KeyAssignment",
     "KeyAssignments",
     "Alarm",
     "Alarms",
     "ProgramMemory",
     "DataMemory",
     "XMFile",
+    "XMHeader",
     "ExtendedMemory",
     "NAME_MIN_CHAR",
     "NAME_MAX_CHAR",
@@ -227,6 +230,7 @@ __all__ = [
     "decode_program_dat",
     "encode_program_txt",
     "decode_program_txt",
+    "ChainMarker",
     "walk_chain",
     "decode_chain_marker",
     "decode_label_name",

@@ -15,9 +15,9 @@ any instruction *means*, only how many bytes it occupies.
 '''
 
 from enum import Enum
-from typing import Optional
+from typing import List, Optional
 
-from .program_chain import decode_chain_marker, decode_label_name
+from .program_chain import ChainMarker, located_marker
 
 # Opcode classification, mirroring hp41uc's decomp.c SEEK_* states.
 class State(Enum):
@@ -103,21 +103,22 @@ def find_program_end(data: bytes) -> Optional[int]:  # pylint: disable=too-many-
     return None
 
 
-def scan_global_markers_forward(data: bytes) -> list:
+def scan_global_markers_forward(data: bytes) -> List[ChainMarker]:
     '''
     Walks `data` forward, opcode by opcode -- the exact same length-
     classification rules `find_program_end()` uses -- but instead of
     stopping at the first END-type marker, continues all the way through
     `data`, recording EVERY global marker (a label header, a plain END, or
-    the permanent `.END.`) it passes, in physical/forward-discovery order.
+    the permanent `.END.`) it passes, in physical/forward-discovery order,
+    as ChainMarkers with `index` (and, for a label, `name`/
+    `key_assignment`) filled in.
 
     Never raises -- like `find_program_end()`, an opcode that would run
     past the end of `data` (a genuinely truncated/corrupt stream) simply
     ends the scan at whatever's already been found, rather than raising.
     This includes a label marker whose own header/name would run past
-    the end of `data`: `decode_label_name()` is only called once its
-    bytes are confirmed to fit (see `program_chain.walk_chain()`, which
-    guards the same way).
+    the end of `data` (`program_chain.located_marker()` returns None for
+    it, as it does for `walk_chain()`).
     '''
     entries = []
     state = State.BYTE1
@@ -154,19 +155,12 @@ def scan_global_markers_forward(data: bytes) -> list:
             state = State.BYTE3_GLOBAL
 
         elif state == State.BYTE3_GLOBAL:
-            marker = decode_chain_marker(data, marker_start)
-            entry = dict(marker)
-            entry["index"] = marker_start
-            if marker["is_label"]:
-                label_end = marker_start + 4 + max(marker["label_length"], 0)
-                if label_end > len(data):
-                    break  # label's own header/name runs past data's end --
-                           # truncated/corrupt stream, stop here like
-                           # find_program_end() would
-                name, key = decode_label_name(data, marker_start, marker["label_length"])
-                entry["name"] = name
-                entry["key_assignment"] = key
-            entries.append(entry)
+            marker = located_marker(data, marker_start)
+            if marker is None:
+                break  # label's own header/name runs past data's end --
+                       # truncated/corrupt stream, stop here like
+                       # find_program_end() would
+            entries.append(marker)
 
             if c < 0xF0:
                 # A plain END (or the permanent .END.) -- not a label.

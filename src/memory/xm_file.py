@@ -5,7 +5,7 @@ docs/memory.md sec 4 for the on-disk format this was reverse-engineered
 from.
 """
 
-from typing import Optional, TYPE_CHECKING
+from typing import NamedTuple, Optional, TYPE_CHECKING
 
 from .registers import Register, DM41MemoryError, format_data_line, parse_data_line
 from .trigraphs import encode_trigraphs, decode_trigraphs
@@ -21,6 +21,17 @@ if TYPE_CHECKING:
 # names don't get trigraph translation at all.
 NAME_MIN_CHAR = 0x20
 NAME_MAX_CHAR = 0x65
+
+
+class XMHeader(NamedTuple):
+    '''A decoded XM file header register (ExtendedMemory._parse_header()).
+    `register_length` is SSS, the register count the header declares;
+    `byte_length` is BBB, the instruction-byte count, for Program files
+    only (None otherwise).'''
+
+    file_type: int
+    register_length: int
+    byte_length: Optional[int]
 
 
 class XMFile:
@@ -347,11 +358,11 @@ class ExtendedMemory(MemoryRegion):
     TYPE_ASCII = XMFile.TYPE_ASCII
 
     @classmethod
-    def _parse_header(cls, raw: bytes) -> Optional[dict]:
+    def _parse_header(cls, raw: bytes) -> XMHeader:
         """
-        Attempts to interpret a 7-byte register at `addr` as an XM file
-        header. Returns None if `raw` doesn't match a known header shape,
-        otherwise a dict with file_type, register_length (SSS in
+        Interprets a 7-byte register as an XM file header. Raises
+        ValueError if `raw` doesn't match a known header shape; otherwise
+        returns an XMHeader with file_type, register_length (SSS in
         docs/memory.md, the register count declared in the header) and,
         for Program files only, byte_length (BBB, the instruction-byte
         count).
@@ -387,11 +398,7 @@ class ExtendedMemory(MemoryRegion):
                 raise ValueError("Header is not a valid PROGRAM header.")
 
             byte_length = (raw[4] << 4) | (raw[5] >> 4)
-            return {
-                "file_type": file_type,
-                "register_length": register_length,
-                "byte_length": byte_length,
-            }
+            return XMHeader(file_type, register_length, byte_length)
 
         # Data ("2AAA0000RRRSSS") and ASCII ("3AAA00CCRRRSSS") headers both
         # encode the header's own address as AAA (nibble 1-3: the low
@@ -429,11 +436,7 @@ class ExtendedMemory(MemoryRegion):
             if raw[2] != 0x00:
                 raise ValueError("Invalid ASCII file header.")
 
-        return {
-            "file_type": file_type,
-            "register_length": register_length,
-            "byte_length": None,
-        }
+        return XMHeader(file_type, register_length, None)
 
     def list_files(self) -> list[XMFile]:
         """
@@ -493,7 +496,7 @@ class ExtendedMemory(MemoryRegion):
             # lands on or below the region's pointer register, the rest of
             # the file continues at the top of the next region -- and, for a
             # file big enough, the one after that.
-            addr -= header["register_length"] + 1
+            addr -= header.register_length + 1
             top = header_addr - 1
             while addr <= regions[current_region][0]:
                 segments.append([regions[current_region][0] + 1, top])
@@ -515,9 +518,9 @@ class ExtendedMemory(MemoryRegion):
                 name=name,
                 name_bytes=name_bytes,
                 header_addr=header_addr,
-                file_type=header["file_type"],
-                declared_length=header["register_length"],
-                byte_length=header.get("byte_length", None),
+                file_type=header.file_type,
+                declared_length=header.register_length,
+                byte_length=header.byte_length,
                 segments=segments,
             )
             files.append(file)

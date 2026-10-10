@@ -549,7 +549,7 @@ class KeyAssignmentsTab(ctk.CTkFrame):
                     fg_color = FLAG_CLEAR_FG
                     text_color = FLAG_CLEAR_TEXT
                 if assignment:
-                    text = f"{prefix}{assignment['name']}"
+                    text = f"{prefix}{assignment.name}"
                 else:
                     # "▸" marks a global-program assignment, distinct from
                     # a built-in/peripheral function -- see the tab caption.

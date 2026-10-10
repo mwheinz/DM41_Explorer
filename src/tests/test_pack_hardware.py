@@ -134,7 +134,7 @@ def test_pack_only_leaves_a_null_between_two_numbers(fixture):
     # The zero bytes between the last END and the permanent .END. are
     # register-alignment padding, not NULL instructions.
     markers = scan_global_markers_forward(area)[:-1]
-    last_marker_end = markers[-1]["index"] + 3 if markers else 0
+    last_marker_end = markers[-1].index + 3 if markers else 0
     for position, (start, length) in enumerate(instructions):
         if area[start] != 0x00 or start >= last_marker_end:
             continue
@@ -165,10 +165,10 @@ def test_pack_marks_every_end_packed_and_closes_with_an_empty_dot_end(fixture):
         pytest.skip("no programs")
     memory.pack()
     markers = [
-        m for m in scan_global_markers_forward(program_area(memory)) if not m["is_label"]
+        m for m in scan_global_markers_forward(program_area(memory)) if not m.is_label
     ]
-    assert [m["third_byte"] for m in markers[:-1]] == [0x09] * (len(markers) - 1)
-    assert markers[-1]["third_byte"] == 0x20  # the permanent .END.
+    assert [m.third_byte for m in markers[:-1]] == [0x09] * (len(markers) - 1)
+    assert markers[-1].third_byte == 0x20  # the permanent .END.
     programs = memory.programs.list_programs()
     assert all(p.terminator == "END" for p in programs)
 

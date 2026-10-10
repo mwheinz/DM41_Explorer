@@ -26,7 +26,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from gui.key_assignment_edit_dialog import KeyAssignmentEditDialog
-from memory import DM41L, DM41X
+from memory import DM41L, DM41X, KeyAssignment
 from memory.functions import XROM_FUNCTIONS
 from memory.mnemonics import key_bytes_for, resolve
 
@@ -99,10 +99,11 @@ def test_typed_ascii_native_xrom_name_is_not_mangled(root):
 def test_dropdown_uses_hp41_display_names(root):
     dlg = _make_dialog(
         root,
-        assignment={
-            "key_number": 1, "shifted": False,
-            "fn_byte1": 0x4E, "fn_byte2": None, "name": "P-R",
-        },
+        assignment=KeyAssignment(
+            key_number=1, shifted=False,
+            fn_byte1=0x4E, fn_byte2=None, name="P-R",
+            raw_key_byte=0x01,
+        ),
     )
     # The current assignment's display name is a real dropdown entry, so
     # the Function tab (not Raw Hex) opens with it selected.
@@ -136,10 +137,11 @@ def test_dm41x_only_hint_follows_the_function_in_the_box(root):
 def test_dm41x_only_hint_is_shown_for_the_current_assignment(root):
     dlg = _make_dialog(
         root,
-        assignment={
-            "key_number": 1, "shifted": False,
-            "fn_byte1": 0xA6, "fn_byte2": 0xB1, "name": "LKAON",
-        },
+        assignment=KeyAssignment(
+            key_number=1, shifted=False,
+            fn_byte1=0xA6, fn_byte2=0xB1, name="LKAON",
+            raw_key_byte=0x01,
+        ),
     )
     assert dlg._function_var.get() == "LKAON"
     assert "DM41X only" in dlg._dm41x_hint.cget("text")
@@ -258,11 +260,11 @@ def test_function_assignment_takes_display_priority_over_program(root):
     program.name = "AAA"
     dlg = _make_dialog(
         root,
-        assignment={
-            "key_number": 1, "shifted": False,
-            "fn_byte1": 0x40, "fn_byte2": None, "name": "+",
-            "raw_key_byte": 0x01,
-        },
+        assignment=KeyAssignment(
+            key_number=1, shifted=False,
+            fn_byte1=0x40, fn_byte2=None, name="+",
+            raw_key_byte=0x01,
+        ),
         program_assignment=program,
         program_names=["AAA"],
     )
@@ -393,13 +395,13 @@ def test_an_existing_dm41x_assignment_opens_on_raw_hex_in_dm41l_mode(root):
     DM41L mode, so the dialog opens on Raw Hex rather than silently
     showing some unrelated function."""
     byte1, byte2 = key_bytes_for(resolve("LKAOFF", programmable_only=False))
-    assignment = {
-        "name": "LKAOFF",
-        "fn_byte1": byte1,
-        "fn_byte2": byte2,
-        "key_number": 1,
-        "shifted": False,
-        "raw_key_byte": 0x01,
-    }
+    assignment = KeyAssignment(
+        name="LKAOFF",
+        fn_byte1=byte1,
+        fn_byte2=byte2,
+        key_number=1,
+        shifted=False,
+        raw_key_byte=0x01,
+    )
     dialog = _make_dialog(root, assignment=assignment, profile=DM41L)
     assert dialog._tabs.get() == "Raw Hex"
