@@ -374,12 +374,14 @@ class Memory:
             self.restore(saved)
             raise
 
-    def is_modified(self):
-        ''' Memory modifications can happen many different ways, so we can't
+    def mark_modified(self):
+        '''Sets the modified flag (read it with `modified`).
+
+        Memory modifications can happen many different ways, so we can't
         just detect such changes automatically - checking every register
         change would be a bit expensive - instead we have whatever code
         changed the memory to set the modified flag; this permits the code to
-        set the flag just once when the change is complete. '''
+        set the flag just once when the change is complete.'''
         self._modified = True
 
     @property

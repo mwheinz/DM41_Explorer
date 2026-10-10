@@ -65,7 +65,7 @@ def test_restore_puts_back_the_cached_key_assignment_extent():
 def test_restore_puts_back_the_modified_flag():
     memory = Memory()
     saved = memory.snapshot()
-    memory.is_modified()  # sets the flag
+    memory.mark_modified()
     memory.restore(saved)
     assert memory.modified is False
 

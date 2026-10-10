@@ -22,7 +22,7 @@ def _leftovers(directory, name):
 
 def test_to_file_writes_the_state_and_clears_modified(tmp_path):
     memory = Memory.from_file(DATA_DIR / "6x-xm.dm41")
-    memory.is_modified()  # sets the flag
+    memory.mark_modified()
     path = tmp_path / "out.dm41"
 
     memory.to_file(path)
@@ -37,7 +37,7 @@ def test_failed_write_leaves_the_existing_file_untouched(tmp_path, monkeypatch):
     original = (DATA_DIR / "6x-xm.dm41").read_text(encoding="utf-8")
     path.write_text(original, encoding="utf-8")
     memory = Memory()
-    memory.is_modified()
+    memory.mark_modified()
 
     def fail(self):
         raise OSError("disk full")

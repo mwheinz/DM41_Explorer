@@ -198,9 +198,9 @@ def test_on_memory_changed_sets_modified_flag(app):
     """Regression test for a bug where `_on_memory_changed()` -- the
     callback wired to every editable tab's `on_change=` (see __init__)
     and called explicitly by `pack_memory()` -- read
-    `self.memory.is_modified` as a bare attribute access instead of
-    calling it (`self.memory.is_modified()`). Memory.is_modified() is the
-    ONLY thing that ever sets Memory._modified True, so the missing
+    `self.memory.is_modified` (the method's old name) as a bare attribute
+    access instead of calling it. Memory.mark_modified() is the ONLY thing
+    that ever sets Memory._modified True, so the missing
     parens silently meant no edit, anywhere in the app, ever marked the
     state as modified -- every "Discard unsaved changes?" guard below was
     permanently dead and a loaded state could be overwritten with no
@@ -1101,7 +1101,7 @@ def test_auto_fetch_keeps_the_reading_status_until_the_state_arrives(connected_a
 
 def test_auto_fetch_is_skipped_when_a_state_is_already_loaded(connected_app):
     connected_app.serial.serial_inst = mock.Mock(port="/dev/tty.test")
-    connected_app.memory.is_modified()  # sets the modified flag
+    connected_app.memory.mark_modified()
     with mock.patch.object(connected_app, "after") as after:
         connected_app._fetch_memory_state()
 

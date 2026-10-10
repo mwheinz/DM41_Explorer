@@ -954,7 +954,7 @@ class DM41ExplorerApp(ctk.CTk):
         self._status_label.configure(text=text)
 
     def _on_memory_changed(self):
-        self.memory.is_modified()
+        self.memory.mark_modified()
         self._modified_label.configure(text="* Modified")
         # The tab that made this edit already re-rendered itself (each
         # tab's own edit handler calls its render() directly, for

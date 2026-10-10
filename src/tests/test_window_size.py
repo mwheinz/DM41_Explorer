@@ -400,7 +400,7 @@ def test_the_macos_quit_command_goes_through_on_close(make_app, prefs_file, monk
 def test_the_macos_quit_command_still_asks_about_unsaved_changes(make_app, monkeypatch):
     monkeypatch.setattr("gui.app.PLATFORM_SYSTEM", "Darwin")
     app = make_app()
-    app.memory.is_modified()
+    app.memory.mark_modified()
     asked = []
     monkeypatch.setattr(
         "gui.app.messagebox.askyesno", lambda *a, **k: (asked.append(a), False)[1]
