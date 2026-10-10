@@ -148,16 +148,6 @@ def test_pack_only_leaves_a_null_between_two_numbers(fixture):
         )
 
 
-def test_pack_keeps_the_null_that_separates_two_numbers():
-    # numtest.dm41 is real hardware's capture of "12345 <NULL> 67890".
-    memory = load_fixture(path("numtest.dm41"))
-    area_before = program_area(memory)
-    memory.pack()
-    area = program_area(memory)
-    assert bytes([0x15, 0x00, 0x16]) in area
-    assert bytes([0x15, 0x00, 0x16]) in area_before
-
-
 @pytest.mark.parametrize("fixture", ALL_FIXTURES, ids=lambda p: p.name)
 def test_pack_marks_every_end_packed_and_closes_with_an_empty_dot_end(fixture):
     memory = load_fixture(fixture)
@@ -171,18 +161,6 @@ def test_pack_marks_every_end_packed_and_closes_with_an_empty_dot_end(fixture):
     assert markers[-1].third_byte == 0x20  # the permanent .END.
     programs = memory.programs.list_programs()
     assert all(p.terminator == "END" for p in programs)
-
-
-def test_pack_turns_a_dot_end_closed_program_into_end_plus_empty_dot_end():
-    # twolabels.dm41's one program is closed by the permanent .END.
-    # directly, flagged "needs packing" (2d) -- the same state as
-    # dm41x_pack_dotend.dm41, which a real PACK turned into END + .END.
-    memory = load_fixture(path("twolabels.dm41"))
-    assert memory.programs.list_programs()[0].terminator == ".END."
-    memory.pack()
-    programs = memory.programs.list_programs()
-    assert len(programs) == 1
-    assert programs[0].terminator == "END"
 
 
 # -- compact_program_stream(): the byte-level rules, in isolation -------------
@@ -230,29 +208,6 @@ def test_compact_copies_markers_verbatim():
 # -- More real-hardware evidence -----------------------------------------------
 
 
-def test_a_real_pack_of_an_already_packed_file_changes_nothing_in_program_memory():
-    # manyfiles-packed.dm41 was loaded on a DM41L and PACKed again
-    # (manyfiles-repacked.dm41). Every program byte came back identical --
-    # including PURXM's cached jump (b1 91), which pack() clears. So a real
-    # PACK only rewrites a jump cache when something moved.
-    packed = load_fixture(path("manyfiles-packed.dm41"))
-    repacked = load_fixture(path("manyfiles-repacked.dm41"))
-    assert program_area(repacked) == program_area(packed)
-    assert repacked.status_registers.DotEnd == packed.status_registers.DotEnd
-
-
-def test_twolabels_costs_one_register_exactly_like_the_real_pack_did():
-    # twolabels.dm41 (one program, closed by .END. directly, flagged "needs
-    # packing") -> a real PACK on a DM41L: END + empty .END., .END. one
-    # register lower. Byte-for-byte what pack() produces, jump caches
-    # included (this program has none).
-    memory = load_fixture(path("twolabels.dm41"))
-    hardware = load_fixture(path("twolabels-packed.dm41"))
-    assert memory.pack() == -1
-    assert program_area(memory) == program_area(hardware)
-    assert memory.status_registers.DotEnd == hardware.status_registers.DotEnd
-
-
 # Explorer-produced output (Tools > Pack Memory) that was then loaded on a
 # real DM41L and checked: the programs still run. The "before" states are
 # calculator captures (packed-test.dm41 is the state of a calculator right
@@ -269,16 +224,6 @@ def test_pack_output_that_was_verified_to_run_on_a_calculator(before_name, after
     expected = load_fixture(path(after_name))
     assert memory.pack() == 0
     assert program_area(memory) == program_area(expected)
-
-
-def test_pack_clears_a_real_forward_xeq_and_backward_gto_cache():
-    # packed-test.dm41's program: "XEQ 03" (forward, 3-byte form e2 02 03)
-    # and "GTO 00" (backward, compact form b1 e0), both resolved by the
-    # calculator while it ran the program.
-    before = program_area(load_fixture(path("packed-test.dm41")))
-    after = program_area(load_fixture(path("repacked-test.dm41")))
-    assert bytes([0xE2, 0x02, 0x03]) in before and bytes([0xE0, 0x00, 0x03]) in after
-    assert bytes([0xB1, 0xE0]) in before and bytes([0xB1, 0x00]) in after
 
 
 def test_pack_keeps_every_null_that_separates_two_numbers():

@@ -194,36 +194,32 @@ def test_add_alarm_past_due_can_be_overridden():
     assert alarm.past_due is True
 
 
-def test_add_alarm_rejects_message_over_24_characters():
+@pytest.mark.parametrize(
+    "alarm_type, text, message",
+    [
+        (Alarm.TYPE_MESSAGE, "X" * 25, ""),  # the 24-character Alpha field
+        # A control alarm's "^^" marker takes 2 of those 24 characters.
+        (Alarm.TYPE_CONTROL, "X" * 23, ""),
+        # FOCAL has no lowercase letters above 'e' -- 0x66-0x7A are other
+        # symbols, which display as garbage (docs/alarms.md sec 11).
+        (Alarm.TYPE_MESSAGE, "Test Message", "lowercase"),
+    ],
+    ids=["message too long", "control label too long", "lowercase"],
+)
+def test_add_alarm_rejects_text_the_calculator_cannot_hold(alarm_type, text, message):
     memory = Memory()
-    with pytest.raises(ValueError):
-        memory.alarms.add_alarm(trigger_time=_dt(2026, 9, 5), text="X" * 25)
+    with pytest.raises(ValueError, match=message or None):
+        memory.alarms.add_alarm(trigger_time=_dt(2026, 9, 5), alarm_type=alarm_type, text=text)
+    assert memory.alarms.list_alarms() == []  # rejected before any write
 
 
-def test_add_alarm_rejects_control_label_over_22_characters():
-    """A control alarm's field is the same <=24-byte Alpha-register field
-    a message alarm uses, minus the 2 bytes the "^^" marker itself takes
-    (Owner's Manual vol 2 sec 16 -- the label comes from the Alpha
-    register, same as a plain message)."""
+def test_add_alarm_accepts_text_at_the_limits():
     memory = Memory()
-    memory.alarms.add_alarm(trigger_time=_dt(2026, 9, 5), alarm_type=Alarm.TYPE_CONTROL, text="X" * 22)
-    with pytest.raises(ValueError):
-        memory.alarms.add_alarm(trigger_time=_dt(2026, 9, 5), alarm_type=Alarm.TYPE_CONTROL, text="X" * 23)
-
-
-def test_add_alarm_rejects_lowercase_focal_characters():
-    """Root cause of the user's 2026-09-02 "ALMCAT displayed garbage"
-    report (docs/alarms.md sec 11, badalarms.dm41): FOCAL has no real
-    lowercase letters above 'e' -- 0x66-0x7A are reassigned to unrelated
-    symbols, not lowercase f-z. Typing ordinary mixed-case text like "Test
-    Message" used to be silently accepted and written byte-for-byte,
-    which displayed as garbage on real hardware. Matches xm_file.py's
-    NAME_MAX_CHAR boundary for XM file names (issue #11)."""
-    memory = Memory()
-    with pytest.raises(ValueError, match="lowercase"):
-        memory.alarms.add_alarm(trigger_time=_dt(2026, 9, 5), text="Test Message")
-    # Buffer is untouched -- the whole call is rejected before any write.
-    assert memory.alarms.list_alarms() == []
+    memory.alarms.add_alarm(trigger_time=_dt(2026, 9, 5), text="X" * 24)
+    memory.alarms.add_alarm(
+        trigger_time=_dt(2026, 9, 6), alarm_type=Alarm.TYPE_CONTROL, text="X" * 22
+    )
+    assert [len(a.text) for a in memory.alarms.list_alarms()] == [24, 22]
 
 
 def test_add_alarm_allows_lowercase_a_through_e_and_uppercase():

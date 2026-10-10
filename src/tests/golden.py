@@ -21,6 +21,7 @@ import json
 from pathlib import Path
 
 from memory import DM41L, DM41X, Memory, evaluate_mode_switch
+from memory.program_text import encode_program_txt
 
 DATA_DIR = Path(__file__).parent / "data"
 GOLDEN_PATH = DATA_DIR / "golden.json"
@@ -86,6 +87,12 @@ def _programs(memory):
             "labels": [
                 [label.name, label.key_assignment] for label in p.labels
             ],
+            # The decompiled listing (memory/program_text.py).
+            "listing": _attempt(
+                lambda p=p: encode_program_txt(
+                    memory.programs.get_program_bytes(p)
+                ).splitlines()
+            ),
         }
         for p in memory.programs.list_programs()
     ]

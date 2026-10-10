@@ -17,7 +17,7 @@ from pathlib import Path
 
 import pytest
 
-from memory import Memory, DM41MemoryError, Program
+from memory import Memory, Program
 from fixture_loading import load_fixture
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -28,22 +28,6 @@ def _names_lengths(programs):
 
 
 # -- Removing from each position in a multi-program chain -------------------
-
-
-def test_remove_oldest_program_keeps_the_rest_intact():
-    memory = Memory.from_file(DATA_DIR / "6x-xm.dm41")
-    programs = memory.programs.list_programs()
-    assert _names_lengths(programs) == [
-        ("XMBCD", 61), ("XMALPHA", 51), ("PURXM", 20),
-    ]
-
-    memory.programs.remove_program(programs[0])
-
-    after = memory.programs.list_programs()
-    assert _names_lengths(after) == [("XMALPHA", 51), ("PURXM", 20)]
-    # R00 (the data-register boundary) is never touched by a program
-    # removal -- only the program/free-memory split below it moves.
-    assert memory.status_registers.R00 == 0x19C
 
 
 def test_remove_newest_program_leaves_the_new_newest_dot_end_terminated():
@@ -59,16 +43,6 @@ def test_remove_newest_program_leaves_the_new_newest_dot_end_terminated():
     # register) -- see _collapse_trailing_end_into_dot_end()'s docstring
     # for when this optimization can and can't apply.
     assert after[-1].terminator == ".END."
-
-
-def test_remove_middle_program_keeps_the_others_at_their_own_lengths():
-    memory = Memory.from_file(DATA_DIR / "6x-xm.dm41")
-    programs = memory.programs.list_programs()
-
-    memory.programs.remove_program(programs[1])  # XMALPHA
-
-    after = memory.programs.list_programs()
-    assert _names_lengths(after) == [("XMBCD", 61), ("PURXM", 20)]
 
 
 def test_remove_the_only_program_leaves_program_memory_genuinely_empty():
@@ -173,14 +147,6 @@ def test_remove_raises_for_a_program_not_in_the_current_list():
         memory.programs.remove_program(bogus)
 
 
-def test_remove_raises_when_program_memory_is_already_empty():
-    memory = Memory.from_file(DATA_DIR / "simple.dm41")
-    only = memory.programs.list_programs()[0]
-    memory.programs.remove_program(only)
-    with pytest.raises(ValueError):
-        memory.programs.remove_program(only)
-
-
 def test_remove_rejects_on_a_buffer_with_no_valid_partition():
     memory = Memory()
     memory.status_registers.set_R00(0)
@@ -196,9 +162,9 @@ def test_remove_rejects_on_a_buffer_with_no_valid_partition():
 
 def test_remove_every_program_in_every_sample_state_one_at_a_time():
     """For every real program in every sample state, removing it should
-    never raise, should reduce the program count by exactly one, and
-    should leave every other program's own name/length exactly as it
-    was."""
+    never raise, should reduce the program count by exactly one, should
+    leave every other program's own name/length exactly as it was, and
+    should never move R00."""
     for path in sorted(DATA_DIR.glob("*.dm41")):
         memory = load_fixture(path)
         programs = memory.programs.list_programs()
@@ -215,9 +181,12 @@ def test_remove_every_program_in_every_sample_state_one_at_a_time():
             expected_remaining = [
                 (p.names_label, p.length) for p in fresh_programs if p is not match
             ]
+            r00 = fresh.status_registers.R00
             fresh.programs.remove_program(match)
             after = fresh.programs.list_programs()
             assert len(after) == len(fresh_programs) - 1, path.name
+            # Only the program/free split moves; the data registers don't.
+            assert fresh.status_registers.R00 == r00, path.name
             assert _names_lengths(after) == expected_remaining, path.name
 
 

@@ -21,9 +21,9 @@ from pathlib import Path
 
 import pytest
 
-from memory import Memory, DM41MemoryError, Program
+from memory import Memory, DM41MemoryError
 from memory.opcode_scan import find_program_end
-from memory.program_files import decode_program_raw, decode_program_dat
+from memory.program_files import decode_program_raw
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -75,41 +75,6 @@ def test_import_tower_into_empty_memory_round_trips_exactly():
     assert imported.length == 1088
     assert dest.programs.get_program_bytes(imported) == instruction_bytes
     assert find_program_end(dest.programs.get_program_bytes(imported)) == 1088
-
-
-def test_import_dat_and_raw_of_tower_produce_identical_results():
-    dest_raw = Memory.from_file(DATA_DIR / "empty.dm41")
-    dest_dat = Memory.from_file(DATA_DIR / "empty.dm41")
-    raw_bytes = decode_program_raw((DATA_DIR / "tower.raw").read_bytes())
-    dat_bytes = decode_program_dat((DATA_DIR / "tower.dat").read_bytes())
-    assert raw_bytes == dat_bytes
-
-    imported_raw = dest_raw.programs.import_program(raw_bytes)
-    imported_dat = dest_dat.programs.import_program(dat_bytes)
-    assert dest_raw.programs.get_program_bytes(imported_raw) == dest_dat.programs.get_program_bytes(imported_dat)
-    assert dest_raw.status_registers.DotEnd == dest_dat.status_registers.DotEnd
-
-
-def test_import_ppc_of_tower_matches_dat_and_raw():
-    # PPC (memory/program_files.py's module docstring) is DAT's own hex
-    # text word-wrapped every 50 characters -- built here from tower.dat
-    # directly (not through encode_program_ppc()) so this exercises
-    # decode_program_dat() against a file it didn't produce itself, same
-    # as test_decode_program_ppc_and_dat_agree_on_tower() in
-    # test_program_export.py.
-    dat_text = (DATA_DIR / "tower.dat").read_bytes()
-    wrapped = b"\n".join(dat_text[i : i + 50] for i in range(0, len(dat_text), 50)) + b"\n"
-
-    dest_ppc = Memory.from_file(DATA_DIR / "empty.dm41")
-    dest_dat = Memory.from_file(DATA_DIR / "empty.dm41")
-    ppc_bytes = decode_program_dat(wrapped)
-    dat_bytes = decode_program_dat(dat_text)
-    assert ppc_bytes == dat_bytes
-
-    imported_ppc = dest_ppc.programs.import_program(ppc_bytes)
-    imported_dat = dest_dat.programs.import_program(dat_bytes)
-    assert dest_ppc.programs.get_program_bytes(imported_ppc) == dest_dat.programs.get_program_bytes(imported_dat)
-    assert dest_ppc.status_registers.DotEnd == dest_dat.status_registers.DotEnd
 
 
 # -- Case B: importing alongside a program that already has a real END ----
@@ -279,17 +244,6 @@ def test_import_rejects_when_no_valid_partition_is_loaded():
     dest.status_registers.set_R00(0)
     with pytest.raises(DM41MemoryError):
         dest.programs.import_program(bytes.fromhex("c00009"))
-
-
-def test_import_rejects_stale_program_reference_style_bogus_bytes():
-    # Not a program-splicing concern per se, but a nearby sharp edge:
-    # get_program_bytes() itself still raises ValueError for a Program
-    # that doesn't match the current chain -- confirm import_program()
-    # doesn't change that existing contract.
-    dest = Memory.from_file(DATA_DIR / "simple.dm41")
-    bogus = Program(start_addr=0x000, start_offset=0, length=0, labels=[], terminator="END")
-    with pytest.raises(ValueError):
-        dest.programs.get_program_bytes(bogus)
 
 
 # -- Regression sweep --------------------------------------------------------

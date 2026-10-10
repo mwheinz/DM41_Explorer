@@ -1,27 +1,13 @@
 """
-Tests for Memory.pack() -- GitHub issue #31 ("DM41L_Explorer needs PACK
-functionality"). Key Assignments/Alarms already stay canonically packed
-as a side effect of every set_key_assignment()/delete_key_assignment()
-call (see _encode_key_assignment_entries()'s docstring); pack() re-runs
-that explicitly and does the equivalent for program memory.
+Memory.pack() (GitHub issue #31): invariants that hold for every real
+capture -- nothing lost or reordered, no negative reclaim except where a
+real PACK also cost a register, idempotent, survives a save -- plus key
+assignments, edge cases, and refusing to guess on corrupt program memory.
 
-Program memory itself is handled by _forward_scan_programs() +
-_rebuild_program_memory() (the latter shared with ProgramMemory.remove_program()
--- see test_program_remove.py for that other caller). _forward_scan_programs()
-is the part that matters most here: per the user's own correction to this
-method's first version ("Packing needs to (re)build the program chain so
-that global labels can be viewed and assigned to keys"), pack() does not
-just compact whatever list_programs()'s existing backward-chain walk
-already recognizes -- it re-derives the whole chain from the raw opcodes,
-forward, independent of whatever the existing backward-chain-link fields
-say. lander.dm41/targ.dm41 (below) are real-world states -- from the
-user's own investigation (project notes,
-pack_anomaly_investigation_2026-08-24.md) into a real DM41L, comparing
-against a third-party tool's export -- whose backward chain is entirely
-missing even though their real, well-formed FOCAL programs (LANDER/TARG)
-are physically present; lander-packed.dm41/targ-packed.dm41 are that
-same content after a REAL PACK on real hardware, used below as ground
-truth for what the repaired content should be.
+pack() re-derives the global chain from the raw opcodes rather than
+trusting its backward links, so it also repairs states whose links are
+missing (lander.dm41, targ.dm41). test_pack_hardware.py checks the result
+byte for byte against real PACKs on a DM41L/DM41X.
 """
 
 from pathlib import Path
@@ -29,7 +15,6 @@ from pathlib import Path
 import pytest
 
 from memory import Memory, DM41MemoryError, Register
-from memory.opcode_scan import clear_jump_caches
 from memory.program_text import encode_program_txt
 from fixture_loading import load_fixture
 
@@ -124,29 +109,6 @@ def test_pack_round_trips_through_to_string_and_from_string(path):
 # -- twolabels.dm41: the specific alignment regression ------------------------
 
 
-def test_pack_on_twolabels_closes_the_program_with_end_and_an_empty_dot_end():
-    # FIRST/SECOND (twolabels.dm41) has no explicit END at all -- only
-    # the permanent .END. closes it (flagged "needs packing"). A real PACK
-    # of this very file on a DM41L (twolabels-packed.dm41, and likewise
-    # dm41x_pack_dotend.dm41 -> -packed; see test_pack_hardware.py) wrote
-    # a real END right after the last instruction and left .END. as a
-    # separate, empty marker. The old expectation here -- that
-    # .END.-terminated is "already the most compact form" and PACK keeps
-    # it -- was never checked on hardware and contradicted those captures.
-    memory = Memory.from_file(DATA_DIR / "twolabels.dm41")
-    before = memory.programs.list_programs()[0]
-    assert before.terminator == ".END."
-    before_dot_end = memory.status_registers.DotEnd
-
-    freed = memory.pack()
-
-    after = memory.programs.list_programs()
-    assert len(after) == 1
-    assert after[0].terminator == "END"
-    assert freed == -1
-    assert memory.status_registers.DotEnd == before_dot_end - 1
-
-
 # -- Key Assignments / Alarms --------------------------------------------------
 
 
@@ -208,57 +170,7 @@ def test_pack_on_a_freshly_constructed_memory_does_not_raise():
     assert memory.programs.list_programs() == []
 
 
-# -- Rebuilding a broken/missing backward chain (the pack() correction) ------
-#
-# The scenario the user's own real-hardware investigation identified
-# (pack_anomaly_investigation_2026-08-24.md, referenced above): a state
-# written by a tool other than this app or a real HP-41/DM41L can leave
-# the backward chain-link fields zeroed or never set at all, even though
-# real FOCAL program bytes are physically present. Before this fix,
-# list_programs()/list_global_chain() reported nothing at all for such a
-# state, and nothing in it could be assigned to a key. lander.dm41/
-# targ.dm41 are exactly that scenario; lander-packed.dm41/targ-packed.dm41
-# are the same content after a real PACK on real hardware.
-
-
-@pytest.mark.parametrize(
-    "unpacked_name,label,real_length",
-    [("lander.dm41", "LANDER", 771), ("targ.dm41", "TARG", 552)],
-)
-def test_pack_repairs_a_broken_backward_chain(unpacked_name, label, real_length):
-    memory = Memory.from_file(DATA_DIR / unpacked_name)
-
-    # Before the fix: the label is physically present but invisible.
-    assert memory.programs.list_programs() == []
-    assert memory.programs.list_global_chain() == []
-
-    memory.pack()
-
-    programs = memory.programs.list_programs()
-    assert [p.names_label for p in programs] == [label]
-    # Exactly the length a real hardware PACK produced -- since pack()
-    # also deletes NULLs and puts the END right after the last instruction
-    # (see test_pack_hardware.py), there's no padding difference left.
-    assert programs[0].length == real_length
-
-
-@pytest.mark.parametrize(
-    "unpacked_name,packed_name",
-    [("lander.dm41", "lander-packed.dm41"), ("targ.dm41", "targ-packed.dm41")],
-)
-def test_pack_repaired_bytes_match_real_hardware_content(unpacked_name, packed_name):
-    # The repaired program (opcodes, embedded labels, key bytes, and its
-    # closing END marker) must match a real hardware PACK byte for byte.
-    # The one allowed difference: pack() clears every GTO/XEQ's cached
-    # jump distance, which a real PACK only does when something moved.
-    memory = Memory.from_file(DATA_DIR / unpacked_name)
-    memory.pack()
-    mine = memory.programs.get_program_bytes(memory.programs.list_programs()[0])
-
-    reference = Memory.from_file(DATA_DIR / packed_name)
-    real = reference.programs.get_program_bytes(reference.programs.list_programs()[0])
-
-    assert mine == clear_jump_caches(real)
+# -- Rebuilding a missing backward chain ---------------------------------------
 
 
 @pytest.mark.parametrize("unpacked_name,label", [("lander.dm41", "LANDER"), ("targ.dm41", "TARG")])

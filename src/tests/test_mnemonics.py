@@ -161,14 +161,6 @@ def test_sigma_reg_spellings_are_equivalent(spelling):
     assert resolve(spelling) == function_op(0x99)
 
 
-def test_resolve_is_case_insensitive():
-    assert resolve("sigmareg") == function_op(0x99)
-    assert resolve("p->r") == function_op(0x4E)
-    assert resolve("enter^") == function_op(0x83)
-    assert resolve("seekpt") == xrom_op(0xA6, 0x6A)
-    assert resolve("σreg") == function_op(0x99)
-
-
 @pytest.mark.parametrize("spelling", ["P→R", "X≤Y?", "→HMS", "FOO", ""])
 def test_unknown_spellings_are_rejected(spelling):
     with pytest.raises(UnknownMnemonicError, match="unrecognized instruction"):

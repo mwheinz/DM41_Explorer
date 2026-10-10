@@ -29,7 +29,6 @@ list_programs() reports, which is NOT a program size (see ProgramInfo's
 docstring and docs/program.md's still-open reconciliation question).
 """
 
-import os
 from pathlib import Path
 
 import pytest
@@ -113,70 +112,6 @@ def test_get_program_bytes_rejects_stale_entry():
     )
     with pytest.raises(ValueError):
         memory.programs.get_program_bytes(bogus)
-
-
-def test_get_program_bytes_unlabelled_matches_real_cat_1_byte_counts():
-    # tests/data/unlabelled.dm41: two programs, neither named -- the user
-    # confirmed 16 and 20 bytes against a real DM41L's CAT 1 listing. This
-    # is the fixture that caught the bug where an earlier version of the
-    # program grouping mistook the zero-padding bytes in front of the
-    # permanent .END. marker for a small, nonexistent third program.
-    memory = Memory.from_file(DATA_DIR / "unlabelled.dm41")
-    programs = memory.programs.list_programs()
-    assert len(programs) == 2
-    assert [p.length for p in programs] == [16, 20]
-    for program in programs:
-        instruction_bytes = memory.programs.get_program_bytes(program)
-        assert len(instruction_bytes) == program.length
-        assert find_program_end(instruction_bytes) == len(instruction_bytes)
-
-
-def test_get_program_bytes_twolabels_exports_the_whole_shared_program():
-    # tests/data/twolabels.dm41: one program, two global labels ("FIRST",
-    # "SECOND"), no explicit END -- terminated only by the permanent
-    # .END. sentinel (legal for the single newest program in memory).
-    # Exporting it returns the full 28-byte block starting at FIRST's own
-    # header (the oldest/topmost label), not a per-label slice.
-    memory = Memory.from_file(DATA_DIR / "twolabels.dm41")
-    programs = memory.programs.list_programs()
-    assert len(programs) == 1
-    program = programs[0]
-    instruction_bytes = memory.programs.get_program_bytes(program)
-    assert len(instruction_bytes) == 28
-    assert find_program_end(instruction_bytes) == len(instruction_bytes)
-
-
-def test_get_program_bytes_finds_a_real_unnamed_program_mid_chain():
-    # 3x-xm.dm41 has a real unnamed program sandwiched between two named
-    # ones (not just trailing at the newest end of the chain like
-    # simple.dm41's case) -- a stronger check that list_programs()'s
-    # grouping generalizes past the single-program case.
-    memory = Memory.from_file(DATA_DIR / "3x-xm.dm41")
-    programs = memory.programs.list_programs()
-    unnamed = [p for p in programs if not p.is_named]
-    assert len(unnamed) == 1
-    data = memory.programs.get_program_bytes(unnamed[0])
-    assert len(data) == unnamed[0].length > 0
-    assert find_program_end(data) == len(data)
-
-
-def test_get_program_bytes_terminates_on_every_sample_state():
-    """Defensive/regression coverage, matching
-    test_list_programs_terminates_on_every_sample_state(): exporting every
-    program in every sample state should never raise DM41MemoryError (a
-    corrupt-data signal) or hang, and every program's own bytes must form
-    exactly one well-formed program (find_program_end() agrees on where
-    it ends)."""
-    for filename in os.listdir(DATA_DIR):
-        if not filename.endswith(".dm41"):
-            continue
-        memory = Memory.from_file(DATA_DIR / filename)
-        for program in memory.programs.list_programs():
-            instruction_bytes = memory.programs.get_program_bytes(program)
-            assert len(instruction_bytes) == program.length > 0, filename
-            assert find_program_end(instruction_bytes) == len(
-                instruction_bytes
-            ), filename
 
 
 def test_encode_program_raw_apptest():

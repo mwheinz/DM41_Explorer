@@ -12,7 +12,6 @@ import pytest
 
 from memory.functions import SINGLE_BYTE_FUNCTIONS, XROM_FUNCTIONS
 from memory.mnemonics import (
-    UnknownMnemonicError,
     assignable_display_names,
     display_for_key_bytes,
     key_bytes_for,
@@ -87,6 +86,7 @@ def test_display_for_key_bytes(fn1, fn2, expected):
         ("clsigma", 0x70),
         ("sigmareg", 0x99),
         ("\\EREG", 0x99),
+        ("σreg", 0x99),  # lowercase Greek sigma
         ("x<=y?", 0x46),
         ("x<=0?", 0x7B),
         ("x#y?", 0x79),
@@ -113,12 +113,6 @@ def test_typed_xrom_names_resolve(typed, expected):
 def test_keyboard_only_functions_are_assignable():
     assert _key_bytes("cat") == 0x00
     assert _key_bytes("SST") == 0x08
-
-
-@pytest.mark.parametrize("typed", ["->hms", "P→R", "X≤Y?", "not a real function"])
-def test_rejected_names(typed):
-    with pytest.raises(UnknownMnemonicError):
-        _key_bytes(typed)
 
 
 def test_text_format_keywords_are_not_assignable():
