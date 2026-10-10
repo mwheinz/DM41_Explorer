@@ -5,6 +5,7 @@ this code). Each app keeps its own preferences file -- see ProjectConfig's
 overwrite each other's settings or recent-file lists.
 """
 
+import copy
 import json
 import logging
 from pathlib import Path
@@ -12,6 +13,29 @@ from pathlib import Path
 from memory import DEFAULT_MODE, DeviceMode, atomic_write_text
 
 logger = logging.getLogger(__name__)
+
+
+class PreferencesError(OSError):
+    """The preferences file could not be read or written. The message
+    names the file; the underlying error is chained as __cause__."""
+
+
+class _Pref:
+    """A preference stored as-is under the attribute's own name, for the
+    settings that need no conversion or validation. Settings that do (mode,
+    log_directory, high_contrast, window_size, recent_files) are written
+    out as properties on ProjectConfig instead."""
+
+    def __set_name__(self, owner, name):
+        self.key = name
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        return obj._prefs[self.key]
+
+    def __set__(self, obj, value):
+        obj._prefs[self.key] = value
 
 
 class ProjectConfig:
@@ -47,6 +71,16 @@ class ProjectConfig:
     # dropped first, enforced by add_recent_file() below.
     MAX_RECENT_FILES = 10
 
+    # Settings read and written as stored (see _Pref).
+    baudrate = _Pref()
+    console_timeout_minutes = _Pref()
+    serial_port = _Pref()
+    logging_level = _Pref()
+    appearance_mode = _Pref()
+    color_theme = _Pref()
+    font_family = _Pref()
+    font_size = _Pref()
+
     def __init__(self, prefs_filename: str = None):
         """Initializes the config with default values.
 
@@ -55,38 +89,45 @@ class ProjectConfig:
         class-level PREFS_FILE (DM41_Explorer's)."""
         if prefs_filename is not None:
             self.PREFS_FILE = Path.home() / prefs_filename
-        self._prefs = self.DEFAULT_PREFS.copy()
+        # A deep copy: DEFAULT_PREFS holds a list (recent_files), which a
+        # shallow copy would share with every ProjectConfig.
+        self._prefs = copy.deepcopy(self.DEFAULT_PREFS)
 
-    def load(self) -> dict:
-        """
-        Loads preferences from disk. Throws an exception if the preference
-        file cannot be found or is otherwise unreadable.
-        """
-        loaded_data = {}
+    def load(self) -> None:
+        """Merges the preferences file over the defaults. A missing file is
+        not an error: the defaults simply stay in force.
+
+        Raises PreferencesError if the file exists but can't be read, isn't
+        valid JSON, or isn't a JSON object; the current settings are then
+        left unchanged."""
+        if not self.PREFS_FILE.exists():
+            return
         try:
-            if self.PREFS_FILE.exists():
-                with open(self.PREFS_FILE, "r", encoding="utf-8") as f:
-                    loaded_data = json.load(f)
-                    self._prefs.update(loaded_data)
-        except Exception as e:
-            raise IOError(
-                f"Warning: Could not load preferences from {self.PREFS_FILE}"
+            with open(self.PREFS_FILE, "r", encoding="utf-8") as f:
+                loaded = json.load(f)
+        except (OSError, ValueError) as e:
+            raise PreferencesError(
+                f"Could not load preferences from {self.PREFS_FILE}: {e}"
             ) from e
+        if not isinstance(loaded, dict):
+            raise PreferencesError(
+                f"Could not load preferences from {self.PREFS_FILE}: "
+                f"expected a JSON object, found {type(loaded).__name__}"
+            )
+        self._prefs.update(loaded)
 
-
-    def save(self, prefs: dict = None) -> None:
-        """Saves current preferences to disk."""
-        if prefs is not None:
-            self._prefs = prefs
-
+    def save(self) -> None:
+        """Writes the current preferences to disk. Raises PreferencesError
+        if the file can't be written; an existing file is then left as it
+        was."""
         try:
             # Atomic, so a failed save can't leave a truncated file that
             # then stops the preferences loading at the next start.
             atomic_write_text(self.PREFS_FILE, json.dumps(self._prefs, indent=2))
-        except Exception as e:
-            raise Exception(
-                f"Error: Could not save preferences to {self.PREFS_FILE}"
-                ) from e
+        except OSError as e:
+            raise PreferencesError(
+                f"Could not save preferences to {self.PREFS_FILE}: {e}"
+            ) from e
 
     @property
     def mode(self) -> DeviceMode:
@@ -109,60 +150,12 @@ class ProjectConfig:
         self._prefs["mode"] = DeviceMode.from_value(value).value
 
     @property
-    def baudrate(self) -> int:
-        return self._prefs["baudrate"]
-
-    @baudrate.setter
-    def baudrate(self, value):
-        self._prefs["baudrate"] = value
-
-    @property
-    def console_timeout_minutes(self) -> int:
-        return self._prefs["console_timeout_minutes"]
-
-    @console_timeout_minutes.setter
-    def console_timeout_minutes(self, value):
-        self._prefs["console_timeout_minutes"] = value
-
-    @property
-    def serial_port(self) -> str:
-        return self._prefs["serial_port"]
-
-    @serial_port.setter
-    def serial_port(self, value):
-        self._prefs["serial_port"] = value
-
-    @property
-    def logging_level(self) -> str:
-        return self._prefs["logging_level"]
-
-    @logging_level.setter
-    def logging_level(self, value):
-        self._prefs["logging_level"] = value
-
-    @property
     def log_directory(self) -> Path:
         return Path(self._prefs["log_directory"]).expanduser()
 
     @log_directory.setter
     def log_directory(self, value):
         self._prefs["log_directory"] = str(value)
-
-    @property
-    def appearance_mode(self) -> str:
-        return self._prefs["appearance_mode"]
-
-    @appearance_mode.setter
-    def appearance_mode(self, value):
-        self._prefs["appearance_mode"] = value
-
-    @property
-    def color_theme(self) -> str:
-        return self._prefs["color_theme"]
-
-    @color_theme.setter
-    def color_theme(self, value):
-        self._prefs["color_theme"] = value
 
     @property
     def high_contrast(self) -> bool:
@@ -177,22 +170,6 @@ class ProjectConfig:
     @high_contrast.setter
     def high_contrast(self, value):
         self._prefs["high_contrast"] = bool(value)
-
-    @property
-    def font_family(self) -> str:
-        return self._prefs["font_family"]
-
-    @font_family.setter
-    def font_family(self, value):
-        self._prefs["font_family"] = value
-
-    @property
-    def font_size(self) -> int:
-        return self._prefs["font_size"]
-
-    @font_size.setter
-    def font_size(self, value):
-        self._prefs["font_size"] = value
 
     @property
     def window_size(self):

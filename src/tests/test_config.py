@@ -61,14 +61,6 @@ def test_save_writes_current_prefs_to_disk(prefs_file):
     on_disk = json.loads(prefs_file.read_text())
     assert on_disk["baudrate"] == 57600
 
-def test_save_with_explicit_prefs_argument(prefs_file):
-    config = ProjectConfig()
-    new_prefs = {**ProjectConfig.DEFAULT_PREFS, "logging_level": "DEBUG"}
-    config.save(new_prefs)
-    on_disk = json.loads(prefs_file.read_text())
-    assert on_disk["logging_level"] == "DEBUG"
-    assert config.logging_level == "DEBUG"
-
 def test_property_setters_update_internal_state(prefs_file):
     config = ProjectConfig()
     config.serial_port = "/dev/tty.fake"
@@ -237,3 +229,55 @@ def test_save_writes_the_same_json_as_before(prefs_file):
     assert prefs_file.read_text(encoding="utf-8") == json.dumps(
         config.get_all(), indent=2
     )
+
+
+def test_configs_do_not_share_the_default_recent_files_list(prefs_file):
+    """DEFAULT_PREFS holds a list; each config must get its own copy."""
+    first = ProjectConfig()
+    first._prefs["recent_files"].append("/tmp/x.dm41")
+    assert ProjectConfig().recent_files == []
+    assert ProjectConfig.DEFAULT_PREFS["recent_files"] == []
+
+
+def test_missing_prefs_file_keeps_the_defaults(prefs_file):
+    config = ProjectConfig()
+    config.load()  # no file: not an error
+    assert config.baudrate == ProjectConfig.DEFAULT_PREFS["baudrate"]
+
+
+@pytest.mark.parametrize("content", ["[1, 2, 3]", '"text"', "42", "null"])
+def test_load_rejects_a_prefs_file_that_is_not_a_json_object(prefs_file, content):
+    from config import PreferencesError
+
+    prefs_file.write_text(content)
+    config = ProjectConfig()
+    config.baudrate = 9600
+    with pytest.raises(PreferencesError, match="expected a JSON object"):
+        config.load()
+    assert config.baudrate == 9600  # unchanged
+
+
+def test_load_and_save_failures_are_preferences_errors(prefs_file, monkeypatch):
+    from config import PreferencesError
+
+    prefs_file.write_text("{not valid json")
+    with pytest.raises(PreferencesError):
+        ProjectConfig().load()
+
+    def fail(src, dst):
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(os, "replace", fail)
+    with pytest.raises(PreferencesError, match="replace failed"):
+        ProjectConfig().save()
+
+
+def test_plain_settings_round_trip_through_the_file(prefs_file):
+    config = ProjectConfig()
+    config.serial_port = "/dev/ttyTEST"
+    config.font_size = 15
+    config.save()
+    reloaded = ProjectConfig()
+    reloaded.load()
+    assert reloaded.serial_port == "/dev/ttyTEST"
+    assert reloaded.font_size == 15
