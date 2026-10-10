@@ -2,7 +2,7 @@
 Programs tab: a read-only listing of the real, END-delimited programs in
 program memory -- one row per program, matching how many programs CAT 1
 would actually show, NOT one row per global label or per raw chain marker.
-See docs/program.md sec 5.3 for the full derivation and memory.py's
+See docs/program.md sec 5.3 for the full derivation and
 ProgramMemory.list_programs() / Program / ProgramLabel for the implementation
 this renders (built on top of the raw chain walk,
 ProgramMemory.list_global_chain() / ProgramInfo, described in sec 5).
@@ -12,19 +12,10 @@ label: an HP-41 program can have zero, one, or several labels (the Labels
 column lists them, comma-joined, or shows "(unlabelled)" if it has none),
 and the single newest program in memory doesn't need an explicit END of
 its own at all -- the permanent `.END.` sentinel can close it out instead.
-This replaces an earlier version of this tab that showed one row per raw
-chain link (LBL/END/.END.) with no notion of "a program" at all, built on
-an earlier version of the grouping logic that also miscounted programs by
-mistaking the zero-padding bytes kept in front of the permanent `.END.`
-marker (for register alignment -- see docs/program.md sec 5.1) for a small
-extra unnamed program. Both were caught by the user's own real-hardware
-CAT 1 comparisons (tests/data/unlabelled.dm41, tests/data/twolabels.dm41).
 
-Uses a native ttk.Treeview rather than one CustomTkinter widget per row --
-the same performance/consistency fix as gui/data_registers_tab.py and
-gui/xm_files_tab.py (see either module's docstring for the full story;
-GitHub issues #21/#22). This tab does not let you edit program memory, so
-unlike those two there's no double-click-to-edit -- but a selected row can
+Uses a native ttk.Treeview rather than one CustomTkinter widget per row,
+like gui/data_registers_tab.py and gui/xm_files_tab.py, for speed with
+many rows. There's no double-click-to-edit here -- but a selected row can
 be exported to a standalone HP-41 program file (RAW, DAT, PPC, or TXT
 format -- see memory/program_files.py), so there is one selection-driven
 action button, "Export...".
@@ -39,26 +30,19 @@ separate per-label slices.
 
 Import is the write side, not selection-driven -- a standalone RAW/DAT/
 PPC/TXT file is always spliced in as the newest program
-(ProgramMemory.import_program(), memory/program_memory.py), the only place it can safely
-go without a much riskier "insert in the middle of the chain" algorithm
-(see that method's own docstring for the full splicing rules -- converting
-a `.END.`-terminated newest program into a real closing END,
-register-aligning a fresh `.END.`, etc.). Any key assignment baked into an
-imported label's own header is always cleared on the way in, and a
-duplicate global label name blocks the import outright -- both deliberate
-project decisions, not defaults `import_program()` picked on its own. A
-TXT import goes through one extra step first, memory/program_files.py's
-own `decode_program_txt()` (in turn memory/program_text.py's compiler,
-docs/program_text_io_plan.md) -- everything past that point (splicing,
-duplicate-name/key-assignment handling) is identical to RAW/DAT/PPC,
-since all four formats converge on the same instruction bytes.
+(ProgramMemory.import_program()), the one place it can go without the
+much riskier job of inserting into the middle of the chain (see that
+method's docstring for the splicing rules). Any key assignment in an
+imported label's header is cleared on the way in, and a duplicate global
+label name blocks the import outright. A TXT file is first compiled to
+instruction bytes (memory/program_files.py's `decode_program_txt()`,
+backed by memory/program_text.py); from there all four formats are
+handled identically.
 
-Remove (GitHub issue #6 -- "add the ability to remove programs", the last
-of "add"/"edit"/"remove" to land, after Export/Import already covered
-"add"/"edit") IS selection-driven, unlike Import: it deletes the selected
-row's own program (ProgramMemory.remove_program()) and closes up whatever gap
-that leaves behind, so every other program stays exactly as contiguous as
-before -- this works for any program, not just the newest, unlike Import.
+Remove (GitHub issue #6) IS selection-driven, unlike Import: it deletes
+the selected row's program (ProgramMemory.remove_program()) and closes up
+the gap it leaves, so every other program stays contiguous -- this works
+for any program, not just the newest.
 Any key assignment(s) the removed program's own label(s) held are cleared
 as part of the removal (see remove_program()'s own docstring); the
 confirmation dialog says so up front rather than only after the fact.
@@ -156,9 +140,7 @@ class ProgramTab(ctk.CTkFrame):
         ctk.set_appearance_mode() changes elsewhere (e.g. Preferences) --
         see gui/data_registers_tab.py's identical method for why this is
         needed at all (CustomTkinter's theme engine has no hook into
-        ttk). This tab used to not need an equivalent call (its old
-        CTkScrollableFrame render() recomputed stripe color fresh every
-        time) -- now that it's a ttk.Treeview too, it does."""
+        ttk)."""
         self._stripe_bg = style_treeview(_TREE_STYLE)
         apply_row_tags(self._tree, self._stripe_bg)
 

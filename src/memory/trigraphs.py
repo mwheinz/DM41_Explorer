@@ -24,9 +24,9 @@ literal "12" would be indistinguishable from "\\6" + "512" or "\\651" +
 
 `decode_trigraphs()`'s optional `restrict_literals` flag adds a further,
 separate check: real FOCAL has no true lowercase letters above 'e'
-(0x66-0x7A are reassigned to unrelated symbols, not lowercase f-z) --
-confirmed 2026-09-02 after a user-typed alarm message containing plain
-lowercase ("Test Message") displayed as garbage on real DM41L hardware.
+(0x66-0x7A are reassigned to unrelated symbols, not lowercase f-z), so
+plain lowercase text like "Test Message" displays as garbage on a real
+DM41L.
 xm_file.py's NAME_MIN_CHAR/NAME_MAX_CHAR already enforced the same
 0x20-0x65 boundary for XM file names (issue #11); `restrict_literals`
 brings that same boundary to any other *content* a user types expecting
@@ -74,9 +74,8 @@ _LITERAL_BYTES = frozenset(range(0x20, 0x7F)) - frozenset(_SHORTHAND_BY_BYTE)
 # The highest byte value FOCAL treats as a "real" printable literal for
 # ordinary typed content -- 0x65 ('e'). FOCAL has no genuine lowercase
 # letters above this; 0x66-0x7A are reassigned to unrelated symbols, not
-# lowercase f-z (confirmed 2026-09-02 -- see module docstring). Matches
-# xm_file.py's NAME_MAX_CHAR, which independently hit the same boundary
-# for XM file names (issue #11, 2026-08-16).
+# lowercase f-z (see module docstring). Matches xm_file.py's
+# NAME_MAX_CHAR, the same boundary for XM file names (issue #11).
 _SAFE_LITERAL_MIN = 0x20
 _SAFE_LITERAL_MAX = 0x65
 

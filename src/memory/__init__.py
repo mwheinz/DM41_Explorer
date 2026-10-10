@@ -12,8 +12,7 @@ _data[6] contains the LSB. Care must be taken to remember this difference when
 comparing HP41 documentation with the implementation of the Register and
 Memory classes.
 
-This used to be a single memory.py file; it was split into this package
-for readability. The current components are:
+The package's modules:
 
   registers.py     Register, AlphaRegister, DM41MemoryError (alias DM41LMemoryError),
                     format_data_line/parse_data_line (DATA line format)

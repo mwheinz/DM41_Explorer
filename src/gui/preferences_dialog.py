@@ -12,7 +12,7 @@ for. It is reported to the caller through `on_saved(requested_mode=...)`
 instead, and the application decides (see gui/app.py's set_mode()). The
 value shown is therefore always the *saved* mode, never a session-only
 override from an auto-switch on load -- the status bar is where that is
-shown (Mike, 2026-10-09).
+shown.
 """
 
 import logging

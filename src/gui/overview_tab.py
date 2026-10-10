@@ -34,11 +34,9 @@ logger = logging.getLogger(__name__)
 # immediately above one another with no gap -- they are NOT part of
 # "unused" program memory. _render_summary() below subtracts both out of
 # its "Unused program memory" figure, and _render_partition() shows their
-# bounds directly (GitHub issue #23 -- neither used to be accounted for
-# or shown at all). Both methods now source every one of these boundaries
-# from Memory.regions() (issue #25) -- by key ("key", "alarms", "unused",
-# "program", "data") -- rather than computing them independently, so this
-# module no longer needs to know any of the raw address math itself.
+# bounds directly. Both take every boundary from Memory.regions(), by key
+# ("key", "alarms", "unused", "program", "data"), so this module does no
+# address arithmetic of its own.
 
 # Raw structural XM capacity comes from the memory's device profile
 # (DeviceProfile.xm_raw_registers): each region's usable span is (lo, hi] --

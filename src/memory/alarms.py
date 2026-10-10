@@ -12,15 +12,15 @@ Each entry is `[time register] + [repeat register, only if repeating] +
 [message register(s), 0-4]`. The time register's low nibble of byte 6 is
 the message-register count; the high nibble is a best-effort "past due"
 marker (see `Alarm.past_due`'s docstring -- confirmed against exactly one
-real sample so far, treat with appropriate skepticism). Whether a repeat
-register is present can't be told from the time register alone -- see
-`Alarms._looks_like_repeat_register()`.
+real sample so far, treat with appropriate skepticism). The time's last
+BCD digit says whether a repeat register follows -- see
+`Alarms._decode_time()`.
 
 Alarm TYPE (message / control / conditional) is not a separate field --
 it's encoded by however many FOCAL "up arrow" characters (byte 0x5E,
-docs/trigraphs.md's `\^|`) lead the message field itself, confirmed
-2026-09-01 against real ALMCAT output and the Owner's Manual vol 2 sec 16
-alarm-type flowchart:
+docs/trigraphs.md's `\^|`) lead the message field itself (checked against
+real ALMCAT output and the Owner's Manual vol 2 sec 16 alarm-type
+flowchart):
     no leading 0x5E    -- a plain message alarm; the field is the message
     one leading 0x5E    -- a conditional alarm; the rest of the field is
                            the global label (or catalog-2 function) name
@@ -50,13 +50,10 @@ _EPOCH = datetime.datetime(1900, 1, 1)
 # How large a decoded "repeat interval" can plausibly be before treating
 # the register that produced it as message text instead (docs/alarms.md
 # sec 4/9 -- this disambiguation is a documented, irreducible heuristic,
-# not something provable from the format alone). Kept deliberately
-# generous: a real (if very unusual) repeat register has been confirmed
-# 2026-09-01 at ~416.7 days -- the whole point of that sample, per the
-# user, appears to have been to stress-test exactly this heuristic -- so
-# this bound favors under- rather than over-rejecting a genuine repeat
-# register, at the cost of very rarely misreading a digit/early-alphabet-
-# heavy message as a bogus one instead (see
+# not something provable from the format alone). Deliberately generous --
+# a real repeat interval of about 417 days has been seen -- so it favors
+# accepting a genuine repeat register, at the cost of very rarely
+# misreading a digit- or early-alphabet-heavy message as one (see
 # Alarms._looks_like_repeat_register()).
 _MAX_PLAUSIBLE_REPEAT = datetime.timedelta(days=3650)
 
@@ -274,27 +271,15 @@ class Alarms(MemoryRegion):
 
     @classmethod
     def _decode_time(cls, reg_bytes: bytes) -> Tuple[datetime.datetime, bool]:
-        '''Decodes a time register into `(trigger_time, repeats)`.
+        '''Decodes a time register into `(trigger_time, repeats)`
+        (docs/alarms.md sec 12).
 
-        CORRECTED 2026-09-04 (docs/alarms.md sec 12 update pending): only
-        the very last BCD digit (the hundredths-of-a-second-units place)
-        is the deterministic repeats marker -- `0` for one-time, `1` for
-        repeating, confirmed 2026-09-02 against 16/16 real alarm entries,
-        plus 4 more real past-due samples since. The digit *before* it
-        (tenths of a second) is genuine time precision, not part of the
-        flag -- every sample above happened to have a `0` there (a
-        keypad-set alarm only ever has whole-second precision to begin
-        with), which is why the original 2026-09-02 pass treated the
-        whole last two digits as the flag (`cs % 100 != 0`). That was
-        falsified 2026-09-04 by `src/tests/data/tenthsofasecond.dm41`: a
-        real one-time alarm deliberately set to tenth-of-a-second
-        precision (confirmed against the real calculator's own `ALMCAT`,
-        which displays the `.9` and reads the alarm as non-repeating) --
-        the old check misread its nonzero tenths digit as the repeats
-        flag and raised `DM41MemoryError` looking for a repeat register
-        that doesn't exist. `trigger_time` now keeps the tenths digit;
-        only the flag digit itself is zeroed out of it, since that digit
-        is a marker `_encode_time()` writes, not real elapsed time.'''
+        The last BCD digit (the hundredths-of-a-second units place) is the
+        repeats marker, not time: `0` for a one-time alarm, `1` when a
+        repeat register follows. It is dropped from `trigger_time`. The
+        digit before it is real tenths-of-a-second precision and is kept;
+        a keypad-set alarm always has 0 there, but one set to tenths of a
+        second does not (tests/data/tenthsofasecond.dm41).'''
         cs = cls._decode_bcd_centiseconds(reg_bytes)
         repeats = (cs % 10) == 1
         cs_time = cs - (cs % 10)  # drop only the flag digit, keep tenths
@@ -303,15 +288,12 @@ class Alarms(MemoryRegion):
 
     @classmethod
     def _encode_time(cls, when: datetime.datetime, *, repeats: bool) -> bytes:
-        '''Encodes `when` (tenths-of-a-second precision preserved -- see
-        `_decode_time()`'s 2026-09-04 correction) plus the repeats-flag
-        digit in the last BCD position -- `repeats` must match whether a
-        repeat register will actually follow this time register, or real
-        hardware will misread the buffer exactly the way it did
-        2026-09-02 (docs/alarms.md sec 12): a repeat register present but
-        the flag says no, so the repeat register's raw bytes get read as
-        the start of the message instead, and every subsequent alarm in
-        the buffer is misaligned by one register from there on.'''
+        '''Encodes `when` (to a tenth of a second) plus the repeats digit in
+        the last BCD position (see `_decode_time()`). `repeats` must match
+        whether a repeat register really follows: if it doesn't, the
+        calculator reads the repeat register as the start of the message,
+        and every later alarm in the buffer is misaligned by one register
+        (docs/alarms.md sec 12).'''
         delta = when - _EPOCH
         if delta.total_seconds() < 0:
             raise ValueError("Alarm trigger time can't be before 1900-01-01.")
@@ -333,17 +315,15 @@ class Alarms(MemoryRegion):
 
     @classmethod
     def _looks_like_repeat_register(cls, reg_bytes: bytes) -> bool:
-        '''SUPERSEDED 2026-09-02 as the primary "does a repeat register
-        follow" signal -- `_decode_time()`'s repeats-flag digit is the
-        real, deterministic marker (docs/alarms.md sec 12); this heuristic
-        was the best available guess before that was found, and is kept
-        only as a sanity check (see `_decode_one()`): if the flag says a
-        repeat register follows but the candidate register doesn't even
-        look plausible by this check, that's a real sign of a genuinely
-        corrupt buffer, worth surfacing rather than silently trusting.
-        Original docstring, for that narrower use: byte 6 == 0x00,
-        all-BCD digits in bytes 0-5, and a plausible magnitude (see
-        _MAX_PLAUSIBLE_REPEAT).'''
+        '''True if `reg_bytes` looks like a repeat register: byte 6 is
+        0x00, bytes 0-5 are all BCD digits, and the interval is plausible
+        (see _MAX_PLAUSIBLE_REPEAT).
+
+        Whether a repeat register follows is decided by the time
+        register's repeats digit (see `_decode_time()`); this is only a
+        sanity check in `_decode_one()`, so a buffer whose flag promises
+        a repeat register that doesn't look like one is reported as
+        corrupt rather than trusted.'''
         if len(reg_bytes) < REGISTER_SIZE_BYTES or reg_bytes[6] != 0x00:
             return False
         nibbles = cls._bcd_nibbles(reg_bytes[:6])
@@ -468,8 +448,8 @@ class Alarms(MemoryRegion):
         prefix = cls._prefix_for_type(alarm_type)
         # restrict_literals=True: a bare lowercase letter above 'e' isn't
         # a real FOCAL character (it's reassigned to an unrelated symbol,
-        # not lowercase f-z) -- typing one produced a confirmed garbage
-        # display on real hardware 2026-09-02 (docs/alarms.md sec 11).
+        # not lowercase f-z) -- it displays as garbage on real hardware
+        # (docs/alarms.md sec 11).
         # Trigraphs are still fully supported for a genuinely-wanted byte
         # value, including building a control/conditional alarm's label
         # out of special FOCAL characters.

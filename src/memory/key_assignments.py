@@ -92,11 +92,8 @@ class KeyAssignments(MemoryRegion):
     # every other row -- but they sit at physical column positions 3, 4, 5 in
     # the formulas below, not 2, 3, 4. Every other row's key-number column
     # digit equals its physical column directly; row 4 is the sole exception.
-    # Found 2026-08-18 from the user's real-hardware testing: assignments to
-    # key 42 showed up on the calculator as key 41 and didn't work, and
-    # real-calculator row-4 assignments came back missing/misplaced when read
-    # by this app -- both are exactly what using the wrong (N-1) column offset
-    # for row 4 would cause.
+    # (Checked on real hardware: using N-1 for row 4 puts an assignment to
+    # key 42 on key 41.)
     #
     # For the DM41L, the keys are physically laid out very differently but in
     # order to emulate the HP41 series, a key press generates the same key

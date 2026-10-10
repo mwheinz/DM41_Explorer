@@ -427,7 +427,7 @@ def assignable_display_names(profile=None) -> List[str]:
 
     With a `profile`, only the functions that model actually has: in
     DM41L mode the key-assignment picker offers the HP-41CX set alone,
-    since a DM41L cannot run a DM41X function at all (Mike, 2026-10-09).
+    since a DM41L cannot run a DM41X function at all.
     Without one, every registered function, which is what the mnemonic
     reference and the import path want -- the registry always knows every
     name whatever model is in force."""

@@ -116,14 +116,10 @@ class XMFileDialog(ctk.CTkToplevel):
         # For `initial` (the Import File... flow), both boxes are
         # pre-filled with the *same* raw lines, regardless of which type
         # was guessed -- see XMFilesTab._import_file()/_guess_file_type().
-        # Otherwise switching the type dropdown after import would silently
-        # empty out whichever box wasn't showing (real bug: a text file
-        # guessed/left as "Data" would show a normal-looking Data editor,
-        # but switching to ASCII to fix it wiped the imported content,
-        # since only the box matching the *original* guess ever got the
-        # text). `existing` (editing a real file already in memory) keeps
-        # the old single-box behavior -- its type is locked, so there's
-        # nothing to switch to anyway.
+        # That way, switching the type dropdown after a wrong guess (say, a
+        # text file guessed as "Data") still shows the imported content.
+        # `existing` (editing a file already in memory) fills only its own
+        # box -- its type is locked, so there's nothing to switch to.
         data_default = ""
         if existing and existing.file_type == ExtendedMemory.TYPE_DATA:
             data_default = "\n".join(existing.get_data_lines())

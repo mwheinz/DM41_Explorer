@@ -601,12 +601,11 @@ class ExtendedMemory(MemoryRegion):
         # False -- "spans" means real data in a later region, not merely that
         # the terminator was pushed there.
         #
-        # Getting this boundary wrong by one was a confirmed real bug: a file
-        # was allowed to use every last usable register, add_file() wrote it
-        # successfully, but no terminator was ever written, so the very next
-        # list_files() walked past it into unrelated memory and crashed.
-        # Rejecting such a file here -- before any registers are written --
-        # keeps a directory this close to full from losing its terminator.
+        # This boundary matters: a file allowed to use the last usable
+        # register would leave no room for the terminator, and the next
+        # list_files() would walk past it into unrelated memory. Rejecting
+        # such a file here, before any registers are written, keeps a
+        # nearly-full directory's terminator intact.
         while cursor <= regions[ri][0]:
             segments.append([regions[ri][0] + 1, top])
             s = regions[ri][0] - cursor
@@ -702,15 +701,12 @@ class ExtendedMemory(MemoryRegion):
         so each must have a pointer register, and each one before the last
         must have its NNN field pointing at the next region's ceiling.
 
-        Missing in the past, and a confirmed real bug: a state where region 0
-        was bootstrapped by an earlier, non-spanning file (leaving NNN at 0,
-        correctly, at that time) and only a *later* file first spans into
-        region 1 left NNN stuck at 0 forever after -- the real DM41L trusts
-        that field to know region 1 exists at all, so every file from the
-        first spanning one onward (including ones entirely within region 1)
-        was invisible to it, even though this tool's own list_files() never
-        needed that field and so never caught it. The same chain applies
-        between every pair of adjacent regions.
+        This matters when a later file is the first to span into region 1:
+        region 0's pointer was written with NNN 0 by an earlier file and
+        must now be updated. The real DM41L relies on that field to know
+        region 1 exists at all (this module's list_files() doesn't), so a
+        stale 0 hides every file from the first spanning one onward. The
+        same applies between every pair of adjacent regions.
 
         A pointer that already exists is only ever patched in its NNN field;
         every other nibble (WW, PP, ...) is left as it was -- there's no
@@ -1003,34 +999,24 @@ class ExtendedMemory(MemoryRegion):
 
         Raises DM41MemoryError if no file has a header at header_addr.
 
-        Rebuilds go through _place_file() directly, NOT add_file(): a
-        surviving file's raw name_bytes and data_registers() are written
-        back byte-for-byte, bypassing add_file()'s name-length/character-
-        range and duplicate-name checks (see _place_file()'s docstring).
-        Those checks exist for *new* names a caller is asking to create,
-        not for files that already legitimately exist -- running them
-        during a rebuild used to be a real (confirmed) bug: get_ascii()'s
-        lossy '.'-for-unprintable display name was, until recently, a
-        file's only recorded identity, so two files with different raw
-        names but the same sanitized display name would collide as a false
-        "duplicate" mid-rebuild, after registers were already wiped --
-        losing every not-yet-rebuilt file (not just the intended edit or
-        removal) with no rollback.
+        Rebuilds go through _place_file() directly, NOT add_file(): each
+        surviving file's raw name_bytes and data registers are written
+        back byte-for-byte, without add_file()'s name and duplicate-name
+        checks. Those checks are for *new* names; applied to existing
+        files they could reject one mid-rebuild -- e.g. two raw names that
+        only differ in unprintable characters look identical once
+        sanitized -- after the registers were already wiped.
         """
         files = self.list_files()
         if not any(f.header_addr == header_addr for f in files):
             raise DM41MemoryError(f"No XM file with a header at 0x{header_addr:03x}")
 
-        # Snapshot each surviving file's raw name bytes, type, and actual
-        # data Register objects *before* clearing anything -- data_registers()
-        # reads live from self._memory, so this has to happen while the
-        # original layout is still intact. The Register objects returned
-        # here are unaffected by the wipe below (set_register() replaces
-        # each address's dict entry with a brand-new Register rather than
-        # mutating the existing one in place), so holding onto them is
-        # enough to preserve exact original content, verbatim -- including
-        # any raw bytes get_data_lines()/get_records()/get_instruction_bytes()
-        # would have had to (lossily) re-encode as text.
+        # Snapshot each surviving file's raw name bytes, type and data
+        # registers *before* clearing anything: data_registers() reads the
+        # live layout, which the wipe below destroys. The registers it
+        # returns are copies (Memory.get_register()), so they keep the
+        # exact original content -- including raw bytes that
+        # get_data_lines()/get_records() would have to re-encode as text.
         rebuild = []
         for f in files:
             if f.header_addr == header_addr:

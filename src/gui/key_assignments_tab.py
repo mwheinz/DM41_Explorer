@@ -3,18 +3,17 @@ Key Assignments tab: a keypad-shaped grid of the 34 assignable keys, for
 viewing and editing key assignments -- both the built-in/peripheral kind
 (docs/key_assignments.md sec 4.2, stored in the Key Assignment Registers)
 and global-label/program assignments (sec 4.6, stored inside the
-program's own header instead), through
-get_key_assignment()/set_key_assignment()/delete_key_assignment() and
-get_program_for_key()/set_program_key_assignment()/clear_program_key_assignment()
-respectively (see gui/key_assignment_edit_dialog.py's "Program" tab).
+program's own header instead), through KeyAssignments'
+get_assignment()/set_assignment()/delete_assignment() and ProgramMemory's
+get_program_for_key()/set_program_key_assignment()/
+clear_program_key_assignment() respectively (see
+gui/key_assignment_edit_dialog.py's "Program" tab).
 
 **One keyboard at a time.** Both models assign the same 34 keys, but
 their physical keyboards lay them out differently (see
 docs/key_assignments.md, "Keyboard layouts"), so there are two layout
-tables below. Issue #39 originally showed both at once, on a sub-tab
-each; phase 6 of docs/dm41x_explorer_plan.md supersedes that (Mike,
-2026-10-09): the grid shown is the one for the model the app is working
-as, and the other is not drawn at all.
+tables below. Only the grid for the model the app is working as is drawn
+(docs/dm41x_explorer_plan.md phase 6).
 
 The layout follows the rendered state's own `profile`, which is the
 mode's profile by construction -- the application builds every Memory
@@ -35,15 +34,12 @@ Import/export of key assignments is still out of scope -- see
 docs/key_assignments.md sec 6 items 1-2.
 
 Unlike every other tab's render(), this one does NOT destroy and rebuild
-its widgets on every call. Every other tab's row count scales with actual
-data (XM files, programs, ...), so a full rebuild is cheap; this tab
-always has the same fixed 34*2 = 68 buttons per grid regardless of how
-many keys are actually assigned, and CustomTkinter widget construction
-(each CTkButton draws its own rounded-rect image) is expensive enough
-that destroying and recreating ~270 widgets on every single key edit was
-visibly slow -- the whole tab would go blank for a couple of seconds
-before redrawing. The grids are now built once and subsequently only
-their existing buttons' text/color are updated in place via configure().
+its widgets on every call. The grid always has the same 34*2 = 68 buttons
+however many keys are assigned, and CustomTkinter widgets are expensive
+to build (each CTkButton draws its own rounded-rectangle image), so
+rebuilding them on every key edit would blank the tab for a moment. The
+grid is built once (and again only when the model changes); after that,
+render() just updates its buttons' text and colors with configure().
 """
 
 import logging

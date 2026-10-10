@@ -343,9 +343,8 @@ class DM41ExplorerApp(ctk.CTk):
     def _mode_status_text(self) -> str:
         text = f"{self.mode.value} mode"
         if self.mode_is_temporary:
-            # Mike, 2026-10-09: the status bar is where a temporary
-            # override is shown; the Preferences dialog shows the saved
-            # setting and says nothing about this.
+            # The status bar is the one place a temporary override is
+            # shown; the Preferences dialog shows the saved setting.
             text += " (this session)"
         return text
 
@@ -354,8 +353,8 @@ class DM41ExplorerApp(ctk.CTk):
         a mode that has a serial console, and nothing at all in one that
         does not.
 
-        "Not connected" is only meaningful where connecting is possible
-        (Mike, 2026-10-09). In DM41X mode there is nothing to connect to,
+        "Not connected" is only meaningful where connecting is possible.
+        In DM41X mode there is nothing to connect to,
         so the status bar stays empty until something actually happens
         (a state loaded, a mode changed), rather than reporting the
         absence of a connection the app would refuse to make anyway."""
@@ -366,8 +365,8 @@ class DM41ExplorerApp(ctk.CTk):
 
     def _apply_mode_to_menus(self):
         """Greys out the serial actions in a mode whose calculator has no
-        serial console -- disabled rather than hidden (Mike, 2026-10-09),
-        so the user can see the app has them and why they are unavailable.
+        serial console -- disabled rather than hidden, so the user can see
+        the app has them and why they are unavailable.
 
         The keyboard shortcuts bypass menu state entirely, so every one of
         these actions also guards itself with _require_serial_mode()."""
@@ -394,8 +393,8 @@ class DM41ExplorerApp(ctk.CTk):
     def set_mode(self, mode, *, persist: bool, reason: str = None) -> bool:
         """Changes the effective mode, erasing the open state.
 
-        Changing mode starts a new, empty state on the new mode's profile
-        (Mike, 2026-10-09): a Memory fixes its profile when it is built, and
+        Changing mode starts a new, empty state on the new mode's profile:
+        a Memory fixes its profile when it is built, and
         rebuilding one through to_string()/from_string() to keep the
         contents would be a silent partial conversion in the narrowing
         direction. Moving a state between models is done by exporting the
@@ -464,9 +463,9 @@ class DM41ExplorerApp(ctk.CTk):
         and returns whether the caller should go on to load it.
 
         The offer is deliberately session-only: someone who owns one
-        calculator will rarely want the other mode permanently (Mike,
-        2026-10-09), so accepting does not write the preference. Declining
-        aborts the load and leaves both the mode and the open state alone."""
+        calculator will rarely want the other mode permanently, so
+        accepting does not write the preference. Declining aborts the load
+        and leaves both the mode and the open state alone."""
         target = DeviceMode.DM41X
         logger.info(
             "%s does not fit %s mode: %s",
@@ -601,7 +600,7 @@ class DM41ExplorerApp(ctk.CTk):
         status_bar = ctk.CTkFrame(self)
         status_bar.pack(side="bottom", fill="x", padx=8, pady=(0, 8))
 
-        # The effective mode comes first (Mike, 2026-10-09): it is the
+        # The effective mode comes first: it is the
         # standing fact about the session, while the label beside it is a
         # running commentary that _set_status() rewrites constantly. This
         # order also keeps the bar tidy in DM41X mode, where the status
@@ -810,18 +809,15 @@ class DM41ExplorerApp(ctk.CTk):
         self.bind(f"<{acc}-o>", lambda e: self.load_state_from_file())
         self.bind(f"<{acc}-s>", lambda e: self.save_state_to_file())
         self.bind(f"<{acc}-q>", lambda e: self.on_close())
-        # Preferences' menu accelerator (Cmd/Ctrl+,) never actually had
-        # a matching bind() -- the menu's `accelerator=` text is purely
-        # cosmetic in Tk, so this shortcut has silently never worked
-        # until now.
+        # A menu's `accelerator=` text is only a label in Tk -- every
+        # shortcut shown in the menus needs its own bind() here.
         self.bind(f"<{acc}-comma>", lambda e: self.show_preferences())
         self.bind("<F5>", lambda e: self._render_tabs())
 
-        # GitHub issue #7 follow-up: Export.../Import... are tab-scoped
-        # header buttons (Data Registers, XM Files, Programs), not menu
-        # items, so their shortcuts are bound globally here and just
-        # forward to whichever tab is currently active -- see
-        # _dispatch_tab_action().
+        # Export.../Import... are tab-scoped header buttons (Data
+        # Registers, XM Files, Programs), not menu items, so their
+        # shortcuts are bound globally here and forward to whichever tab
+        # is active -- see _dispatch_tab_action().
         self.bind(f"<{acc}-e>", lambda e: self._export_current_tab())
         self.bind(f"<{acc}-i>", lambda e: self._import_current_tab())
 
@@ -946,8 +942,8 @@ class DM41ExplorerApp(ctk.CTk):
         '''Renders only the tab currently on screen, if it's stale.
 
         Tabs render lazily rather than all at once: building a tab's
-        widgets from scratch for a big register table is genuinely slow
-        (see the module docstring), so there's no reason to pay that cost
+        widgets from scratch for a big register table is genuinely slow,
+        so there's no reason to pay that cost
         for tabs the user hasn't looked at yet, or to pay it twice for a
         tab that's already showing current content.
         '''
@@ -1186,10 +1182,9 @@ class DM41ExplorerApp(ctk.CTk):
         # a direct disconnect() call here is safe -- see _on_verify_failed.
         if self.serial.is_connected:
             self.serial.disconnect()
-        # Deferred for the same reason as the previous GUI: showing a modal
-        # dialog immediately would open a nested Tk event loop while the
-        # engine is mid-reset, risking reentrant calls into
-        # process_incoming_data().
+        # Deferred: showing a modal dialog immediately would open a nested
+        # Tk event loop while the engine is mid-reset, risking reentrant
+        # calls into process_incoming_data().
         self.after(0, lambda: messagebox.showerror("Error", message))
 
     # -- File menu actions --------------------------------------------------
@@ -1203,16 +1198,12 @@ class DM41ExplorerApp(ctk.CTk):
     # -- Tools menu actions --------------------------------------------------
 
     def pack_memory(self):
-        '''GitHub issue #31 ("DM41L_Explorer needs PACK functionality"):
-        explicitly repacks Key Assignments/Alarms and program memory
-        (Memory.pack() -- see that method's own docstring for exactly
-        what it does and why, including the chain-repair case per the
-        user's own correction to this method's first version). Meant to
-        be run before an Import to guarantee the maximum possible free
-        space is available for it, per the issue's own suggested use --
-        lives in its own menu (rather than on the Program tab, next to
-        Import) since it also touches Key Assignments/Alarms, which
-        aren't shown there.'''
+        '''Tools > Pack Memory: repacks Key Assignments/Alarms and program
+        memory the way a real PACK does (see Memory.pack()), reporting the
+        registers reclaimed and any programs whose global labels became
+        visible. Useful before an Import, to make the most free space
+        available. It lives in the Tools menu rather than on the Programs
+        tab because it also changes Key Assignments and Alarms.'''
         before_count = len(self.memory.programs.list_programs())
         try:
             freed = self.memory.pack()
@@ -1517,18 +1508,12 @@ class DM41ExplorerApp(ctk.CTk):
 
         ctk.set_appearance_mode(self.config_store.appearance_mode)
         _setup_logging(self.config_store)
-        # Hex View, Data Registers, XM Files, and Programs use native
-        # ttk.Treeview widgets, which CTk's theme engine has no hook into
-        # -- set_appearance_mode() above does nothing for their region/
-        # stripe colors on its own, so they need to be told explicitly to
-        # recompute and re-apply them (see each tab's refresh_theme() for
-        # why -- GitHub issues #21/#22's Treeview conversions are what
-        # grew this list from two tabs to four). Overview/Flags/Key
-        # Assignments don't need an equivalent call: their CTk-widget
-        # render()s already recompute stripe color fresh every time, so
-        # marking them stale and re-rendering the active tab below (the
-        # same thing F5/"Refresh Tabs" already does) is enough to pick up
-        # the new theme.
+        # Hex View, Data Registers, XM Files, Programs and Alarms use native
+        # ttk.Treeview widgets, which CTk's theme engine has no hook into:
+        # set_appearance_mode() above doesn't recolor their rows, so each
+        # is told to recompute and re-apply its colors. Overview, Flags
+        # and Key Assignments are CTk widgets whose render() picks the
+        # current colors every time, so re-rendering (below) is enough.
         self.hex_view_tab.refresh_theme()
         self.data_registers_tab.refresh_theme()
         self.xm_files_tab.refresh_theme()

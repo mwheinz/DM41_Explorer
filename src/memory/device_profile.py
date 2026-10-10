@@ -163,7 +163,7 @@ class DeviceMode(enum.Enum):
 
 
 # What a user with no `mode` in their preferences file gets. The DM41X is
-# the more common device (Mike, 2026-10-09), so it is the default -- note
+# the more common device, so it is the default -- note
 # that this means an existing DM41L owner's states report the DM41X's XM
 # totals until they set the mode themselves.
 DEFAULT_MODE = DeviceMode.DM41X

@@ -141,8 +141,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         # caller that has no profile to give.
         self._profile = profile
         # In DM41L mode the picker offers the HP-41CX set alone: a DM41L
-        # cannot run a DM41X function, so offering it would be a trap
-        # (Mike, 2026-10-09).
+        # cannot run a DM41X function, so offering it would be a trap.
         self._function_names = assignable_display_names(profile)
 
         if assignment is not None:

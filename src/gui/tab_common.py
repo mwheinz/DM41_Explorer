@@ -95,7 +95,7 @@ SELECTED_ROW_FG = "#ffffff"
 
 # Bordered/tinted "card" look shared by gui/overview_tab.py's summary
 # cards, gui/flags_tab.py's flag grid, and gui/key_assignments_tab.py's
-# default (unassigned) key cells -- formerly three identical copies.
+# default (unassigned) key cells.
 CARD_FG = ("gray92", "gray17")
 CARD_BORDER = ("gray80", "gray28")
 

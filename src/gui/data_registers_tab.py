@@ -126,36 +126,22 @@ class DataRegistersTab(ctk.CTkFrame):
             self._on_change()
 
     def _on_tree_selected(self, selected_tree: ttk.Treeview):
-        """Gives the selected row a visible highlight -- GitHub issue #22.
+        """Gives the selected row a visible highlight (GitHub issue #22).
 
-        ttk.Treeview has a built-in "selected" state background (set via
-        `style.map()` in gui/tab_common.py's `style_treeview()`), but a
-        per-item tag's background overrides it regardless of selection
-        state, which is why the highlight never showed: every row here
-        carries either the "oddrow" zebra-stripe tag or the default
-        (untagged) style, and the tag always won.
+        A per-item tag's background overrides ttk.Treeview's built-in
+        "selected" background, and every row here carries a stripe tag,
+        so selection needs its own tag. Two tags on one item that both set
+        a background resolve differently on different Tk builds (Linux
+        picks one, macOS the other), so the two never coexist: while a
+        row is selected it carries *only* "selectedrow", whose color
+        matches the "selected" state color from `style_treeview()`. On
+        deselect its stripe tag is recomputed from the row's position
+        (`clear_selected_row_tag()`), so nothing goes stale when render()
+        rebuilds the rows.
 
-        The fix is NOT to give "selectedrow" priority over "oddrow" by
-        listing it first -- an earlier version of this fix tried that,
-        and it turns out *which* tag wins when two tags on the same item
-        both set a background is itself inconsistent across Tk builds
-        (confirmed: reliably "selectedrow" on this project's Linux/Xvfb
-        dev environment, but reliably "oddrow" -- grey background, barely
-        readable white text -- on a real Mac). So this never lets the two
-        compete in the first place: while a row is selected it carries
-        *only* the "selectedrow" tag (no "oddrow" alongside it), and its
-        background matches the "selected" state color from `style.map()`
-        above, so it doesn't matter which of those two agreeing sources
-        wins either. "oddrow" is restored on deselect by recomputing that
-        row's position parity from its current index in the tree
-        (gui/tab_common.py's `clear_selected_row_tag()`), rather than
-        caching it -- no state to go stale across a render() teardown/
-        rebuild. This tab's own version of the fix (unlike
-        gui/program_tab.py's/gui/xm_files_tab.py's single-table
-        `highlight_selected_row()` use) has to clear the tag across
-        *both* side-by-side tables before re-tagging just the one that
-        was actually clicked, hence calling `clear_selected_row_tag()`
-        directly here instead.
+        Unlike the single-table tabs (which use `highlight_selected_row()`),
+        this clears the tag across *both* side-by-side tables before
+        tagging the one that was clicked.
         """
         selection = selected_tree.selection()
         if not selection:

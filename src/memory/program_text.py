@@ -124,8 +124,8 @@ _COMPACT_REGISTER_MAX = 0x0F  # registers 00-15
 # 09). Label numbers 15-99 use the general 2-byte 0xCF-prefixed form
 # instead (confirmed: "LBL 20"/"LBL 21"/"LBL 92" are all 0xCF <value>).
 # Local *letter* labels A-J also use that same 2-byte 0xCF form, with
-# values 0x66-0x6F (see _decode_register_operand below) -- confirmed
-# separately via src/tests/data/samplelabels.dm41, per project notes.
+# values 0x66-0x6F (see _decode_register_operand below; confirmed with
+# src/tests/data/samplelabels.dm41).
 _LBL_COMPACT_BASE = 0x01
 _LBL_COMPACT_MAX = 14
 
@@ -212,8 +212,8 @@ _XEQ_IND_FLAG = 0x80
 # through" -- confirmed: "STO IND 16" is STO + 0x90 (0x80 | 0x10), vs.
 # plain "STO 16" being STO + 0x10. Below that:
 #   0x00-0x63 (0-99): direct register/flag/label number.
-#   0x66-0x6F: local letter labels A-J (10 slots -- confirmed elsewhere,
-#     see samplelabels.dm41 per project notes; not exercised by name in
+#   0x66-0x6F: local letter labels A-J (10 slots -- confirmed with
+#     samplelabels.dm41; not exercised by name in
 #     tower.txt, since it has no letter-labelled GTO/XEQ/LBL, but the
 #     encoding matches the already-established local-letter table).
 #   0x70-0x74: the stack registers T/Z/Y/X/L. Only X (0x73) and Y (0x72)
@@ -973,12 +973,10 @@ def _encode_xrom(tokens: List[str]) -> bytes:
 
     Accepts any module 00-31 and function 00-63, whether or not the
     DM41L emulates that module -- matching hp41uc, and matching RAW/DAT/
-    PPC import, which already accept these bytes. (Changed 2026-09-22:
-    this used to reject anything outside Extended Functions/Time, so a
-    program using e.g. the card reader's XROM 30,03 could be exported to
-    .txt but not imported back.) On the calculator, an XROM for a module
-    that isn't present shows as "XROM mm,ff" and only errors
-    (NONEXISTENT) if executed.
+    PPC import, which accept these bytes too, so any program that exports
+    to .txt (e.g. one using the card reader's XROM 30,03) imports back.
+    On the calculator, an XROM for a module that isn't present shows as
+    "XROM mm,ff" and only errors (NONEXISTENT) if executed.
 
     This is only reached for the numeric "XROM mm,ff" spelling -- a
     function spelled by its own name (e.g. "SEEKPT") resolves directly
