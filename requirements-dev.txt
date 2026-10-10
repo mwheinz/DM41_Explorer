@@ -1,21 +1,29 @@
-# Runtime dependencies, plus everything needed to test, lint, and build
+# Runtime dependencies, plus everything needed to test, format, and build
 # distributable binaries. `pip install -r requirements-dev.txt` is
 # everything a contributor needs.
 -r requirements.txt
 
-black==26.5.1
-click==8.4.2
+# Tests
+pytest==9.1.1
 iniconfig==2.3.0
-mypy_extensions==1.1.0
-packaging
-pathspec==1.1.1
-Pillow
-platformdirs==4.10.1
 pluggy==1.6.0
 Pygments==2.20.0
-pyinstaller
-pytest==9.1.1
+
+# Formatting
+black==26.5.1
+click==8.4.2
+mypy_extensions==1.1.0
+pathspec==1.1.1
+platformdirs==4.10.1
 pytokens==0.4.1
 
-# Pillow is only needed to run resources/makeicon.sh (regenerates
-# MyIcon.ico/.png from icon.png) -- not imported anywhere in src/.
+# Building the standalone app (src/build.sh, dm41explorer.spec)
+pyinstaller==6.22.3
+pyinstaller-hooks-contrib==2026.8
+altgraph==0.17.5
+macholib==1.16.4
+setuptools==84.0.0
+
+# Tools: resources/makeicon.sh (regenerates MyIcon.ico/.png) and
+# tools/make_screenshots.py. Not used by the app itself.
+pillow==12.3.0

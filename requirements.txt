@@ -1,10 +1,7 @@
-altgraph==0.17.5
+# What the app needs to run from source (`python3 -m gui.app` in src/).
+# Everything for testing, formatting and building is in
+# requirements-dev.txt.
 customtkinter==6.0.0
 darkdetect==0.8.0
-macholib==1.16.4
 packaging==26.3
-pillow==12.3.0
-pyinstaller==6.22.3
-pyinstaller-hooks-contrib==2026.8
 pyserial==3.5
-setuptools==84.0.0

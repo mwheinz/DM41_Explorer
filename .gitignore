@@ -12,3 +12,7 @@ _to_delete/*
 
 # Scratch copy of the GitHub issue list, regenerated on demand; never committed.
 issues.json
+
+# Created by `pip install .` (pyproject.toml).
+/build/
+*.egg-info/

@@ -1,3 +1,39 @@
+[build-system]
+requires = ["setuptools>=64", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dm41-explorer"
+description = "Read, write and edit the memory of a SwissMicros DM41L/DM41X calculator"
+readme = "README.md"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+authors = [{ name = "Michael Heinz" }]
+requires-python = ">=3.10"
+# What the app imports. requirements.txt pins these (and CustomTkinter's
+# own dependencies) to the exact versions used for development and
+# releases.
+dependencies = [
+    "customtkinter",
+    "pyserial",
+]
+# The version comes from the latest git tag (vYYYY.MM.DD), as `git
+# describe` does for the About box (see src/build.sh).
+dynamic = ["version"]
+
+[project.urls]
+Homepage = "https://github.com/mwheinz/DM41_Explorer"
+
+[project.scripts]
+dm41explorer = "gui.app:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+packages = ["engine", "gui", "memory"]
+py-modules = ["config"]
+
+[tool.setuptools_scm]
+
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["src/tests"]
