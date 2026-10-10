@@ -618,7 +618,16 @@ class ProgramMemory(MemoryRegion):
         confirmed exhaustively for every 3-byte input and over 400,000
         random short buffers). Left in place as cheap insurance in case
         these bounds ever change.
+
+        All-or-nothing: if any step raises, including the final
+        consistency check after the bytes are written, this Memory is left
+        exactly as it was (see Memory.transaction()).
         '''
+        with self._memory.transaction():
+            return self._splice_program(instruction_bytes)
+
+    def _splice_program(self, instruction_bytes: bytes) -> Program:
+        '''import_program()'s body, run inside its transaction.'''
         status = self._memory.status_registers
         if not instruction_bytes:
             raise ValueError("Nothing to import -- the program is empty.")
@@ -1186,7 +1195,16 @@ class ProgramMemory(MemoryRegion):
         current program list (e.g. it's stale, from a `list_programs()`
         call taken before the state changed) -- same defensive check as
         `get_program_bytes()`.
+
+        All-or-nothing: if anything raises part-way through (e.g. a kept
+        program's bytes fail get_program_bytes()'s cross-check), this
+        Memory is left exactly as it was (see Memory.transaction()).
         '''
+        with self._memory.transaction():
+            self._remove_program(program)
+
+    def _remove_program(self, program: Program):
+        '''remove_program()'s body, run inside its transaction.'''
         key_assignments_region = self._memory.key_assignments
         programs = self.list_programs()
         match = next(
@@ -1271,11 +1289,13 @@ class ProgramMemory(MemoryRegion):
         safely determine program memory's real content -- see that
         method's own docstring for exactly when that happens. Nothing is
         changed if that happens: the scan runs, and can raise, before
-        anything about program memory is touched.
+        anything about program memory is touched. The rebuild after it is
+        all-or-nothing too (see Memory.transaction()).
         '''
         keep = self._forward_scan_programs()
         if keep:
-            self._rebuild(keep, collapse_trailing_end=False)
+            with self._memory.transaction():
+                self._rebuild(keep, collapse_trailing_end=False)
 
     # -- Global label (program) key assignments --------------------------
     #

@@ -61,20 +61,6 @@ def _format_repeat(interval) -> str:
     return "every " + " ".join(parts)
 
 
-def _alarm_to_add_kwargs(alarm):
-    """The kwargs Alarms.add_alarm() needs to recreate `alarm` exactly as
-    it currently is -- used by _save_new_or_edited_alarm() to restore an
-    alarm it had to remove before discovering the replacement was
-    invalid."""
-    return {
-        "trigger_time": alarm.trigger_time,
-        "alarm_type": alarm.alarm_type,
-        "text": alarm.text,
-        "repeat_interval": alarm.repeat_interval,
-        "past_due": alarm.past_due,
-    }
-
-
 class AlarmsTab(ctk.CTkFrame):
     """Renders the alarm list for a Memory object. Call `render(memory)`
     whenever the buffer changes."""
@@ -180,54 +166,23 @@ class AlarmsTab(ctk.CTkFrame):
 
     # -- Add / Edit / Remove ------------------------------------------------
 
-    def _save_new_or_edited_alarm(
-        self, kwargs, *, replacing_addr=None, replacing_alarm=None
-    ):
-        """Shared save path for Add and Edit. Editing is implemented as
-        remove-then-add (no in-place resize -- an edit can change how many
-        registers the entry needs, e.g. a longer message or a newly-added
-        repeat interval), the same pattern gui/xm_files_tab.py uses for XM
-        files.
-
-        `replacing_alarm` (the pre-edit Alarm, when this is an edit) is
-        what lets a rejected add_alarm() be rolled back below: it's only
-        used for restoring the original entry, never to decide where it
-        was, since `replacing_addr` already covers that (add_alarm()
-        validates the new text/length *before* touching any registers --
-        see _build_entry_registers() -- so the delete_alarm() just above
-        is the only mutation that can have already happened when this
-        fires)."""
+    def _save_new_or_edited_alarm(self, kwargs, *, replacing_addr=None):
+        """Shared save path for Add and Edit. Editing is remove-then-add
+        (no in-place resize -- an edit can change how many registers the
+        entry needs, e.g. a longer message or a newly-added repeat
+        interval), the same pattern gui/xm_files_tab.py uses for XM files.
+        Both steps run in one Memory.transaction(), so a rejected edit
+        leaves the alarms exactly as they were, and the Treeview's rows
+        (keyed by start_addr) still match them."""
         alarms = self._memory.alarms
         try:
-            if replacing_addr is not None:
-                alarms.delete_alarm(replacing_addr)
-            alarms.add_alarm(**kwargs)
+            with self._memory.transaction():
+                if replacing_addr is not None:
+                    alarms.delete_alarm(replacing_addr)
+                alarms.add_alarm(**kwargs)
         except (ValueError, DM41MemoryError) as e:
             verb = "save" if replacing_addr is not None else "add"
             logger.warning("Could not %s alarm: %s", verb, e)
-            if replacing_alarm is not None:
-                # The original alarm was already removed above (to make
-                # room for the edit) before add_alarm() rejected the
-                # replacement -- put it back. Without this, the buffer
-                # would be left missing the edited alarm entirely while
-                # this tab's Treeview still showed its old row under its
-                # now-stale start_addr, and delete_alarm() closing the
-                # gap shifts every later alarm's start_addr too --
-                # corrupting selection for the edited row *and* every
-                # alarm after it until the next full reload.
-                try:
-                    alarms.add_alarm(**_alarm_to_add_kwargs(replacing_alarm))
-                except (ValueError, DM41MemoryError) as restore_error:
-                    logger.error(
-                        "Could not restore alarm %r after a failed edit "
-                        "-- it has been lost from the buffer: %s",
-                        replacing_alarm.text,
-                        restore_error,
-                    )
-                # Re-render either way: whatever the buffer now actually
-                # contains, the Treeview's iids (each alarm's start_addr)
-                # must match it before the user can select anything again.
-                self.render(self._memory)
             messagebox.showerror(f"Could Not {verb.title()} Alarm", str(e))
             return
         logger.info(
@@ -255,7 +210,7 @@ class AlarmsTab(ctk.CTkFrame):
 
         def save(kwargs):
             self._save_new_or_edited_alarm(
-                kwargs, replacing_addr=alarm.start_addr, replacing_alarm=alarm
+                kwargs, replacing_addr=alarm.start_addr
             )
 
         AlarmEditDialog(self, save, existing=alarm)

@@ -384,8 +384,11 @@ class ProgramTab(ctk.CTkFrame):
             return
 
         try:
-            imported = self._memory.programs.import_program(instruction_bytes)
-            self._memory.programs.repack()
+            # One transaction: if repack() rejects the result, the import
+            # is undone too, matching the "Could Not Import" message.
+            with self._memory.transaction():
+                self._memory.programs.import_program(instruction_bytes)
+                self._memory.programs.repack()
         except (ValueError, DM41MemoryError) as e:
             logger.warning("Could not import program from %s: %s", path, e)
             messagebox.showerror("Could Not Import", str(e))
@@ -399,12 +402,11 @@ class ProgramTab(ctk.CTkFrame):
         # memory/program_text.py's decode_program_txt() docstring) always
         # emits zero/unlinked chain markers, and RAW/DAT read from an
         # hp41uc-compiled file (e.g. tests/data/tower.raw) can carry the
-        # same thing over from that file. `imported`, captured right
-        # after import_program() but before that repair runs, can
-        # therefore be stale -- reporting "(unlabelled)" for a program
-        # repack() then correctly re-recognizes by name. Re-fetch the
-        # newest program from the freshly-rebuilt list instead of
-        # trusting the pre-repack object for the log/success message
+        # same thing over from that file. import_program()'s own return
+        # value, from before that repair runs, can therefore be stale --
+        # reporting "(unlabelled)" for a program repack() then correctly
+        # re-recognizes by name. Take the newest program from the
+        # freshly-rebuilt list instead for the log/success message
         # below (import_program()'s own contract: always spliced in as
         # the newest program, so it's always list_programs()'s last
         # entry once repack() finishes).

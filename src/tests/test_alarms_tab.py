@@ -75,7 +75,6 @@ def test_failed_edit_restores_the_original_alarm_and_leaves_others_selectable(
             "past_due": False,
         },
         replacing_addr=target.start_addr,
-        replacing_alarm=target,
     )
 
     current = memory.alarms.list_alarms()

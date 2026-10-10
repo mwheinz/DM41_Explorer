@@ -63,7 +63,6 @@ def test_failed_edit_restores_the_original_file_and_leaves_others_selectable(
         xm.TYPE_DATA,
         {"data_lines": ["TOOLONGTEXT"]},
         replacing_addr=target.header_addr,
-        replacing_file=target,
     )
 
     xm = ExtendedMemory(memory, address_range=[0x40, 0x2EF])

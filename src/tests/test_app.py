@@ -571,7 +571,6 @@ def test_editing_a_data_file_in_the_third_region_keeps_every_other_file(app):
         target.TYPE_DATA,
         {"data_lines": ["1", "2", "3", "4", "5", "6", "7", "8"]},
         replacing_addr=target.header_addr,
-        replacing_file=target,
     )
 
     after = contents()

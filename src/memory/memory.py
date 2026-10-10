@@ -12,6 +12,7 @@ region properties below.
 '''
 
 import re
+from contextlib import contextmanager
 from typing import Dict, Optional, Union
 from pathlib import Path
 
@@ -323,6 +324,47 @@ class Memory:
     def modified(self) -> bool:
         return self._modified
 
+    # -- Snapshots and transactions ---------------------------------------
+
+    def snapshot(self):
+        '''An opaque copy of this state's full contents, for restore().
+
+        Copies every Register (they are mutable) plus the one piece of
+        derived state a region caches rather than recomputes -- the Key
+        Assignments extent, see KeyAssignments.end -- so a restore puts
+        this Memory back exactly as it was.'''
+        return (
+            {addr: Register(reg.get_bytes()) for addr, reg in self._core_memory.items()},
+            {key: Register(reg.get_bytes()) for key, reg in self._special_registers.items()},
+            self.key_assignments._end,
+            self._modified,
+        )
+
+    def restore(self, snapshot):
+        '''Puts this Memory back to the contents captured by snapshot().
+        The snapshot can be restored more than once.'''
+        core, special, key_end, modified = snapshot
+        self._core_memory = {a: Register(r.get_bytes()) for a, r in core.items()}
+        self._special_registers = {
+            k: Register(r.get_bytes()) for k, r in special.items()
+        }
+        self.key_assignments._end = key_end
+        self._modified = modified
+
+    @contextmanager
+    def transaction(self):
+        '''Runs the body as one all-or-nothing edit: if it raises, this
+        Memory is restored to exactly what it was on entry and the
+        exception propagates. Use it around any edit made of several
+        steps, so a failure part-way through can't leave the state half
+        changed. Transactions nest; only the failing level is undone.'''
+        saved = self.snapshot()
+        try:
+            yield self
+        except BaseException:
+            self.restore(saved)
+            raise
+
     def is_modified(self):
         ''' Memory modifications can happen many different ways, so we can't
         just detect such changes automatically - checking every register
@@ -471,13 +513,14 @@ class Memory:
         Raises `DM41MemoryError` if the program-memory scan cannot safely
         determine program memory's real content -- see
         `ProgramMemory._forward_scan_programs()` for exactly when that
-        happens. Nothing is changed at all if that happens: the scan runs,
-        and can raise, before anything about program memory is touched.
+        happens. All-or-nothing: if anything raises, nothing is changed
+        (see transaction()).
         '''
         before_free = self.status_registers.DotEnd() - self.alarms.end_exclusive
 
-        self.key_assignments.repack()
-        self.programs.repack()
+        with self.transaction():
+            self.key_assignments.repack()
+            self.programs.repack()
 
         after_free = self.status_registers.DotEnd() - self.alarms.end_exclusive
         return after_free - before_free

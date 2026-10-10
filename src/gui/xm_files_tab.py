@@ -84,19 +84,6 @@ def _guess_file_type(lines: list) -> str:
     return "Data"
 
 
-def _xm_file_to_add_kwargs(f):
-    """The (name, file_type, kwargs) ExtendedMemory.add_file() needs to
-    recreate Data/ASCII file `f` exactly as it currently is -- used by
-    _save_new_or_edited_file() to restore a file it had to remove before
-    discovering the replacement was invalid. Only covers the two types
-    _EDITABLE_FILE_TYPES allows editing in the first place (Program files
-    never reach this path)."""
-    name = f.name.rstrip()
-    if f.file_type == ExtendedMemory.TYPE_DATA:
-        return name, f.file_type, {"data_lines": f.get_data_lines()}
-    return name, f.file_type, {"records": f.get_records()}
-
-
 class XMFilesTab(ctk.CTkFrame):
     """Renders the extended-memory file list for a Memory object. Call
     `render(memory)` whenever the buffer changes."""
@@ -278,63 +265,31 @@ class XMFilesTab(ctk.CTkFrame):
 
     # -- Add / Edit / Remove ------------------------------------------------
 
-    def _save_new_or_edited_file(
-        self, name, file_type, kwargs, *, replacing_addr=None, replacing_file=None
-    ):
+    def _save_new_or_edited_file(self, name, file_type, kwargs, *, replacing_addr=None):
         """Shared save path for Add, Import, and Edit -- all three end up
         calling ExtendedMemory.add_file() with the same kind of kwargs
         (see XMFileDialog); Edit additionally removes the file being
-        replaced first (see _edit_file()).
+        replaced first (`replacing_addr`).
 
-        `replacing_file` (the pre-edit XMFile, when this is an edit) is
-        used only to roll back a rejected replacement below -- the
-        remove-then-add order itself is required, not just historical:
-        add_file()'s duplicate-name check only allows editing a file
-        under its own unchanged name because the old entry is already
-        gone by the time that check runs (see add_file()'s docstring).
-        So a bad edit (an over-length line, a name that fails validation,
-        no room left, ...) leaves the old file already removed when
-        add_file() raises; without restoring it here, the buffer would be
-        missing a file the user never asked to remove, while this tab's
-        Treeview still showed its old (now-stale) row and header_addr.
-
-        The restore content is captured *before* anything is touched
-        below, not read lazily from `replacing_file` inside the except
-        block: XMFile.get_data_lines()/get_records() re-read live
-        registers at `replacing_file.segments` on every call, and
-        remove_file()'s rebuild overwrites exactly those addresses with
-        whatever files remain -- reading them after the fact would
-        silently "restore" a neighboring file's content instead."""
+        Editing is remove-then-add, in that order: add_file()'s
+        duplicate-name check only allows saving a file under its own
+        unchanged name because the old entry is already gone (see
+        add_file()'s docstring). Both steps run in one Memory.transaction(),
+        so a rejected edit (an over-length line, a bad name, no room left,
+        ...) leaves extended memory exactly as it was, original file
+        included, and the Treeview's rows still match it."""
         xm = self._xm()
-        restore = _xm_file_to_add_kwargs(replacing_file) if replacing_file else None
         try:
-            if replacing_addr is not None:
-                # Editing is implemented as remove-then-add (see
-                # ExtendedMemory.remove_file()'s docstring): there's no
-                # in-place content resize, so the edited file is rebuilt
-                # fresh and ends up positioned after whatever files
-                # remain, rather than keeping its original slot.
-                xm.remove_file(replacing_addr)
-            xm.add_file(name, file_type, **kwargs)
+            with self._memory.transaction():
+                if replacing_addr is not None:
+                    # No in-place resize: the edited file is rebuilt fresh
+                    # and ends up after whatever files remain, rather than
+                    # keeping its original slot.
+                    xm.remove_file(replacing_addr)
+                xm.add_file(name, file_type, **kwargs)
         except (ValueError, DM41MemoryError) as e:
             verb = "save" if replacing_addr is not None else "add"
             logger.warning("Could not %s XM file %r: %s", verb, name, e)
-            if restore is not None:
-                try:
-                    restore_name, restore_type, restore_kwargs = restore
-                    xm.add_file(restore_name, restore_type, **restore_kwargs)
-                except (ValueError, DM41MemoryError) as restore_error:
-                    logger.error(
-                        "Could not restore XM file %r after a failed edit "
-                        "-- it has been lost: %s",
-                        restore[0],
-                        restore_error,
-                    )
-                # Re-render either way: whatever extended memory now
-                # actually contains, the Treeview's rows (keyed by each
-                # file's header_addr) must match it before the user can
-                # select anything again.
-                self.render(self._memory)
             messagebox.showerror(f"Could Not {verb.title()} File", str(e))
             return
         logger.info(
@@ -429,11 +384,7 @@ class XMFilesTab(ctk.CTkFrame):
 
         def save(name, file_type, kwargs):
             self._save_new_or_edited_file(
-                name,
-                file_type,
-                kwargs,
-                replacing_addr=header_addr,
-                replacing_file=existing,
+                name, file_type, kwargs, replacing_addr=header_addr
             )
 
         XMFileDialog(self, save, existing=existing)
