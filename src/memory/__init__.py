@@ -98,6 +98,8 @@ for readability. The current components are:
                     lacks); the check before Send to a DM41L. Plus
                     evaluate_mode_switch(), the errors-only subset asked
                     before opening a state in a mode (phase 6)
+  atomic_write.py  atomic_write_text() -- replace a text file in one step,
+                    used for state files and the preferences file
   memory.py        Memory (the top-level state: parsing, serialization,
                     raw register access, whole-state pack(), and the
                     region lookup -- Memory.region(key) plus the named
@@ -162,6 +164,7 @@ from .program_chain import (
     encode_chain_marker,
 )
 from .memory import Memory
+from .atomic_write import atomic_write_text
 from .profile_fit import (
     ERROR,
     WARNING,
@@ -229,6 +232,7 @@ __all__ = [
     "decode_label_name",
     "encode_chain_marker",
     "Memory",
+    "atomic_write_text",
     "ERROR",
     "WARNING",
     "ProfileFinding",

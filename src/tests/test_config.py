@@ -209,3 +209,31 @@ def test_a_saved_mode_survives_a_restart(prefs_file):
     second = ProjectConfig()
     second.load()
     assert second.mode is DeviceMode.DM41L
+
+
+def test_failed_save_leaves_the_existing_prefs_file_intact(prefs_file, monkeypatch):
+    """save() is atomic: if the final replace fails, the old preferences
+    file is untouched (not truncated) and no temporary file is left."""
+    prefs_file.write_text(json.dumps({"baudrate": 115200}))
+    config = ProjectConfig()
+    config.load()
+    config.baudrate = 9600
+
+    def fail(src, dst):
+        raise OSError("replace failed")
+
+    monkeypatch.setattr(os, "replace", fail)
+    with pytest.raises(Exception, match="Could not save preferences"):
+        config.save()
+
+    assert json.loads(prefs_file.read_text()) == {"baudrate": 115200}
+    assert [p.name for p in prefs_file.parent.iterdir()] == [prefs_file.name]
+
+
+def test_save_writes_the_same_json_as_before(prefs_file):
+    config = ProjectConfig()
+    config.baudrate = 9600
+    config.save()
+    assert prefs_file.read_text(encoding="utf-8") == json.dumps(
+        config.get_all(), indent=2
+    )

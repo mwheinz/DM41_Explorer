@@ -9,7 +9,7 @@ import json
 import logging
 from pathlib import Path
 
-from memory import DEFAULT_MODE, DeviceMode
+from memory import DEFAULT_MODE, DeviceMode, atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -80,8 +80,9 @@ class ProjectConfig:
             self._prefs = prefs
 
         try:
-            with open(self.PREFS_FILE, "w", encoding="utf-8") as f:
-                json.dump(self._prefs, f, indent=2)
+            # Atomic, so a failed save can't leave a truncated file that
+            # then stops the preferences loading at the next start.
+            atomic_write_text(self.PREFS_FILE, json.dumps(self._prefs, indent=2))
         except Exception as e:
             raise Exception(
                 f"Error: Could not save preferences to {self.PREFS_FILE}"

@@ -16,6 +16,7 @@ from contextlib import contextmanager
 from typing import Dict, Optional, Union
 from pathlib import Path
 
+from .atomic_write import atomic_write_text
 from .registers import Register
 from .device_profile import DeviceProfile, DM41L
 from .constants import (
@@ -286,10 +287,13 @@ class Memory:
 
     def to_file(self, path: Union[str, Path]):
         '''Write the state to disk (convenience wrapper over to_string())
-        and clear the modified flag.'''
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(self.to_string())
-        self._modified=False
+        and clear the modified flag.
+
+        The write is atomic (see atomic_write.py): a failure part-way
+        through leaves any existing file at `path` untouched instead of
+        truncated, and the modified flag set.'''
+        atomic_write_text(path, self.to_string())
+        self._modified = False
 
     # -- Raw register access ---------------------------------------------
 
