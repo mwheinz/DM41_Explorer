@@ -1086,3 +1086,25 @@ def test_serial_thread_errors_are_handled_by_the_engine_pump(dm41l_app):
     assert dm41l_app.serial.get_next_error() is None
     # The error dialog is deferred; the pump reschedules itself.
     assert after.call_count == 2
+
+
+def test_auto_fetch_keeps_the_reading_status_until_the_state_arrives(connected_app):
+    """With nothing loaded, connecting fetches the calculator's state and the
+    status bar says so -- it must not be overwritten straight away by
+    "Connected to ...", which made the fetch look finished."""
+    connected_app.serial.serial_inst = mock.Mock(port="/dev/tty.test")
+    with mock.patch.object(connected_app, "after") as after:
+        connected_app._fetch_memory_state()
+
+    assert connected_app._status_label.cget("text") == "Reading memory state..."
+    after.assert_called_once()
+
+
+def test_auto_fetch_is_skipped_when_a_state_is_already_loaded(connected_app):
+    connected_app.serial.serial_inst = mock.Mock(port="/dev/tty.test")
+    connected_app.memory.is_modified()  # sets the modified flag
+    with mock.patch.object(connected_app, "after") as after:
+        connected_app._fetch_memory_state()
+
+    assert connected_app._status_label.cget("text") == "Connected to /dev/tty.test"
+    after.assert_not_called()

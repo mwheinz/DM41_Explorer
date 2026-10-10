@@ -1134,10 +1134,10 @@ class DM41ExplorerApp(ctk.CTk):
                     self._on_command_error,
                 ),
             )
+            return
 
-        # We've already got a modified memory state loaded. Just return.
+        # A file or edited buffer is already loaded: keep it, don't fetch.
         self._set_status(f"Connected to {self.serial.serial_inst.port}")
-        return
 
     def _on_auto_state_received(self, state):
         # Re-check right at the moment the fetched state is about to be
