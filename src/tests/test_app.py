@@ -1072,3 +1072,17 @@ def test_the_mode_is_shown_before_the_connection_status(app):
     left = [w for w in bar.winfo_children() if w.pack_info().get("side") == "left"]
     assert left.index(app._mode_label) < left.index(app._status_label)
     assert left.index(app._status_label) < left.index(app._modified_label)
+
+
+def test_serial_thread_errors_are_handled_by_the_engine_pump(dm41l_app):
+    """A fatal error from SerialManager's background thread is queued, and
+    the app picks it up from its own Tk-thread pump instead of the
+    background thread calling into Tk directly."""
+    dm41l_app.serial.error_queue.put("Serial communications failure: boom")
+    with mock.patch.object(dm41l_app, "after") as after:
+        dm41l_app._pump_engine()
+
+    assert dm41l_app._status_label.cget("text") == dm41l_app._idle_status()
+    assert dm41l_app.serial.get_next_error() is None
+    # The error dialog is deferred; the pump reschedules itself.
+    assert after.call_count == 2

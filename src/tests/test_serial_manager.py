@@ -165,3 +165,21 @@ class TestSerialManager:
             manager._run_loop()
 
         assert manager.is_connected is False
+
+    def test_run_loop_failure_is_queued_for_the_ui_thread(self, manager, mock_serial):
+        """A fatal failure is reported through error_queue, never by calling
+        into the UI from the background thread (Tk isn't thread-safe)."""
+        manager.serial_inst = mock_serial
+        manager.is_connected = True
+        manager.outgoing_queue.put("boom\n")
+        mock_serial.write.side_effect = OSError("device unplugged")
+
+        with patch("time.sleep"):
+            manager._run_loop()
+
+        error = manager.get_next_error()
+        assert "device unplugged" in error
+        assert manager.get_next_error() is None
+
+    def test_get_next_error_empty(self, manager):
+        assert manager.get_next_error() is None

@@ -6,7 +6,6 @@ import threading
 import queue
 import time
 import logging
-from typing import Optional, Callable
 import serial
 import serial.tools.list_ports
 
@@ -29,15 +28,17 @@ class SerialManager:
 
     profile: DeviceProfile = DM41L
 
-    def __init__(self, error_callback: Optional[Callable[[str], None]] = None):
+    def __init__(self):
         self.serial_inst = None
         self._thread = None
         self._stop_event = threading.Event()
 
         self.incoming_queue = queue.Queue()  # Data coming from device -> UI
         self.outgoing_queue = queue.Queue()  # Commands from UI -> device
-
-        self._error_callback = error_callback
+        # Fatal errors from the background thread -> UI. Queued rather than
+        # delivered by callback because the background thread must never
+        # touch Tk; the UI drains this from its own thread (get_next_error).
+        self.error_queue = queue.Queue()
         self.is_connected = False
 
     def get_available_ports(self):
@@ -105,6 +106,14 @@ class SerialManager:
         except queue.Empty:
             return None
 
+    def get_next_error(self):
+        """Public method for the UI thread to retrieve a fatal error message
+        reported by the background thread, or None if there is none."""
+        try:
+            return self.error_queue.get_nowait()
+        except queue.Empty:
+            return None
+
     def _run_loop(self):
         """The main loop running in the background thread."""
         error_msg = None
@@ -148,5 +157,5 @@ class SerialManager:
                     logger.exception("Failed to close serial port during cleanup.")
             self.is_connected = False
             logger.info("Serial connection terminated.")
-            if error_msg and self._error_callback:
-                self._error_callback(error_msg)
+            if error_msg:
+                self.error_queue.put(error_msg)

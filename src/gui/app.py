@@ -268,7 +268,7 @@ class DM41ExplorerApp(ctk.CTk):
         # config and never the connection.
         self.mode = self.config_store.mode
 
-        self.serial = SerialManager(error_callback=self._handle_serial_error)
+        self.serial = SerialManager()
         self.engine = CommandEngine(self.serial)
         self.memory = Memory(profile=self.profile)
         self.memory_source = None
@@ -474,14 +474,11 @@ class DM41ExplorerApp(ctk.CTk):
         logger.error("Serial error: %s", msg)
         self._set_status(self._idle_status())
         self._command_pending = False
-        # No self.serial.disconnect() call here (unlike the other error
-        # handlers below): this callback runs directly on SerialManager's
-        # own background thread (see _run_loop's error_callback invocation),
-        # and disconnect() calls self._thread.join(), which raises
-        # RuntimeError if a thread tries to join itself. SerialManager
-        # already closes its own port handle and clears is_connected before
-        # invoking this callback -- see serial_manager.py's _run_loop -- so
-        # there's nothing left to clean up from here.
+        # Runs on the main Tk thread: _pump_engine() drains SerialManager's
+        # error queue, which its background thread fills after it has
+        # already closed its own port handle and cleared is_connected -- so
+        # there's nothing left to disconnect here. The dialog is deferred
+        # for the same reentrancy reason as _on_command_error's.
         self.after(0, lambda: messagebox.showerror("Error", "Disconnected."))
 
     # -- Window size ------------------------------------------------------
@@ -1012,6 +1009,9 @@ class DM41ExplorerApp(ctk.CTk):
                 pass
         except Exception as e:
             logger.error("Engine pump error: %s", e)
+        error = self.serial.get_next_error()
+        if error is not None:
+            self._handle_serial_error(error)
         self.after(ENGINE_POLL_MS, self._pump_engine)
 
     # -- Connection -------------------------------------------------------
@@ -1082,8 +1082,7 @@ class DM41ExplorerApp(ctk.CTk):
     def _on_verify_failed(self, message: str):
         # This callback runs on the main Tk thread (via the engine pump in
         # _pump_engine), so it's safe to call disconnect() directly here --
-        # unlike _handle_serial_error above, which runs on SerialManager's
-        # own background thread and can't join itself.
+        # the same as every other engine and serial error handler.
         if self.serial.is_connected:
             self.serial.disconnect()
         self._set_status(self._idle_status())
