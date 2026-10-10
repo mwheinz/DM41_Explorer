@@ -1,8 +1,8 @@
 """
 Tests for importing a standalone HP-41 program (as decoded by
 program_files.decode_program_raw()/decode_program_dat(), or straight from
-Memory.get_program_bytes()) into a live Memory as the newest program --
-Memory.import_program() (memory/memory.py), built on the byte-level chain
+ProgramMemory.get_program_bytes()) into a live Memory as the newest program --
+ProgramMemory.import_program() (memory/program_memory.py), built on the byte-level chain
 parsing in memory/program_chain.py (see test_program_chain.py).
 
 This is the write-side counterpart to test_program_export.py: rather than

@@ -35,14 +35,14 @@ class State(Enum):
 def find_program_end(data: bytes) -> Optional[int]:  # pylint: disable=too-many-branches
     '''
     Scans `data` (raw program bytes, starting at a global label's own
-    header -- see Memory.get_program_bytes()) forward, opcode by opcode,
+    header -- see ProgramMemory.get_program_bytes()) forward, opcode by opcode,
     for this program's own terminating END marker.
 
     Returns the number of bytes from the start of `data` through
     that END marker's 3rd byte, inclusive. This is the program's total
     byte length, the same number CAT 1 reports. Returns None if `data` is
     exhausted before a terminating END is found (the program doesn't fit
-    in the bytes given -- see Memory.get_program_bytes() for how the
+    in the bytes given -- see ProgramMemory.get_program_bytes() for how the
     caller bounds this against program memory's actual floor).
     '''
     state = State.BYTE1

@@ -1,7 +1,7 @@
 """
 Tests for exporting a named program (global label) out of main program
-memory as a standalone HP-41 program file -- Memory.get_program_bytes()
-(memory/memory.py), the forward opcode scanner it's built on
+memory as a standalone HP-41 program file -- ProgramMemory.get_program_bytes()
+(memory/program_memory.py), the forward opcode scanner it's built on
 (memory/opcode_scan.py, find_program_end()), and the RAW/DAT file
 encoders (memory/program_files.py).
 
@@ -204,14 +204,14 @@ def test_encode_program_dat_rejects_oversized_program():
 # /r=tower.raw` and `/d=tower.dat`) and added the results as test fixtures.
 # tower.txt's first real line is a LOCAL numbered label ("LBL 21"), not a
 # global alpha label -- exactly the real-world case that showed
-# Memory.get_program_bytes() originally (and wrongly) required a named
+# ProgramMemory.get_program_bytes() originally (and wrongly) required a named
 # global label to export a program at all; see
 # test_get_program_bytes_recovers_a_program_with_no_label_at_all() and
 # test_get_program_bytes_finds_a_real_unnamed_program_mid_chain() above,
 # which exercise that fix directly against real .dm41 states.
 #
 # tower.{raw,dat} aren't themselves loaded into any .dm41 state fixture,
-# so they can't drive Memory.get_program_bytes() end to end -- but they're
+# so they can't drive ProgramMemory.get_program_bytes() end to end -- but they're
 # an excellent real-world check on the lower-level pieces that fix relies
 # on: decoding both files must recover identical instruction bytes,
 # find_program_end() must confirm they form exactly one well-formed

@@ -3,12 +3,14 @@ Byte-level parsing/encoding of the HP-41 "global chain" marker format
 (docs/program.md sec 5.1/5.2), operating directly on a plain `bytes` buffer
 rather than register-addressed `Memory` state.
 
-`Memory._decode_chain_marker()`/`_decode_label_name()` (memory.py) do the
-same decoding, but only against live registers via `Memory._addr_for()`/
-`_pos_for()`. `Memory.import_program()` needs the same decoding applied to a
-standalone RAW/DAT-decoded instruction-byte blob (program_files.py) *before*
-it's spliced into program memory at all -- there's no register addressing
-to lean on yet at that point, just the bytes themselves.
+This is the one implementation of that decoding. `ProgramMemory`
+(program_memory.py) uses it for live registers too: its
+`_decode_chain_marker()`/`_decode_label_name()` read the bytes forward from
+program memory (`read_bytes_forward()`) and hand them to the functions
+here. `ProgramMemory.import_program()` applies it directly to a standalone
+RAW/DAT-decoded instruction-byte blob (program_files.py) *before* it's
+spliced into program memory at all -- there's no register addressing to
+lean on yet at that point, just the bytes themselves.
 
 Marker format (docs/program.md sec 5.1/5.2), 3 bytes, in on-calculator
 forward reading order (data[index] is the highest-address/first-read byte):
@@ -23,7 +25,7 @@ byte 0/1 together encode `distance_registers`/`bbb`; byte 2 ("third_byte"
 here) means something different depending on whether this marker is a
 label or not, and is never touched by import_program()'s own splicing
 logic except to flip a `.END.`-turned-real-`END`'s high nibble -- see
-Memory.import_program().
+ProgramMemory.import_program().
 '''
 
 from dataclasses import dataclass, replace
@@ -86,9 +88,10 @@ def decode_chain_marker(data: bytes, index: int) -> Optional[ChainMarker]:
 
 
 def decode_label_name(data: bytes, index: int, length: int) -> tuple:
-    '''Byte-buffer counterpart to `Memory._decode_label_name()` -- decodes
-    a global label's key-assignment byte and name given where its 4-byte
-    header starts in `data`. Returns (name, key_assignment).'''
+    '''Decodes a global label's name and key-assignment byte given where
+    its 4-byte header starts in `data` (docs/program.md sec 5.2).
+    Non-printable name bytes come back as "?". Returns
+    (name, key_assignment).'''
     end = index + 4 + max(length, 0)
     combined = data[index:end]
     key_assignment = combined[3]
@@ -141,13 +144,14 @@ def walk_chain(data: bytes) -> list:
     '''
     Walks `data`'s own internal global chain backward, starting from its
     trailing 3-byte marker (`data[-3:]` -- every well-formed single-program
-    byte blob, per `Memory.get_program_bytes()`/`decode_program_raw()`/
+    byte blob, per `ProgramMemory.get_program_bytes()`/`decode_program_raw()`/
     `decode_program_dat()`, ends in one), and following each marker's own
-    `bbb`/`distance_registers` field exactly as `Memory.list_global_chain()`
-    does against live registers -- except entirely within `data`'s own
-    bounds, using byte index instead of absolute address (index increases
-    in the same forward-reading direction `Memory._read_bytes_forward()`
-    uses, i.e. toward the *end* of `data`).
+    `bbb`/`distance_registers` field exactly as
+    `ProgramMemory.list_global_chain()` does against live registers --
+    except entirely within `data`'s own bounds, using byte index instead
+    of absolute address (index increases in the same forward-reading
+    direction `ProgramMemory.read_bytes_forward()` uses, i.e. toward the
+    *end* of `data`).
 
     Returns a list of ChainMarkers with `index` (and, for a label,
     `name`/`key_assignment`) filled in, ordered
@@ -155,7 +159,7 @@ def walk_chain(data: bytes) -> list:
     and `result[-1]` is the *outermost* one -- the marker whose own
     distance field pointed *outside* `data` (or reported no predecessor at
     all, i.e. `bbb == distance_registers == 0`) in `data`'s original
-    source memory. `Memory.import_program()` is the only caller that needs
+    source memory. `ProgramMemory.import_program()` is the only caller that needs
     this: `result[-1]` is exactly the marker whose distance field has to
     be recomputed to link into the *destination* memory instead (every
     other entry's distance is an internal, position-independent

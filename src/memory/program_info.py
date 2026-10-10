@@ -1,10 +1,10 @@
 '''
 ProgramInfo: one entry ("chain link") found while walking the global
-label/END chain in program memory -- see Memory.list_global_chain() in
-memory.py, and docs/program.md sec 5, for the full derivation.
+label/END chain in program memory -- see ProgramMemory.list_global_chain() in
+program_memory.py, and docs/program.md sec 5, for the full derivation.
 
 ProgramLabel/Program: the grouped, END-delimited view built on top of that
-chain -- what Memory.list_programs() returns, and what the Program tab and
+chain -- what ProgramMemory.list_programs() returns, and what the Program tab and
 program export actually work with. See docs/program.md sec 5.3 for why
 this grouping is necessary at all (a program is not required to have a
 global label, or may have several) and Program's own docstring below.
@@ -19,9 +19,9 @@ class ProgramInfo:
     linked list of every global alpha label and END marker in program
     memory, described in docs/program.md sec 5 (reverse-engineered from
     sample states and Wickes' "Synthetic Programming on the HP-41C",
-    section 2C). This is the raw, per-marker view (Memory.list_global_chain());
+    section 2C). This is the raw, per-marker view (ProgramMemory.list_global_chain());
     for the grouped, "one row per real program" view most callers actually
-    want, see Program/Memory.list_programs() below and docs/program.md sec
+    want, see Program/ProgramMemory.list_programs() below and docs/program.md sec
     5.3.
 
     `name` is set for a global alpha label -- what CAT 1 shows as a program's
@@ -130,7 +130,7 @@ class ProgramLabel:
 class Program:
     '''
     One real, END-delimited program in program memory -- see
-    `Memory.list_programs()` and docs/program.md sec 5.3.
+    `ProgramMemory.list_programs()` and docs/program.md sec 5.3.
 
     Programs are told apart by explicit plain END markers, NOT by global
     labels: an HP-41 program is not required to have one at all, and may have

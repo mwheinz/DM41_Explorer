@@ -76,7 +76,7 @@ def decode_program_raw(data: bytes) -> bytes:
     Recovers a program's instruction bytes from an HP41 RAW file
     (`encode_program_raw()`'s own format). RAW carries no length header
     of its own, so this uses `find_program_end()` -- the same forward
-    opcode scan `Memory.get_program_bytes()` uses -- to find where the
+    opcode scan `ProgramMemory.get_program_bytes()` uses -- to find where the
     compiled code ends and the checksum trailer begins, then verifies
     that checksum byte.
 

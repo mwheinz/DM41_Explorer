@@ -1,5 +1,5 @@
 """
-Tests for Memory.remove_program() -- GitHub issue #6 ("add the ability to
+Tests for ProgramMemory.remove_program() -- GitHub issue #6 ("add the ability to
 remove programs"; Export/Import already covered "add"/"edit", see
 test_program_export.py/test_program_import.py, this is the last of the
 three). Also exercises the shared _rebuild_program_memory() helper this

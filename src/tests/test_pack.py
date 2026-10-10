@@ -6,7 +6,7 @@ call (see _encode_key_assignment_entries()'s docstring); pack() re-runs
 that explicitly and does the equivalent for program memory.
 
 Program memory itself is handled by _forward_scan_programs() +
-_rebuild_program_memory() (the latter shared with Memory.remove_program()
+_rebuild_program_memory() (the latter shared with ProgramMemory.remove_program()
 -- see test_program_remove.py for that other caller). _forward_scan_programs()
 is the part that matters most here: per the user's own correction to this
 method's first version ("Packing needs to (re)build the program chain so

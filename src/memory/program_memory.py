@@ -32,6 +32,7 @@ from .opcode_scan import (
 from .program_chain import (
     ChainMarker,
     decode_chain_marker,
+    decode_label_name,
     encode_chain_marker,
     walk_chain,
 )
@@ -147,19 +148,16 @@ class ProgramMemory(MemoryRegion):
         return decode_chain_marker(self.read_bytes_forward(reg, offset, 3), 0)
 
     def _decode_label_name(self, reg: int, offset: int, length: int) -> tuple:
-        '''Decodes a global label's key-assignment byte and name, given
-        where its 4-byte header starts -- docs/program.md sec 5.2. Reading
-        the header and name in one continuous forward pass (rather than as
-        two separate reads) is what makes a name longer than 3 characters
-        correctly spill into the preceding register: `read_bytes_forward`
-        only wraps registers within a single call. Returns
+        '''Decodes a global label's name and key-assignment byte, given
+        where its 4-byte header starts -- docs/program.md sec 5.2 -- by
+        reading the header and name forward and handing them to
+        `program_chain.decode_label_name()`. They are read in one
+        continuous pass so a name longer than 3 characters correctly
+        spills into the preceding register (`read_bytes_forward` only
+        wraps registers within a single call). Returns
         (name, key_assignment).'''
-        combined = self.read_bytes_forward(reg, offset, 4 + max(length, 0))
-        key_assignment = combined[3]
-        name = "".join(
-            chr(b) if 0x20 <= b <= 0x7E else "?" for b in combined[4:]
-        )
-        return name, key_assignment
+        data = self.read_bytes_forward(reg, offset, 4 + max(length, 0))
+        return decode_label_name(data, 0, length)
 
     def list_global_chain(self) -> list:
         '''

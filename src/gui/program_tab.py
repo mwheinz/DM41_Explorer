@@ -3,9 +3,9 @@ Programs tab: a read-only listing of the real, END-delimited programs in
 program memory -- one row per program, matching how many programs CAT 1
 would actually show, NOT one row per global label or per raw chain marker.
 See docs/program.md sec 5.3 for the full derivation and memory.py's
-Memory.list_programs() / Program / ProgramLabel for the implementation
+ProgramMemory.list_programs() / Program / ProgramLabel for the implementation
 this renders (built on top of the raw chain walk,
-Memory.list_global_chain() / ProgramInfo, described in sec 5).
+ProgramMemory.list_global_chain() / ProgramInfo, described in sec 5).
 
 A program is delimited by an explicit plain END marker, never by a global
 label: an HP-41 program can have zero, one, or several labels (the Labels
@@ -29,7 +29,7 @@ be exported to a standalone HP-41 program file (RAW, DAT, PPC, or TXT
 format -- see memory/program_files.py), so there is one selection-driven
 action button, "Export...".
 
-Export uses Memory.get_program_bytes() (memory/memory.py) -- the exact
+Export uses ProgramMemory.get_program_bytes() (memory/program_memory.py) -- the exact
 bytes CAT 1 would report for that program, from its own first instruction
 through its own terminator (an explicit END, or the permanent `.END.` for
 the single newest program). A program with more than one global label
@@ -39,7 +39,7 @@ separate per-label slices.
 
 Import is the write side, not selection-driven -- a standalone RAW/DAT/
 PPC/TXT file is always spliced in as the newest program
-(Memory.import_program(), memory/memory.py), the only place it can safely
+(ProgramMemory.import_program(), memory/program_memory.py), the only place it can safely
 go without a much riskier "insert in the middle of the chain" algorithm
 (see that method's own docstring for the full splicing rules -- converting
 a `.END.`-terminated newest program into a real closing END,
@@ -56,7 +56,7 @@ since all four formats converge on the same instruction bytes.
 Remove (GitHub issue #6 -- "add the ability to remove programs", the last
 of "add"/"edit"/"remove" to land, after Export/Import already covered
 "add"/"edit") IS selection-driven, unlike Import: it deletes the selected
-row's own program (Memory.remove_program()) and closes up whatever gap
+row's own program (ProgramMemory.remove_program()) and closes up whatever gap
 that leaves behind, so every other program stays exactly as contiguous as
 before -- this works for any program, not just the newest, unlike Import.
 Any key assignment(s) the removed program's own label(s) held are cleared
@@ -245,7 +245,7 @@ class ProgramTab(ctk.CTkFrame):
 
     def _export_selected(self):
         """Exports the selected row's own program bytes
-        (Memory.get_program_bytes() -- this module's docstring) as a
+        (ProgramMemory.get_program_bytes() -- this module's docstring) as a
         standalone HP-41 program file, in whichever of RAW/DAT (hp41uc's
         own formats), PPC (not an hp41uc format), or TXT (a plain-text
         keystroke listing, memory/program_text.py -- also not an hp41uc
@@ -343,7 +343,7 @@ class ProgramTab(ctk.CTkFrame):
         whichever the chosen filename's extension picks --
         memory/program_files.py)
         and splices it into program memory as the newest program
-        (Memory.import_program()). Not selection-driven -- there's no
+        (ProgramMemory.import_program()). Not selection-driven -- there's no
         "insert at this row" concept for an Import, only "add as the
         newest program" (see this module's own docstring)."""
         if self._memory is None:
@@ -432,7 +432,7 @@ class ProgramTab(ctk.CTkFrame):
         currently selected -- same pattern as gui/xm_files_tab.py's own
         _remove_selected()/_remove_file(). Unlike Import, this is
         selection-driven: any program can be removed, not just the
-        newest one (Memory.remove_program() closes up the gap that
+        newest one (ProgramMemory.remove_program() closes up the gap that
         leaves behind, wherever it is -- see that method's docstring)."""
         if self._memory is None:
             messagebox.showwarning(
@@ -447,11 +447,11 @@ class ProgramTab(ctk.CTkFrame):
         self._remove_program(program)
 
     def _remove_program(self, program):
-        """Confirms and removes `program` (Memory.remove_program()) --
+        """Confirms and removes `program` (ProgramMemory.remove_program()) --
         the write-side counterpart to _export_selected(). Mentions any
         key assignment(s) the program's own label(s) hold up front in the
         confirmation, since removing it clears them (see
-        Memory.remove_program()'s own docstring)."""
+        ProgramMemory.remove_program()'s own docstring)."""
         assignment_note = ""
         if any(label.key_assignment for label in program.labels):
             assignment_note = (

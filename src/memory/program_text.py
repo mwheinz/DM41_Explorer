@@ -1168,7 +1168,7 @@ def decode_program_txt(text: str) -> bytes:
     Compiles a plain-text keystroke listing (as produced by
     `encode_program_txt()`, or an hp41uc/community-authored `.txt` file
     such as `src/tests/data/tower.txt` itself) back into one program's
-    raw instruction bytes, ready for `Memory.import_program()` (per
+    raw instruction bytes, ready for `ProgramMemory.import_program()` (per
     docs/program_text_io_plan.md sec 4.3/sec 5: packing is a separate,
     already-implemented, user-invoked operation and is never this
     function's job).

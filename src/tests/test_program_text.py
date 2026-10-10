@@ -309,7 +309,7 @@ def _normalize_memory_state_fields(data: bytes) -> bytes:
         links happened to exist in that memory layout, which
         decode_program_txt() has no way to reconstruct (nor should it
         try to -- linking a state's own chain to memory it's about to be
-        spliced into is exactly what Memory.import_program()'s own
+        spliced into is exactly what ProgramMemory.import_program()'s own
         pack()/_forward_scan_programs() repair mechanism already
         handles, per docs/program.md sec 5.4, and belongs there, not in
         a text compiler).

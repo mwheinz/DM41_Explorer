@@ -59,7 +59,7 @@ for readability. The current components are:
   opcode_scan.py   find_program_end() -- forward HP-41 opcode-length
                     scanner (ported from hp41uc's seek_end(), see
                     ~/Work/hp41uc/Source/decomp.c), used by
-                    Memory.get_program_bytes() to find one named
+                    ProgramMemory.get_program_bytes() to find one named
                     program's own byte range for export
   program_files.py encode_program_raw/encode_program_dat and
                     decode_program_raw/decode_program_dat -- hp41uc-
@@ -74,7 +74,7 @@ for readability. The current components are:
                     (walk_chain/decode_chain_marker/decode_label_name/
                     encode_chain_marker) operating on a plain bytes
                     buffer rather than register-addressed Memory state --
-                    what Memory.import_program() (memory.py) uses to
+                    what ProgramMemory.import_program() (program_memory.py) uses to
                     inspect/patch a standalone program's bytes before
                     splicing them into program memory
   program_text.py  encode_program_txt()/decode_program_txt() -- converts

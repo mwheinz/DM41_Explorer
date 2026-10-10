@@ -1,7 +1,7 @@
 """
 Tests for memory/program_chain.py -- byte-level global-chain marker
 parsing/encoding, operating on a plain bytes buffer rather than register-
-addressed Memory state. This is the piece Memory.import_program() (see
+addressed Memory state. This is the piece ProgramMemory.import_program() (see
 test_program_import.py) uses to inspect and patch a standalone program's
 bytes before splicing them into program memory.
 """
