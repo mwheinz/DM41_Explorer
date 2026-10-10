@@ -1073,7 +1073,7 @@ class DM41ExplorerApp(ctk.CTk):
                                  f"{self.config_store.PREFS_FILE}, {e}")
         self._set_status(f"Connected to {port} -- verifying...")
 
-        self.engine.execute(
+        self._execute_command(
             BatteryCheckCommand(timeout=2.0),
             self._on_startup_battery,
             self._on_verify_failed,
@@ -1102,7 +1102,7 @@ class DM41ExplorerApp(ctk.CTk):
         self._set_status(f"Connected to {self.serial.serial_inst.port}")
         self.after(
             10,
-            lambda: self.engine.execute(
+            lambda: self._execute_command(
                 ConsoleTimeoutCommand([self.config_store.console_timeout_minutes]),
                 self._on_timeout_command,
                 self._on_command_error,
@@ -1113,7 +1113,7 @@ class DM41ExplorerApp(ctk.CTk):
         logger.info("Timeout: %s", result)
         self.after(
             10,
-            lambda: self.engine.execute(
+            lambda: self._execute_command(
                 GetTimeCommand(), self._on_startup_time, self._on_command_error
             ),
         )
@@ -1128,7 +1128,7 @@ class DM41ExplorerApp(ctk.CTk):
             self._set_status("Reading memory state...")
             self.after(
                 10,
-                lambda: self.engine.execute(
+                lambda: self._execute_command(
                     MemoryStringCommand(),
                     self._on_auto_state_received,
                     self._on_command_error,
@@ -1168,6 +1168,29 @@ class DM41ExplorerApp(ctk.CTk):
             self._on_command_error(f"Failed to parse memory state: {e}")
 
     # -- Command callbacks -------------------------------------------------
+
+    def _execute_command(self, command, on_success, on_error) -> bool:
+        """Runs `command` on the engine, which refuses it while another
+        command is still in progress. A refused command is reported to the
+        user and the status bar is put back, rather than the request being
+        dropped silently while the status still claims it is under way.
+        Returns whether the command was accepted -- a caller with a
+        follow-up step (Send's trigger_transfer()) must check it."""
+        if self.engine.execute(command, on_success, on_error):
+            return True
+        logger.warning(
+            "%s not sent: another command is still in progress.",
+            type(command).__name__,
+        )
+        if self.serial.is_connected:
+            self._set_status(f"Connected to {self.serial.serial_inst.port}")
+        else:
+            self._set_status(self._idle_status())
+        messagebox.showwarning(
+            "Busy",
+            "Another command is still in progress. Please wait a moment and try again.",
+        )
+        return False
 
     def _on_command_error(self, message: str):
         logger.error("%s", message)
@@ -1253,7 +1276,7 @@ class DM41ExplorerApp(ctk.CTk):
             return
         now = datetime.now()
         args = [now.strftime("%Y%m%d"), now.strftime("%H%M%S")]
-        self.engine.execute(
+        self._execute_command(
             SetTimeCommand(args), self._on_time_set, self._on_command_error
         )
 
@@ -1469,18 +1492,8 @@ class DM41ExplorerApp(ctk.CTk):
         state_text = self.memory.to_string()
 
         command = LoadMemoryStringCommand([state_text], serial=self.serial)
-        accepted = self.engine.execute(
-            command,
-            self._on_state_sent,
-            self._on_io_failed,
-        )
-        if not accepted:
-            messagebox.showwarning(
-                "Busy",
-                "Another command is still in progress. Please wait a moment and try again.",
-            )
-            return
-        command.trigger_transfer()
+        if self._execute_command(command, self._on_state_sent, self._on_io_failed):
+            command.trigger_transfer()
 
     def _on_state_sent(self, result):
         logger.info("State sent: %s", result)
@@ -1506,7 +1519,7 @@ class DM41ExplorerApp(ctk.CTk):
         self._set_status("Reading memory state...")
         self.after(
             10,
-            lambda: self.engine.execute(
+            lambda: self._execute_command(
                 MemoryStringCommand(), self._on_state_received, self._on_io_failed
             ),
         )

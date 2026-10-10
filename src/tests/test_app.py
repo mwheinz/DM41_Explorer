@@ -1107,3 +1107,64 @@ def test_auto_fetch_is_skipped_when_a_state_is_already_loaded(connected_app):
 
     assert connected_app._status_label.cget("text") == "Connected to /dev/tty.test"
     after.assert_not_called()
+
+
+# -- A command refused because the engine is busy is reported -------------
+
+
+@pytest.fixture
+def busy_app(dm41l_app):
+    """A connected app whose engine refuses every command, as it does while
+    another command is still in progress. after() runs its callback at
+    once, so deferred commands are attempted inside the test."""
+    dm41l_app.serial.is_connected = True
+    dm41l_app.serial.serial_inst = mock.Mock(port="/dev/tty.test")
+    with mock.patch.object(
+        dm41l_app.engine, "execute", return_value=False
+    ) as execute, mock.patch.object(
+        dm41l_app, "after", side_effect=lambda ms, fn=None: fn() if fn else None
+    ), mock.patch("gui.app.messagebox.showwarning") as warning:
+        dm41l_app.execute = execute
+        dm41l_app.warning = warning
+        yield dm41l_app
+
+
+def _assert_reported_busy(app):
+    app.execute.assert_called_once()
+    app.warning.assert_called_once()
+    assert app.warning.call_args.args[0] == "Busy"
+    # The status no longer claims the refused command is under way.
+    assert app._status_label.cget("text") == "Connected to /dev/tty.test"
+
+
+def test_busy_get_state_is_reported_and_the_status_restored(busy_app):
+    busy_app.get_state_from_calculator()
+    _assert_reported_busy(busy_app)
+
+
+def test_busy_auto_fetch_is_reported_and_the_status_restored(busy_app):
+    busy_app._fetch_memory_state()
+    _assert_reported_busy(busy_app)
+
+
+def test_busy_set_time_is_reported(busy_app):
+    busy_app.set_calculator_time()
+    _assert_reported_busy(busy_app)
+
+
+def test_busy_startup_step_is_reported(busy_app):
+    busy_app._on_timeout_command("Console timeout set")
+    _assert_reported_busy(busy_app)
+
+
+def test_busy_send_is_reported_and_nothing_is_transferred(busy_app):
+    busy_app.memory = Memory.from_file(DATA_DIR / "6x-xm.dm41", profile=DM41L)
+    with mock.patch(
+        "gui.app.messagebox.askyesno", return_value=True
+    ), mock.patch(
+        "gui.app.LoadMemoryStringCommand.trigger_transfer"
+    ) as transfer:
+        busy_app.send_state_to_calculator()
+
+    _assert_reported_busy(busy_app)
+    transfer.assert_not_called()
