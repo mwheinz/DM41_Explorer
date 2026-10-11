@@ -59,15 +59,28 @@ class ProfileFinding:
     """One thing in a memory state that does not fit a model.
 
     `level` is ERROR or WARNING. `location` says where it was found
-    ("Extended memory", 'Program "TEST", step 3', "Key 12 (unshifted)") and
-    `message` says what is wrong there. str() joins them for display."""
+    ("Extended memory", 'Program "TEST"', "Key 12 (unshifted)"), `step` is
+    the program step within it, if any, and `message` says what is wrong
+    there. str() joins them for a log line ('Program "TEST", step 3: ...');
+    format_findings() groups them for a dialog."""
 
     level: str
     location: str
     message: str
+    step: Optional[int] = None
+
+    @property
+    def detail(self) -> str:
+        """The finding without its location: "step 3: X<I>Y is not
+        built into a DM41L", or just the message when there is no step."""
+        if self.step is None:
+            return self.message
+        return f"step {self.step}: {self.message}"
 
     def __str__(self) -> str:
-        return f"{self.location}: {self.message}"
+        if self.step is None:
+            return f"{self.location}: {self.message}"
+        return f"{self.location}, step {self.step}: {self.message}"
 
 
 def check_profile_fit(memory: Memory, profile: DeviceProfile) -> List[ProfileFinding]:
@@ -93,9 +106,24 @@ def check_profile_fit(memory: Memory, profile: DeviceProfile) -> List[ProfileFin
 
 
 def format_findings(findings: List[ProfileFinding], limit: int = 12) -> str:
-    """`findings` as a bulleted list for a dialog, one line each, cut off
-    after `limit` with a count of how many more there are."""
-    lines = [f"- {finding}" for finding in findings[:limit]]
+    """`findings` for a dialog (GitHub issue #55): each location once, as a
+    heading, with a bullet for each finding there under it. Findings at
+    the same location are grouped only when they are next to each other,
+    so the order is kept. The list is cut off after `limit` findings, with
+    a count of how many more there are.
+
+        Program "TWR":
+        - step 60: TRNG is not built into a DM41L
+        Key 14 (unshifted):
+        - XROM 25,00 is not built into a DM41L
+    """
+    lines = []
+    location = None
+    for finding in findings[:limit]:
+        if finding.location != location:
+            location = finding.location
+            lines.append(f"{location}:")
+        lines.append(f"- {finding.detail}")
     if len(findings) > limit:
         lines.append(f"...and {len(findings) - limit} more.")
     return "\n".join(lines)
@@ -272,9 +300,7 @@ def _check_instructions(
             if pair not in profile.builtin_xroms:
                 findings.append(
                     ProfileFinding(
-                        WARNING,
-                        f"{where}, step {step}",
-                        _xrom_message(pair, profile),
+                        WARNING, where, _xrom_message(pair, profile), step=step
                     )
                 )
     return findings

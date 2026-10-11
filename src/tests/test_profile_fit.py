@@ -187,15 +187,14 @@ def test_xrom_program_lists_each_dm41x_function_with_its_step():
     assert [f.message for f in findings] == [
         f"{name} is not built into a DM41L" for name in expected_names
     ]
-    assert [f.location for f in findings] == [
-        f'Program "DM41X", step {step}' for step in range(3, 21)
-    ]
+    assert {f.location for f in findings} == {'Program "DM41X"'}
+    assert [f.step for f in findings] == list(range(3, 21))
 
 
 def test_ed_dollar_is_not_reported_because_a_dm41l_has_ed():
     findings = check_profile_fit(_load("xrom.d41"), DM41L)
     # Step 2 of the program is ED$; the warnings start at step 3 (X<I>Y).
-    assert 'Program "DM41X", step 2' not in [f.location for f in findings]
+    assert 2 not in [f.step for f in findings]
     assert not any(f.message.split()[0] == "ED" for f in findings)
 
 
@@ -221,7 +220,8 @@ def test_xm_program_files_are_checked_too():
     (finding,) = check_profile_fit(memory, DM41L)
 
     assert finding.level == WARNING
-    assert finding.location == 'XM file "PROG", step 2'
+    assert finding.location == 'XM file "PROG"'
+    assert finding.step == 2
     assert finding.message == "LKAOFF is not built into a DM41L"
 
 
@@ -231,7 +231,7 @@ def test_a_number_is_one_step_not_one_per_digit():
     (finding,) = check_profile_fit(memory, DM41L)
 
     # LBL, 12.5 (four bytes), STO 01, LKAOFF.
-    assert finding.location == 'XM file "PROG", step 4'
+    assert finding.step == 4
 
 
 def test_an_xrom_outside_the_cx_modules_is_reported_by_number():
@@ -262,7 +262,7 @@ def test_unlabelled_program_is_located_by_address():
 
     (finding,) = check_profile_fit(memory, DM41L)
 
-    assert finding.location == "Unlabelled program at 0x19b:0, step 4"
+    assert str(finding).startswith("Unlabelled program at 0x19b:0, step 4: ")
     assert finding.message == "LKAOFF is not built into a DM41L"
 
 
@@ -314,33 +314,49 @@ def test_a_finding_prints_its_location_then_its_message():
     assert str(finding) == "Key 12 (unshifted): LKAOFF is not built in"
 
 
-def test_format_findings_makes_a_bulleted_list():
+def test_a_finding_with_a_step_prints_it_after_the_location():
+    finding = ProfileFinding(WARNING, 'Program "TWR"', "TRNG is not built in", 60)
+    assert str(finding) == 'Program "TWR", step 60: TRNG is not built in'
+    assert finding.detail == "step 60: TRNG is not built in"
+
+
+def test_format_findings_groups_findings_under_their_location():
+    """GitHub issue #55: each program or key once, as a heading, with a
+    bullet for each finding there."""
     findings = [
+        ProfileFinding(WARNING, 'Program "TWR"', "TRNG is not built into a DM41L", 60),
+        ProfileFinding(WARNING, 'Program "TWR"', "TRNG is not built into a DM41L", 282),
         ProfileFinding(
-            WARNING, "Key 11 (unshifted)", "LKAON is not built into a DM41L"
+            WARNING, "Key 14 (unshifted)", "XROM 25,00 is not built into a DM41L"
         ),
         ProfileFinding(
             WARNING, "Key 12 (unshifted)", "LKAOFF is not built into a DM41L"
         ),
     ]
-    assert format_findings(findings) == (
-        "- Key 11 (unshifted): LKAON is not built into a DM41L\n"
-        "- Key 12 (unshifted): LKAOFF is not built into a DM41L"
-    )
+    assert format_findings(findings).splitlines() == [
+        'Program "TWR":',
+        "- step 60: TRNG is not built into a DM41L",
+        "- step 282: TRNG is not built into a DM41L",
+        "Key 14 (unshifted):",
+        "- XROM 25,00 is not built into a DM41L",
+        "Key 12 (unshifted):",
+        "- LKAOFF is not built into a DM41L",
+    ]
 
 
 def test_format_findings_cuts_a_long_list_and_counts_the_rest():
-    findings = [ProfileFinding(WARNING, f"Step {n}", "x") for n in range(1, 6)]
+    findings = [ProfileFinding(WARNING, "Program", "x", n) for n in range(1, 6)]
 
     text = format_findings(findings, limit=3)
 
     assert text.splitlines() == [
-        "- Step 1: x",
-        "- Step 2: x",
-        "- Step 3: x",
+        "Program:",
+        "- step 1: x",
+        "- step 2: x",
+        "- step 3: x",
         "...and 2 more.",
     ]
-    assert format_findings(findings, limit=5).count("\n") == 4  # nothing cut
+    assert format_findings(findings, limit=5).count("\n") == 5  # nothing cut
     assert format_findings([]) == ""
 
 

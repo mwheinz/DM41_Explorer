@@ -8,6 +8,7 @@ Tcl/Tk itself -- so building a new app per test made this file take
 minutes. Requires a display (Xvfb in CI).
 """
 
+import contextlib
 import json
 import time
 from pathlib import Path
@@ -27,6 +28,17 @@ from gui.overview_tab import xm_total_registers
 
 def _write_prefs(path, **prefs):
     path.write_text(json.dumps({"log_directory": str(path.parent / "logs"), **prefs}))
+
+
+@pytest.fixture(autouse=True)
+def no_unexpected_questions(monkeypatch):
+    """ask_yes_no() opens a real dialog and waits for a click, which would
+    hang the run. A test that expects the question patches it itself,
+    inside this one."""
+    monkeypatch.setattr(
+        "gui.app.ask_yes_no",
+        mock.Mock(side_effect=AssertionError("unexpected ask_yes_no() question")),
+    )
 
 
 @pytest.fixture(scope="module")
@@ -241,7 +253,7 @@ def _send(app, name, *, answer=True):
     app.memory_source = DATA_DIR / name
     with (
         mock.patch("gui.app.messagebox.showerror") as error,
-        mock.patch("gui.app.messagebox.askyesno", return_value=answer) as confirm,
+        mock.patch("gui.app.ask_yes_no", return_value=answer) as confirm,
     ):
         app.send_state_to_calculator()
     return error, confirm
@@ -268,12 +280,17 @@ def test_send_lists_what_a_dm41l_cannot_run_and_sends_only_on_yes(
 
     error.assert_not_called()
     confirm.assert_called_once()
-    _title, message = confirm.call_args.args
+    parent, _title, message = confirm.call_args.args
+    assert parent is connected_app
     assert message.startswith(ORIGINAL_CONFIRMATION[: -len(" Continue?")])
-    assert "These will not work on a DM41L:" in message
-    assert '- Program "DM41X", step 3: X<I>Y is not built into a DM41L' in message
+    # Grouped under the program, which is named once (GitHub issue #55).
+    assert (
+        'These will not work on a DM41L:\n\nProgram "DM41X":\n'
+        "- step 3: X<I>Y is not built into a DM41L\n"
+    ) in message
+    assert message.count('Program "DM41X"') == 1
     # 18 warnings; the dialog shows 12 and counts the rest.
-    assert '- Program "DM41X", step 14:' in message
+    assert "- step 14:" in message
     assert "step 15" not in message
     assert "...and 6 more." in message
     assert message.endswith("Send it anyway?")
@@ -283,9 +300,9 @@ def test_send_lists_what_a_dm41l_cannot_run_and_sends_only_on_yes(
 def test_send_lists_key_assignments_a_dm41l_cannot_run(connected_app):
     _error, confirm = _send(connected_app, "dm41x_xrom_keys.d41")
 
-    _title, message = confirm.call_args.args
-    assert "- Key 12 (unshifted): LKAOFF is not built into a DM41L" in message
-    assert "- Key 11 (unshifted): LKAON is not built into a DM41L" in message
+    _parent, _title, message = confirm.call_args.args
+    assert "Key 12 (unshifted):\n- LKAOFF is not built into a DM41L" in message
+    assert "Key 11 (unshifted):\n- LKAON is not built into a DM41L" in message
 
 
 @pytest.mark.parametrize(
@@ -305,7 +322,9 @@ def test_send_of_a_state_that_fits_asks_the_usual_question(
     error, confirm = _send(connected_app, state)
 
     error.assert_not_called()
-    confirm.assert_called_once_with("Send State to Calculator", ORIGINAL_CONFIRMATION)
+    confirm.assert_called_once_with(
+        connected_app, "Send State to Calculator", ORIGINAL_CONFIRMATION
+    )
     connected_app.sent.assert_called_once()
 
 
@@ -610,12 +629,24 @@ def test_connect_menu_command_returns_before_the_dialog_blocks(dm41l_app):
 # application's own sequence.
 
 
+@contextlib.contextmanager
+def _answer(value):
+    """Answers every question with `value`: the native discard prompt
+    (messagebox.askyesno) and the mode question (ask_yes_no, GitHub issue
+    #55). Yields the ask_yes_no mock, whose call is the mode question."""
+    with (
+        mock.patch("gui.app.messagebox.askyesno", return_value=value),
+        mock.patch("gui.app.ask_yes_no", return_value=value) as ask,
+    ):
+        yield ask
+
+
 def _yes():
-    return mock.patch("gui.app.messagebox.askyesno", return_value=True)
+    return _answer(True)
 
 
 def _no():
-    return mock.patch("gui.app.messagebox.askyesno", return_value=False)
+    return _answer(False)
 
 
 @pytest.mark.parametrize("mode, profile", [("DM41X", DM41X), ("DM41L", DM41L)])
@@ -688,10 +719,11 @@ def test_the_discard_guard_runs_before_the_switch_confirmation(app):
 
 
 def test_the_switch_confirmation_names_the_consequence(app):
-    with mock.patch("gui.app.messagebox.askyesno", return_value=False) as ask:
+    with _no() as ask:
         app.set_mode(DeviceMode.DM41L, persist=True)
 
-    message = ask.call_args.args[1]
+    parent, title, message = ask.call_args.args
+    assert (parent, title) == (app, "Switch Mode")
     assert "starts a new, empty memory state" in message
     assert "export" in message, "says how to move data between models"
 
@@ -723,7 +755,7 @@ def test_a_too_large_state_offers_dm41x_mode_and_loads_on_yes(dm41l_app):
     with _yes() as ask:
         dm41l_app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
 
-    message = ask.call_args.args[1]
+    message = ask.call_args.args[2]
     assert "does not fit a DM41L" in message
     assert "XM files use memory a DM41L does not have" in message
     assert dm41l_app.mode is DeviceMode.DM41X
@@ -833,11 +865,11 @@ def test_switching_mode_while_connected_warns_and_disconnects_only_on_yes(
     dm41l_app.serial.is_connected = True
     with (
         mock.patch.object(dm41l_app, "disconnect") as disconnect,
-        mock.patch("gui.app.messagebox.askyesno", return_value=confirm) as ask,
+        _answer(confirm) as ask,
     ):
         assert dm41l_app.set_mode(DeviceMode.DM41X, persist=True) is confirm
 
-    assert "serial connection will be closed" in ask.call_args.args[1]
+    assert "serial connection will be closed" in ask.call_args.args[2]
     assert disconnect.called is confirm
 
 
@@ -850,7 +882,7 @@ def test_switching_mode_while_connected_warns_and_disconnects_only_on_yes(
 def test_preferences_can_change_the_mode_if_the_switch_is_confirmed(
     app, confirm, expected
 ):
-    with mock.patch("gui.app.messagebox.askyesno", return_value=confirm):
+    with _answer(confirm):
         app._on_preferences_saved(requested_mode=DeviceMode.DM41L)
 
     assert app.mode is expected
@@ -1058,7 +1090,7 @@ def test_a_command_refused_as_busy_is_reported_and_the_status_restored(
 def test_busy_send_is_reported_and_nothing_is_transferred(busy_app):
     busy_app.memory = Memory.from_file(DATA_DIR / "6x-xm.dm41", profile=DM41L)
     with (
-        mock.patch("gui.app.messagebox.askyesno", return_value=True),
+        mock.patch("gui.app.ask_yes_no", return_value=True),
         mock.patch("gui.app.LoadMemoryStringCommand.trigger_transfer") as transfer,
     ):
         busy_app.send_state_to_calculator()

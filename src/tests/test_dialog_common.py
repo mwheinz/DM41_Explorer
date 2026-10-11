@@ -17,7 +17,14 @@ pytest.importorskip("customtkinter")
 
 import customtkinter as ctk
 
-from gui.dialog_common import build_dialog_button_row, _is_multiline_text_widget
+from gui.dialog_common import (
+    CONFIRM_DIALOG_WIDTH,
+    ConfirmDialog,
+    _is_multiline_text_widget,
+    ask_yes_no,
+    build_dialog_button_row,
+    scaled,
+)
 
 
 def _buttons_by_text(widget) -> dict:
@@ -202,3 +209,73 @@ def test_return_inside_textbox_does_not_trigger_primary_action(dialog):
     dialog.update()
 
     on_primary.assert_not_called()
+
+
+# -- ConfirmDialog / ask_yes_no (GitHub issue #55) ----------------------------
+
+_FINDINGS = (
+    "These will not work on a DM41L:\n\n"
+    'Program "TWR":\n'
+    "- step 416: TRNG is not built into a DM41L\n"
+    "Key 14 (unshifted):\n"
+    "- XROM 25,00 is not built into a DM41L\n\n"
+    "Send it anyway?"
+)
+
+
+@pytest.fixture
+def confirm(root):
+    dialog = ConfirmDialog(root, "Send State to Calculator", _FINDINGS)
+    yield dialog
+    if dialog.winfo_exists():
+        dialog.destroy()
+
+
+def test_confirm_dialog_shows_the_whole_message_and_title(confirm):
+    assert confirm.title() == "Send State to Calculator"
+    assert confirm._message.cget("text") == _FINDINGS
+
+
+def test_confirm_dialog_wraps_only_at_its_wide_width(confirm):
+    """The point of the dialog: wider than a native alert, so a finding's
+    line does not wrap."""
+    assert confirm._message.cget("wraplength") == scaled(CONFIRM_DIALOG_WIDTH)
+    confirm.update_idletasks()
+    width = confirm._reverse_window_scaling(confirm.winfo_reqwidth())
+    assert width >= CONFIRM_DIALOG_WIDTH
+
+
+def test_confirm_dialog_yes_answers_true(confirm):
+    _buttons_by_text(confirm)["Yes"].invoke()
+    assert confirm.result is True
+    assert not confirm.winfo_exists()
+
+
+def test_confirm_dialog_no_answers_false(confirm):
+    _buttons_by_text(confirm)["No"].invoke()
+    assert confirm.result is False
+    assert not confirm.winfo_exists()
+
+
+def test_confirm_dialog_escape_answers_false(confirm):
+    # Same as the Return test above: a key event needs a mapped, focused
+    # window to land on.
+    if not _show(confirm):
+        pytest.skip("dialog never became viewable, so it cannot take a key")
+    confirm.focus_force()
+    confirm.update()
+    confirm.event_generate("<Escape>")
+    confirm.update()
+    assert confirm.result is False
+    assert not confirm.winfo_exists()
+
+
+def test_ask_yes_no_returns_the_dialog_answer(root):
+    def answer_yes(dialog):
+        _buttons_by_text(dialog)["Yes"].invoke()
+
+    with mock.patch.object(root, "wait_window", side_effect=answer_yes):
+        assert ask_yes_no(root, "Question", "Really?") is True
+
+    with mock.patch.object(root, "wait_window", side_effect=lambda dialog: None):
+        assert ask_yes_no(root, "Question", "Really?") is False

@@ -36,6 +36,7 @@ from engine.commands import (
 
 from config import ProjectConfig
 from gui.contrast import SECONDARY_TEXT, WARNING_TEXT, improve_theme_contrast
+from gui.dialog_common import ask_yes_no
 from gui.tab_common import ui_font
 from gui.window_geometry import initial_window_size, minimum_window_size, parse_geometry
 from gui.port_dialog import PortSelectionDialog
@@ -441,7 +442,9 @@ class DM41ExplorerApp(ctk.CTk):
             "switching and import them afterwards."
         )
         lines.append(f"Switch to {mode.value} mode?")
-        if not messagebox.askyesno("Switch Mode", "\n\n".join(lines)):
+        # Wider than messagebox.askyesno(), for the list of findings an
+        # auto-switch's `reason` carries (GitHub issue #55).
+        if not ask_yes_no(self, "Switch Mode", "\n\n".join(lines)):
             return False
 
         if connected:
@@ -1435,7 +1438,9 @@ class DM41ExplorerApp(ctk.CTk):
             )
         else:
             message += " Continue?"
-        if not messagebox.askyesno("Send State to Calculator", message):
+        # Not messagebox.askyesno(): on macOS that box is too narrow for
+        # the list, which then wraps on every line (GitHub issue #55).
+        if not ask_yes_no(self, "Send State to Calculator", message):
             return
 
         state_text = self.memory.to_string()

@@ -5,6 +5,7 @@ buttons the same way instead of each hand-rolling a slightly different
 pack() order that drifts apart over time -- GitHub issue #13.
 """
 
+import platform
 import tkinter as tk
 import customtkinter as ctk
 
@@ -159,3 +160,68 @@ def build_dialog_button_row(
     dialog.bind("<Return>", _on_return)
 
     return row, primary_button
+
+
+# Wide enough at the default font for a line like
+# '- step 416: XROM 25,00 is not built into a DM41L' and its heading
+# not to wrap (GitHub issue #55).
+CONFIRM_DIALOG_WIDTH = 560
+
+
+class ConfirmDialog(ctk.CTkToplevel):
+    """A modal Yes/No question with room for a list (GitHub issue #55).
+
+    tkinter's messagebox.askyesno() is the platform's own alert, and on
+    macOS that is a narrow box the application cannot widen, so a list of
+    findings wraps on nearly every line. This one is an ordinary dialog:
+    the text wraps at CONFIRM_DIALOG_WIDTH (scaled with the application
+    font), Yes is the default button (Return), and No, Escape or closing
+    the window all answer no. `result` holds the answer once it closes;
+    ask_yes_no() is the usual way to use it."""
+
+    def __init__(self, master, title: str, message: str, width=CONFIRM_DIALOG_WIDTH):
+        super().__init__(master)
+        self.result = False
+        self.title(title)
+        self.resizable(False, False)
+        self.transient(master)
+        if platform.system() == "Darwin" and hasattr(master, "_menubar"):
+            self.config(menu=master._menubar)
+
+        # The label is the full width even when every line is short, so
+        # the dialog is the same size whatever the message.
+        self._message = ctk.CTkLabel(
+            self,
+            text=message,
+            justify="left",
+            anchor="w",
+            width=scaled(width),
+            wraplength=scaled(width),
+        )
+        self._message.pack(padx=20, pady=(20, 8), anchor="w")
+        _row, yes = build_dialog_button_row(
+            self,
+            primary_text="Yes",
+            on_primary=self._on_yes,
+            cancel_text="No",
+            pack_kwargs={"padx": 20, "pady": (12, 20), "fill": "x"},
+        )
+        self.bind("<Escape>", lambda _event: self.destroy())
+        self.protocol("WM_DELETE_WINDOW", self.destroy)
+
+        fit_dialog(self, width + 40)
+        self.grab_set()
+        yes.focus_set()
+
+    def _on_yes(self):
+        self.result = True
+        self.destroy()
+
+
+def ask_yes_no(master, title: str, message: str) -> bool:
+    """Asks `message` in a ConfirmDialog over `master` and waits for the
+    answer: True for Yes, False for anything else. A drop-in for
+    messagebox.askyesno() where the message is long or a list."""
+    dialog = ConfirmDialog(master, title, message)
+    master.wait_window(dialog)
+    return dialog.result
