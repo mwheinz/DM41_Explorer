@@ -352,11 +352,17 @@ def _shipped_builtins() -> Dict[str, XromLibrary]:
     return builtins
 
 
-def builtin_xrom_names(model: Optional[str] = None) -> Dict[Tuple[int, int], str]:
-    """(byte1, byte2) -> display name for each function built into `model`
-    (section headers left out, as they are never named in a program). With
-    no `model`, every model's, merged -- what the instruction registry
-    knows whatever the mode. Raises XromLibraryError if two models' built-in
+def builtin_xrom_names(
+    model: Optional[str] = None, *, headers: bool = False
+) -> Dict[Tuple[int, int], str]:
+    """(byte1, byte2) -> display name for each function built into `model`.
+    With no `model`, every model's, merged -- what the instruction registry
+    knows whatever the mode.
+
+    Section headers are left out unless `headers` is true: they are never
+    matched by name, so the registry must not know them, but they are in
+    the calculator's ROM -- a key can hold one (XROM 25,00, the DM41X's
+    hidden CRT?, issue #58) -- so a model's built-in set includes them. Raises XromLibraryError if two models' built-in
     libraries give the same function different names, which would make a
     name depend on the mode. Returns a new dict each time."""
     models = KNOWN_MODELS if model is None else (model,)
@@ -364,7 +370,7 @@ def builtin_xrom_names(model: Optional[str] = None) -> Dict[Tuple[int, int], str
     for each in models:
         library = _shipped_builtins()[each]
         for function in library.functions():
-            if function.header:
+            if function.header and not headers:
                 continue
             previous = names.setdefault(function.code, function.name)
             if previous != function.name:

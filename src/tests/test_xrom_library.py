@@ -115,12 +115,17 @@ def test_builtin_xrom_names_returns_a_fresh_dict():
     assert len(builtin_xrom_names("DM41L")) == 95
 
 
-def test_builtin_xrom_names_leaves_out_section_headers(monkeypatch):
+def test_builtin_xrom_names_leaves_out_section_headers_unless_asked(monkeypatch):
     library = parse_library(_minimal())
     monkeypatch.setattr(
         xrom_library, "_shipped_builtins", lambda: {"DM41L": library, "DM41X": library}
     )
     assert builtin_xrom_names() == {(0xA2, 0xC1): "FOO", (0xA2, 0xC2): "BAR"}
+    assert builtin_xrom_names("DM41X", headers=True) == {
+        (0xA2, 0xC0): "MY ROM 1A",
+        (0xA2, 0xC1): "FOO",
+        (0xA2, 0xC2): "BAR",
+    }
 
 
 def test_builtin_libraries_that_disagree_on_a_name_are_refused(monkeypatch):

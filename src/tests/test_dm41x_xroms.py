@@ -36,6 +36,7 @@ from memory.mnemonics import (
     entries,
     function_op,
     is_dm41x_only,
+    is_known,
     key_bytes_for,
     resolve,
     xrom_op,
@@ -126,10 +127,37 @@ def test_dm41l_has_only_the_original_cx_xroms():
     assert len(DM41L.builtin_xroms) == 95
 
 
-def test_dm41x_has_the_cx_xroms_and_its_additions():
-    assert DM41X.builtin_xroms == frozenset(ALL_XROMS)
-    assert DM41X.builtin_xroms - DM41L.builtin_xroms == frozenset(DM41X_ADDED)
+def test_dm41x_has_the_cx_xroms_its_additions_and_its_section_headers():
+    assert DM41X.builtin_xroms == frozenset(ALL_XROMS) | frozenset(DM41X_HEADERS)
+    assert DM41X.builtin_xroms - DM41L.builtin_xroms == frozenset(
+        DM41X_ADDED
+    ) | frozenset(DM41X_HEADERS)
     assert DM41L.builtin_xroms < DM41X.builtin_xroms
+
+
+# The DM41X's CAT 2 section headers, read off a real DM41X (issue #58) and
+# placed in the five gaps of its built-in library's numbering.
+DM41X_HEADERS = {
+    (0xA6, 0x40): "-EXT FCN 2X",  # XROM 25,00, the hidden CRT?
+    (0xA6, 0x70): "-CXX XT FCN",  # 25,48
+    (0xA6, 0x80): "-TIME 2X",  # 26,00
+    (0xA6, 0x9E): "-CXX TIME",  # 26,30
+    (0xA6, 0xA5): "-DM 41X-",  # 26,37
+}
+
+
+def test_the_section_headers_are_built_in_but_not_names():
+    """A header is in the ROM -- a key can hold XROM 25,00 -- but is never
+    matched by name, so the registry does not know it."""
+    with_headers = builtin_xrom_names("DM41X", headers=True)
+    assert {
+        pair: name for pair, name in with_headers.items() if pair not in ALL_XROMS
+    } == DM41X_HEADERS
+    for pair, name in DM41X_HEADERS.items():
+        assert pair in DM41X.builtin_xroms
+        assert not is_known(xrom_op(*pair))
+        with pytest.raises(ValueError):
+            resolve(name)
 
 
 def test_registered_profiles_have_their_xroms():

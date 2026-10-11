@@ -332,7 +332,12 @@ def test_the_two_lists_differ_by_exactly_the_dm41x_additions(root):
     either model's built-in set cannot silently change the picker."""
     wide = _make_dialog(root, profile=DM41X)._function_names
     narrow = _make_dialog(root, profile=DM41L)._function_names
-    added = {ALL_XROMS[code] for code in DM41X.builtin_xroms - DM41L.builtin_xroms}
+    # Section headers are built in but never offered by name.
+    added = {
+        ALL_XROMS[code]
+        for code in DM41X.builtin_xroms - DM41L.builtin_xroms
+        if code in ALL_XROMS
+    }
     assert set(wide) - set(narrow) == added
     assert len(added) == 18
 

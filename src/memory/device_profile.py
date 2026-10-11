@@ -33,7 +33,9 @@ class DeviceProfile:
     functions built into it.
 
     `builtin_xroms` is only about what the *calculator* has: the functions
-    of the model's built-in XROM library (memory/xroms/, GitHub issue #51).
+    of the model's built-in XROM library (memory/xroms/, GitHub issue #51),
+    section headers included -- they are in its ROM, and a key can hold
+    one (XROM 25,00, issue #58).
     The name registry in memory/mnemonics.py always knows every built-in
     library's names, whatever profile is in use, so a program using
     a DM41X function still compiles and decompiles. Something that needs to
@@ -106,7 +108,7 @@ class DeviceProfile:
 DM41L = DeviceProfile(
     "DM41L",
     ((0x40, 0xBF), (0x201, 0x2EF)),
-    frozenset(builtin_xrom_names("DM41L")),
+    frozenset(builtin_xrom_names("DM41L", headers=True)),
     supports_serial=True,
 )
 
@@ -121,7 +123,7 @@ DM41L = DeviceProfile(
 DM41X = DeviceProfile(
     "DM41X",
     ((0x40, 0xBF), (0x201, 0x2EF), (0x301, 0x3EF)),
-    frozenset(builtin_xrom_names("DM41X")),
+    frozenset(builtin_xrom_names("DM41X", headers=True)),
     supports_serial=False,
     loads_modules=True,
 )
