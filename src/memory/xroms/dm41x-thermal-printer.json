@@ -4,7 +4,7 @@
   "id": "dm41x-thermal-printer",
   "title": "Thermal Printer (HP 82143A), preloaded in DM41X flash",
   "part_number": "82143A",
-  "source": "hp41uc (-PRINTER 2E); LIST (29,07) and PRP (29,13) placed by FAT order, not yet confirmed",
+  "source": "hp41uc (-PRINTER 2E); LIST (29,07) and PRP (29,13) confirmed by ASN on a DM41X (issue #56, X4)",
   "builtin_on": [],
   "modules": [
     {
