@@ -23,8 +23,11 @@ a = Analysis(
     ["gui/app.py"],
     pathex=["."],
     binaries=[],
-    # No data files: the Flags tab's names are hardcoded (gui/flag_names.py).
-    datas=[],
+    # The XROM library files (GitHub issue #51): memory/xrom_library.py reads
+    # them from memory/xroms/ next to itself, so they go to that same path
+    # in the bundle. The device profiles are built from them at import time,
+    # so the app cannot start without them.
+    datas=[("memory/xroms/*.json", "memory/xroms")],
     # dm41version.py is generated fresh by build.sh right before this spec
     # runs (see above) -- it's not imported anywhere except gui/app.py's
     # own `try: from dm41version import _version / except ImportError`, so

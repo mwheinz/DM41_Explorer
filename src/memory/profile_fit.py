@@ -41,9 +41,8 @@ from dataclasses import dataclass
 from typing import List, Optional, Tuple
 
 from .device_profile import DeviceProfile, PROFILES
-from .functions import XROM_FUNCTIONS
 from .memory import Memory
-from .mnemonics import XROM_FIRST_BYTES, xrom_text
+from .mnemonics import XROM_FIRST_BYTES, display_for_key_bytes
 from .opcode_scan import NUMBER_ENTRY_FIRST, NUMBER_ENTRY_LAST, iter_instructions
 from .registers import DM41MemoryError
 from .xm_file import XMFile
@@ -270,10 +269,7 @@ def _check_leftover_data(view: Memory, profile: DeviceProfile) -> List[ProfileFi
 def _xrom_message(pair: Tuple[int, int], profile: DeviceProfile) -> str:
     """ "LKAOFF is not built into a DM41L", or the XROM's numbers when the
     function is not one the registry knows."""
-    name = XROM_FUNCTIONS.get(pair)
-    if name is None:
-        name = xrom_text(*pair)
-    return f"{name} is not built into a {profile.name}"
+    return f"{display_for_key_bytes(*pair)} is not built into a {profile.name}"
 
 
 def _check_instructions(

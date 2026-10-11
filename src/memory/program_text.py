@@ -30,7 +30,8 @@ _STACK_REGISTER_NAMES):
      variable-length ALPHA text. This module's own dispatch mirrors
      those exact ranges, so it can never desync from the already-tested
      length scanner.
-  2. `functions.py`'s SINGLE_BYTE_FUNCTIONS/XROM_FUNCTIONS tables --
+  2. `functions.py`'s SINGLE_BYTE_FUNCTIONS table and the built-in XROM
+     libraries (memory/xroms/; once functions.py's XROM_FUNCTIONS) --
      which give the correct in-*program*-byte instruction for every entry at 0x40
      and above, and the correct XROM (0xA6, byte2) table for the two
      ROM modules (Extended Functions, Time) the DM41L emulates. The
@@ -446,8 +447,8 @@ def _decode_xrom(byte1: int, byte2: int) -> str:
     every XROM instance in tower.txt (e.g. "XROM 25,46 ;X<>F"). mm/ff are
     recovered from the two raw bytes via mm = ((byte1 & 0x07) << 2) |
     (byte2 >> 6), ff = byte2 & 0x3F -- a formula confirmed by cross-
-    checking multiple known (byte1, byte2) pairs from functions.py's own
-    XROM_FUNCTIONS table against tower.txt's "mm,ff" comments (SEEKPT,
+    checking multiple known (byte1, byte2) pairs from the built-in XROM
+    table against tower.txt's "mm,ff" comments (SEEKPT,
     ARCLREC, GETKEY, X<>F all check out exactly)."""
     mm, ff = xrom_numbers(byte1, byte2)
     text = f"{canonical(XROM)} {mm:02d},{ff:02d}"  # hp41uc: "%02d" (decomp.c)

@@ -48,7 +48,7 @@ from dataclasses import dataclass
 import customtkinter as ctk
 
 from memory import Memory
-from memory.functions import SINGLE_BYTE_FUNCTIONS, XROM_FUNCTIONS
+from memory.mnemonics import assignable_display_names
 from gui.contrast import SECONDARY_TEXT
 from gui.key_assignment_edit_dialog import KeyAssignmentEditDialog
 from gui.scroll_support import bind_touchpad_scroll
@@ -263,8 +263,8 @@ def layout_placements(layout) -> list:
     return placements
 
 
-def _function_names() -> set:
-    return set(SINGLE_BYTE_FUNCTIONS.values()) | set(XROM_FUNCTIONS.values())
+def _function_names() -> list:
+    return assignable_display_names()
 
 
 def key_button_min_width(font) -> int:

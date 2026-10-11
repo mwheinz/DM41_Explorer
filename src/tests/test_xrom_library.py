@@ -2,9 +2,10 @@
 files, the active set, and the conflict report (GitHub issue #50).
 
 The shipped files themselves are checked here too: they all load, each
-model has exactly one built-in library, and the two built-in libraries say
-exactly what memory/functions.py's tables say, so switching the app over to
-the files (issue #51) cannot change a single name.
+model has exactly one built-in library, and builtin_xrom_names() -- what
+the device profiles and the instruction registry are built from (issue
+#51) -- reads them correctly. test_dm41x_xroms.py pins the built-in
+libraries' contents to what real DM41L and DM41X states confirm.
 """
 
 import copy
@@ -12,7 +13,7 @@ import json
 
 import pytest
 
-from memory.functions import CX_XROM_FUNCTIONS, XROM_FUNCTIONS
+from memory import xrom_library
 from memory.xrom_library import (
     ERROR,
     NOTICE,
@@ -20,6 +21,7 @@ from memory.xrom_library import (
     XromLibraryError,
     active_set,
     builtin_library,
+    builtin_xrom_names,
     find_conflicts,
     load_libraries,
     load_library,
@@ -44,10 +46,12 @@ def _by_id(libraries):
 
 
 def _pairs(library):
-    """(byte1, byte2) -> name, the encoding functions.py uses."""
+    """(byte1, byte2) -> name for every function that isn't a header,
+    worked out here independently of XromFunction.code."""
     return {
         (0xA0 + f.module // 4, (f.module % 4) << 6 | f.function): f.name
         for f in library.functions()
+        if not f.header
     }
 
 
@@ -96,10 +100,45 @@ def test_each_model_has_exactly_its_own_builtin_library(shipped):
     assert builtin_library(shipped, "DM41X").id == "dm41x-cx"
 
 
-def test_builtin_libraries_match_functions_tables(shipped):
+def test_builtin_xrom_names_reads_each_models_library(shipped):
     libraries = _by_id(shipped)
-    assert _pairs(libraries["hp41cx"]) == CX_XROM_FUNCTIONS
-    assert _pairs(libraries["dm41x-cx"]) == XROM_FUNCTIONS
+    assert builtin_xrom_names("DM41L") == _pairs(libraries["hp41cx"])
+    assert builtin_xrom_names("DM41X") == _pairs(libraries["dm41x-cx"])
+    # The DM41X's library includes the DM41L's, so merged they are the
+    # DM41X's.
+    assert builtin_xrom_names() == builtin_xrom_names("DM41X")
+
+
+def test_builtin_xrom_names_returns_a_fresh_dict():
+    names = builtin_xrom_names("DM41L")
+    names.clear()
+    assert len(builtin_xrom_names("DM41L")) == 95
+
+
+def test_builtin_xrom_names_leaves_out_section_headers(monkeypatch):
+    library = parse_library(_minimal())
+    monkeypatch.setattr(
+        xrom_library, "_shipped_builtins", lambda: {"DM41L": library, "DM41X": library}
+    )
+    assert builtin_xrom_names() == {(0xA2, 0xC1): "FOO", (0xA2, 0xC2): "BAR"}
+
+
+def test_builtin_libraries_that_disagree_on_a_name_are_refused(monkeypatch):
+    """One function must not have two names depending on the mode."""
+    first = parse_library(_minimal())
+    data = _minimal(id="other", title="Other")
+    data["modules"][0]["functions"][1]["name"] = "FOO2"
+    second = parse_library(data)
+    monkeypatch.setattr(
+        xrom_library, "_shipped_builtins", lambda: {"DM41L": first, "DM41X": second}
+    )
+    with pytest.raises(XromLibraryError, match="XROM 11,01 is FOO in one"):
+        builtin_xrom_names()
+
+
+def test_xrom_function_code_matches_the_encoding():
+    function = parse_library(_minimal()).modules[0].functions[1]  # XROM 11,01
+    assert function.code == (0xA2, 0xC1)
 
 
 def test_a_library_spanning_two_xrom_numbers(shipped):

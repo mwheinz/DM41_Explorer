@@ -7,9 +7,13 @@ ASN, etc..)
 
 Names are the HP-41's own display names (docs/mnemonic_dialects_plan.md
 sec 3.2): only the glyphs the HP-41 can show (Σ, ≠, ↑), never later
-models' → or ≤. These tables are raw data; memory/mnemonics.py builds the
+models' → or ≤. This table is raw data; memory/mnemonics.py builds the
 instruction-name registry (display/canonical names, input spellings) on
-top of them, and everything else should go through that module.
+top of it, and everything else should go through that module.
+
+XROM functions are not here: each model's built-in XROMs, and every other
+ROM's, are in the XROM library files (memory/xroms/, read by
+memory/xrom_library.py; GitHub issue #51).
 """
 
 # Single raw function byte -> function name, for every built-in HP-41
@@ -132,140 +136,3 @@ SINGLE_BYTE_FUNCTIONS = {
     0xD0: "GTO",
     0xE0: "XEQ",
 }
-
-# (byte1, byte2) -> function name, for every Extended Functions ROM (25,xx)
-# and Time ROM (26,xx) function built into the original HP-41CX (and so the
-# DM41L) -- confirmed encoding, docs sec 4.8. The DM41X's additions are in
-# DM41X_XROM_FUNCTIONS below; XROM_FUNCTIONS is the union of the two.
-CX_XROM_FUNCTIONS = {
-    (0xA6, 0x41): "ALENG",
-    (0xA6, 0x42): "ANUM",
-    (0xA6, 0x43): "APPCHR",
-    (0xA6, 0x44): "APPREC",
-    (0xA6, 0x45): "ARCLREC",
-    (0xA6, 0x46): "AROT",
-    (0xA6, 0x47): "ATOX",
-    (0xA6, 0x48): "CLFL",
-    (0xA6, 0x49): "CLKEYS",
-    (0xA6, 0x4A): "CRFLAS",
-    (0xA6, 0x4B): "CRFLD",
-    (0xA6, 0x4C): "DELCHR",
-    (0xA6, 0x4D): "DELREC",
-    (0xA6, 0x4E): "EMDIR",
-    (0xA6, 0x4F): "FLSIZE",
-    (0xA6, 0x50): "GETAS",
-    (0xA6, 0x51): "GETKEY",
-    (0xA6, 0x52): "GETP",
-    (0xA6, 0x53): "GETR",
-    (0xA6, 0x54): "GETREC",
-    (0xA6, 0x55): "GETRX",
-    (0xA6, 0x56): "GETSUB",
-    (0xA6, 0x57): "GETX",
-    (0xA6, 0x58): "INSCHR",
-    (0xA6, 0x59): "INSREC",
-    (0xA6, 0x5A): "PASN",
-    (0xA6, 0x5B): "PCLPS",
-    (0xA6, 0x5C): "POSA",
-    (0xA6, 0x5D): "POSFL",
-    (0xA6, 0x5E): "PSIZE",
-    (0xA6, 0x5F): "PURFL",
-    (0xA6, 0x60): "RCLFLAG",
-    (0xA6, 0x61): "RCLPT",
-    (0xA6, 0x62): "RCLPTA",
-    (0xA6, 0x63): "REGMOVE",
-    (0xA6, 0x64): "REGSWAP",
-    (0xA6, 0x65): "SAVEAS",
-    (0xA6, 0x66): "SAVEP",
-    (0xA6, 0x67): "SAVER",
-    (0xA6, 0x68): "SAVERX",
-    (0xA6, 0x69): "SAVEX",
-    (0xA6, 0x6A): "SEEKPT",
-    (0xA6, 0x6B): "SEEKPTA",
-    (0xA6, 0x6C): "SIZE?",
-    (0xA6, 0x6D): "STOFLAG",
-    (0xA6, 0x6E): "X<>F",
-    (0xA6, 0x6F): "XTOA",
-    (0xA6, 0x71): "ASROOM",
-    (0xA6, 0x72): "CLRGX",
-    (0xA6, 0x73): "ED",
-    (0xA6, 0x74): "EMDIRX",
-    (0xA6, 0x75): "EMROOM",
-    (0xA6, 0x76): "GETKEYX",
-    (0xA6, 0x77): "RESZFL",
-    (0xA6, 0x78): "ΣREG?",
-    (0xA6, 0x79): "X=NN?",
-    (0xA6, 0x7A): "X≠NN?",
-    (0xA6, 0x7B): "X<NN?",
-    (0xA6, 0x7C): "X<=NN?",
-    (0xA6, 0x7D): "X>NN?",
-    (0xA6, 0x7E): "X>=NN?",
-    (0xA6, 0x81): "ADATE",
-    (0xA6, 0x82): "ALMCAT",
-    (0xA6, 0x83): "ALMNOW",
-    (0xA6, 0x84): "ATIME",
-    (0xA6, 0x85): "ATIME24",
-    (0xA6, 0x86): "CLK12",
-    (0xA6, 0x87): "CLK24",
-    (0xA6, 0x88): "CLKT",
-    (0xA6, 0x89): "CLKTD",
-    (0xA6, 0x8A): "CLOCK",
-    (0xA6, 0x8B): "CORRECT",
-    (0xA6, 0x8C): "DATE",
-    (0xA6, 0x8D): "DATE+",
-    (0xA6, 0x8E): "DDAYS",
-    (0xA6, 0x8F): "DMY",
-    (0xA6, 0x90): "DOW",
-    (0xA6, 0x91): "MDY",
-    (0xA6, 0x92): "RCLAF",
-    (0xA6, 0x93): "RCLSW",
-    (0xA6, 0x94): "RUNSW",
-    (0xA6, 0x95): "SETAF",
-    (0xA6, 0x96): "SETDATE",
-    (0xA6, 0x97): "SETIME",
-    (0xA6, 0x98): "SETSW",
-    (0xA6, 0x99): "STOPSW",
-    (0xA6, 0x9A): "SW",
-    (0xA6, 0x9B): "T+X",
-    (0xA6, 0x9C): "TIME",
-    (0xA6, 0x9D): "XYZALM",
-    (0xA6, 0x9F): "CLALMA",
-    (0xA6, 0xA0): "CLALMX",
-    (0xA6, 0xA1): "CLRALMS",
-    (0xA6, 0xA2): "RCLALM",
-    (0xA6, 0xA3): "SWPT",
-}
-
-# The XROMs the DM41X (and the DM41XN) add to the CX set: X<I>Y, an
-# extension of the Extended Functions ROM (25,63); TRNG, an extension of the
-# Time ROM (26,36); and the 16 functions of the DM41X's own module
-# (26,38 - 26,53). Names and codes are hp41uc's (hp41ucg.h, its "-DM 41X-"
-# section) except X<I>Y, which hp41uc doesn't have yet. Every entry is
-# confirmed by a real DM41X/DM41XN state file (docs/dm41x_explorer_plan.md,
-# S5 results). This dict is the "since" flag: an XROM is DM41X-only if and
-# only if it is listed here.
-DM41X_XROM_FUNCTIONS = {
-    (0xA6, 0x7F): "X<I>Y",
-    (0xA6, 0xA4): "TRNG",
-    (0xA6, 0xA6): "ABSP",
-    (0xA6, 0xA7): "AINT",
-    (0xA6, 0xA8): "ASWAP",
-    (0xA6, 0xA9): "CLAC",
-    (0xA6, 0xAA): "CLEM",
-    (0xA6, 0xAB): "FAST",
-    (0xA6, 0xAC): "FILL",
-    (0xA6, 0xAD): "FLCOPY",
-    (0xA6, 0xAE): "FLHD",
-    (0xA6, 0xAF): "FLTYPE",
-    (0xA6, 0xB0): "LKAOFF",
-    (0xA6, 0xB1): "LKAON",
-    (0xA6, 0xB2): "RENMFL",
-    (0xA6, 0xB3): "RETPFL",
-    (0xA6, 0xB4): "SLOW",
-    (0xA6, 0xB5): "WORKFL",
-}
-
-# Every XROM function the DM41X knows: the CX set plus its additions. This
-# is the table the instruction-name registry (mnemonics.py) is built from,
-# since a state file opens with the DM41X profile whichever model made it.
-# Which of these a given model has built in is DeviceProfile.builtin_xroms.
-XROM_FUNCTIONS = {**CX_XROM_FUNCTIONS, **DM41X_XROM_FUNCTIONS}

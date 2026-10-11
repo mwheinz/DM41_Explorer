@@ -27,8 +27,15 @@ from memory import (
     decode_program_txt,
     format_findings,
 )
-from memory.functions import DM41X_XROM_FUNCTIONS
+from memory.xrom_library import builtin_xrom_names
 from memory.mnemonics import key_bytes_for, resolve
+
+# The XROMs the DM41X has built in and the DM41L doesn't.
+DM41X_ADDED = {
+    pair: name
+    for pair, name in builtin_xrom_names("DM41X").items()
+    if pair not in builtin_xrom_names("DM41L")
+}
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -181,7 +188,7 @@ def test_xrom_program_lists_each_dm41x_function_with_its_step():
     # of the DM41X module in table order (TRNG excepted, it is up front).
     expected_names = ["X<I>Y", "TRNG"] + [
         name
-        for (byte1, byte2), name in DM41X_XROM_FUNCTIONS.items()
+        for (byte1, byte2), name in DM41X_ADDED.items()
         if name not in ("X<I>Y", "TRNG")
     ]
     assert [f.message for f in findings] == [

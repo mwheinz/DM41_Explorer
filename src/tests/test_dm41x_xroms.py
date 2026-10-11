@@ -29,7 +29,6 @@ from memory import (
     encode_program_txt,
 )
 from memory.device_profile import PROFILES
-from memory.functions import CX_XROM_FUNCTIONS, DM41X_XROM_FUNCTIONS, XROM_FUNCTIONS
 from memory.mnemonics import (
     OpKind,
     canonical,
@@ -41,6 +40,7 @@ from memory.mnemonics import (
     resolve,
     xrom_op,
 )
+from memory.xrom_library import builtin_xrom_names
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -87,41 +87,48 @@ def _program_bytes(fixture):
     return memory.programs.get_program_bytes(program)
 
 
+# The tables under test, read from the built-in XROM libraries
+# (memory/xroms/hp41cx.json and dm41x-cx.json, GitHub issue #51).
+CX_XROMS = builtin_xrom_names("DM41L")
+ALL_XROMS = builtin_xrom_names("DM41X")
+DM41X_ADDED = {pair: name for pair, name in ALL_XROMS.items() if pair not in CX_XROMS}
+
+
 # -- The tables -------------------------------------------------------------
 
 
 def test_the_additions_are_the_confirmed_xroms_in_hp41ucs_order():
-    found = {_xrom_number(*pair): name for pair, name in DM41X_XROM_FUNCTIONS.items()}
+    found = {_xrom_number(*pair): name for pair, name in DM41X_ADDED.items()}
     assert found == DM41X_ADDITIONS
 
 
 def test_table_sizes():
-    assert len(CX_XROM_FUNCTIONS) == 95
-    assert len(DM41X_XROM_FUNCTIONS) == 18
-    assert len(XROM_FUNCTIONS) == 113
+    assert len(CX_XROMS) == 95
+    assert len(DM41X_ADDED) == 18
+    assert len(ALL_XROMS) == 113
 
 
-def test_the_two_tables_do_not_overlap_and_make_up_the_whole_table():
-    assert not CX_XROM_FUNCTIONS.keys() & DM41X_XROM_FUNCTIONS.keys()
-    assert XROM_FUNCTIONS == {**CX_XROM_FUNCTIONS, **DM41X_XROM_FUNCTIONS}
+def test_the_dm41x_keeps_every_cx_xrom_under_the_same_name():
+    assert {pair: ALL_XROMS[pair] for pair in CX_XROMS} == CX_XROMS
+    assert builtin_xrom_names() == ALL_XROMS
 
 
 def test_no_addition_reuses_a_cx_code_or_name():
-    cx_names = set(CX_XROM_FUNCTIONS.values())
-    assert not cx_names & set(DM41X_XROM_FUNCTIONS.values())
+    cx_names = set(CX_XROMS.values())
+    assert not cx_names & set(DM41X_ADDED.values())
 
 
 # -- Device profiles --------------------------------------------------------
 
 
 def test_dm41l_has_only_the_original_cx_xroms():
-    assert DM41L.builtin_xroms == frozenset(CX_XROM_FUNCTIONS)
+    assert DM41L.builtin_xroms == frozenset(CX_XROMS)
     assert len(DM41L.builtin_xroms) == 95
 
 
 def test_dm41x_has_the_cx_xroms_and_its_additions():
-    assert DM41X.builtin_xroms == frozenset(XROM_FUNCTIONS)
-    assert DM41X.builtin_xroms - DM41L.builtin_xroms == frozenset(DM41X_XROM_FUNCTIONS)
+    assert DM41X.builtin_xroms == frozenset(ALL_XROMS)
+    assert DM41X.builtin_xroms - DM41L.builtin_xroms == frozenset(DM41X_ADDED)
     assert DM41L.builtin_xroms < DM41X.builtin_xroms
 
 
@@ -133,7 +140,7 @@ def test_registered_profiles_have_their_xroms():
 # -- Names ------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("pair, name", sorted(DM41X_XROM_FUNCTIONS.items()))
+@pytest.mark.parametrize("pair, name", sorted(DM41X_ADDED.items()))
 def test_every_addition_resolves_by_canonical_lower_and_mixed_case(pair, name):
     op = xrom_op(*pair)
     assert canonical(op) == display(op) == name
@@ -152,7 +159,7 @@ def test_ed_dollar_is_the_dm41x_name_for_ed():
     assert not is_dm41x_only(ed)
 
 
-@pytest.mark.parametrize("pair", sorted(DM41X_XROM_FUNCTIONS))
+@pytest.mark.parametrize("pair", sorted(DM41X_ADDED))
 def test_additions_are_flagged_dm41x_only(pair):
     assert is_dm41x_only(xrom_op(*pair))
 
@@ -174,7 +181,7 @@ def test_original_functions_are_not_flagged(op):
 
 def test_the_flag_is_set_for_exactly_the_additions():
     flagged = {e.op.code for e in entries() if e.dm41x_only}
-    assert flagged == set(DM41X_XROM_FUNCTIONS)
+    assert flagged == set(DM41X_ADDED)
     assert all(e.op.kind is OpKind.XROM for e in entries() if e.dm41x_only)
 
 

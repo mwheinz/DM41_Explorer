@@ -9,7 +9,8 @@ tree being present.
 
 import pytest
 
-from memory.functions import SINGLE_BYTE_FUNCTIONS, XROM_FUNCTIONS
+from memory.functions import SINGLE_BYTE_FUNCTIONS
+from memory.xrom_library import builtin_xrom_names
 from memory.mnemonic_dialects import Dialect
 from memory.mnemonics import (
     END,
@@ -28,6 +29,8 @@ from memory.mnemonics import (
     xrom_op,
 )
 from memory.program_text import decode_program_txt, encode_program_txt
+
+ALL_XROMS = builtin_xrom_names()
 
 # Every hp41uc decompile name that differs from functions.py's name.
 HP41UC_CANONICAL_DIFFERENCES = {
@@ -248,7 +251,7 @@ def test_every_register_prefix_round_trips(byte):
 
 
 def test_every_xrom_function_round_trips():
-    for (byte1, byte2), name in XROM_FUNCTIONS.items():
+    for (byte1, byte2), name in ALL_XROMS.items():
         op = xrom_op(byte1, byte2)
         assert _compile_one(canonical(op)) == bytes([byte1, byte2]), name
         assert _compile_one(name) == bytes([byte1, byte2]), name

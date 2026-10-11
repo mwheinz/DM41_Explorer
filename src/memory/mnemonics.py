@@ -31,7 +31,8 @@ An `Op` identifies an instruction by its encoding, not its name:
   LBL/GTO/..., its prefix byte). Below 0x40 are the keyboard-only
   functions (CAT, SST, ASN, ...), which can be key-assigned but can't
   appear in a program; they are registered with programmable=False.
-- OpKind.XROM -- a functions.py XROM_FUNCTIONS (byte1, byte2) pair.
+- OpKind.XROM -- an XROM's (byte1, byte2) pair. The registry knows the
+  functions of every model's built-in XROM library (memory/xroms/).
 - OpKind.KEYWORD -- END and XROM: text-format keywords with no single
   function byte of their own.
 
@@ -47,7 +48,8 @@ import re
 from dataclasses import dataclass
 from typing import Dict, Hashable, Iterable, List, Optional, Set, Tuple, Union
 
-from .functions import DM41X_XROM_FUNCTIONS, SINGLE_BYTE_FUNCTIONS, XROM_FUNCTIONS
+from .functions import SINGLE_BYTE_FUNCTIONS
+from .xrom_library import builtin_xrom_names
 from .mnemonic_dialects import DIALECTS, Dialect
 from .trigraphs import decode_trigraphs, focal_to_unicode
 
@@ -197,8 +199,8 @@ class Entry:
     # "display", "substitution", or a dialect name). Case-insensitive
     # matches of these are accepted too.
     aliases: Tuple[Tuple[str, str], ...]
-    # True for an XROM the DM41X added to the HP-41CX set (a DM41L doesn't
-    # have it). The registry knows these names whatever the model, so a
+    # True for an XROM a DM41L doesn't have built in: one the DM41X added
+    # to the HP-41CX set. The registry knows these names whatever the model, so a
     # program that uses one still compiles and decompiles.
     dm41x_only: bool = False
 
@@ -259,6 +261,8 @@ class Registry:
         for spelling, op in self._exact.items():
             self._folded.setdefault(spelling.upper(), set()).add(op)
 
+        # "DM41X only" means "not built into a DM41L" (issue #51).
+        dm41l_xroms = builtin_xrom_names("DM41L")
         self._entries: Dict[Op, Entry] = {
             op: Entry(
                 op=op,
@@ -266,7 +270,7 @@ class Registry:
                 display=display_name,
                 programmable=programmable,
                 aliases=tuple(sources[op].items()),
-                dm41x_only=op.kind is OpKind.XROM and op.code in DM41X_XROM_FUNCTIONS,
+                dm41x_only=op.kind is OpKind.XROM and op.code not in dm41l_xroms,
             )
             for op, (canonical_name, display_name, programmable) in base.items()
         }
@@ -280,7 +284,7 @@ class Registry:
             display_name = name  # functions.py names are HP-41 display names
             canonical_name = _CANONICAL_EXCEPTIONS.get(op, _ascii_form(display_name))
             base[op] = (canonical_name, display_name, byte >= 0x40)
-        for (byte1, byte2), name in XROM_FUNCTIONS.items():
+        for (byte1, byte2), name in builtin_xrom_names().items():
             base[xrom_op(byte1, byte2)] = (_ascii_form(name), name, True)
         for keyword in (END, XROM):
             base[keyword] = (keyword.code, keyword.code, True)

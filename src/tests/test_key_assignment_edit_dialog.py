@@ -27,8 +27,10 @@ import customtkinter as ctk
 
 from gui.key_assignment_edit_dialog import KeyAssignmentEditDialog
 from memory import DM41L, DM41X, KeyAssignment
-from memory.functions import XROM_FUNCTIONS
+from memory.xrom_library import builtin_xrom_names
 from memory.mnemonics import key_bytes_for, resolve
+
+ALL_XROMS = builtin_xrom_names()
 
 
 @pytest.fixture(autouse=True)
@@ -330,7 +332,7 @@ def test_the_two_lists_differ_by_exactly_the_dm41x_additions(root):
     either model's built-in set cannot silently change the picker."""
     wide = _make_dialog(root, profile=DM41X)._function_names
     narrow = _make_dialog(root, profile=DM41L)._function_names
-    added = {XROM_FUNCTIONS[code] for code in DM41X.builtin_xroms - DM41L.builtin_xroms}
+    added = {ALL_XROMS[code] for code in DM41X.builtin_xroms - DM41L.builtin_xroms}
     assert set(wide) - set(narrow) == added
     assert len(added) == 18
 

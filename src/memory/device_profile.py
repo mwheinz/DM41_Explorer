@@ -24,7 +24,7 @@ import enum
 from dataclasses import dataclass
 from typing import FrozenSet, Tuple
 
-from .functions import CX_XROM_FUNCTIONS, XROM_FUNCTIONS
+from .xrom_library import builtin_xrom_names
 
 
 @dataclass(frozen=True)
@@ -32,9 +32,10 @@ class DeviceProfile:
     """An immutable description of one DM41 model's memory map and the XROM
     functions built into it.
 
-    `builtin_xroms` is only about what the *calculator* has. The name
-    registry in memory/mnemonics.py always knows every XROM in
-    functions.XROM_FUNCTIONS, whatever profile is in use, so a program using
+    `builtin_xroms` is only about what the *calculator* has: the functions
+    of the model's built-in XROM library (memory/xroms/, GitHub issue #51).
+    The name registry in memory/mnemonics.py always knows every built-in
+    library's names, whatever profile is in use, so a program using
     a DM41X function still compiles and decompiles. Something that needs to
     know whether a given model can run it (the check before sending a state
     to a DM41L) asks the profile.
@@ -100,18 +101,19 @@ class DeviceProfile:
 # never used on a DM41L and is always zero.
 #
 # Its XROMs are only those of the original HP-41CX modules (Extended
-# Functions/Memory and Time); it cannot load any other module.
+# Functions/Memory and Time), its built-in library hp41cx.json; it cannot
+# load any other module.
 DM41L = DeviceProfile(
     "DM41L",
     ((0x40, 0xBF), (0x201, 0x2EF)),
-    frozenset(CX_XROM_FUNCTIONS),
+    frozenset(builtin_xrom_names("DM41L")),
     supports_serial=True,
 )
 
 # The DM41X adds a second Extended Memory module at 0x301-0x3EF -- confirmed
 # against tests/data/dm41x_manyfiles.dm41, a real state whose files span all
 # three regions. Its XROMs are the CX set plus its own additions (X<I>Y, TRNG
-# and the DM41X module), which is all of functions.XROM_FUNCTIONS. The
+# and the DM41X module): its built-in library, dm41x-cx.json. The
 # DM41XN is treated identically (docs/dm41x_explorer_plan.md), except that
 # its newer USB interface does offer a serial console; when its own profile
 # is added it will set supports_serial=True. The DM41X is strictly
@@ -119,7 +121,7 @@ DM41L = DeviceProfile(
 DM41X = DeviceProfile(
     "DM41X",
     ((0x40, 0xBF), (0x201, 0x2EF), (0x301, 0x3EF)),
-    frozenset(XROM_FUNCTIONS),
+    frozenset(builtin_xrom_names("DM41X")),
     supports_serial=False,
     loads_modules=True,
 )

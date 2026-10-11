@@ -30,11 +30,14 @@ the instruction-name registry. It answers three questions:
   one, and only "XROM mm,ff" reaches this one. Section headers are never
   matched by name, so they never hide anything.
 
-It deliberately imports neither mnemonics.py nor device_profile.py: both
-will be built from these libraries (issue #51), so they will import this
-module, not the other way round.
+builtin_xrom_names() is what the rest of memory/ builds on: each model's
+built-in XROMs (DeviceProfile.builtin_xroms) and the XROM names the
+instruction registry knows (mnemonics.py) come from the shipped built-in
+libraries, not from a table in code (issue #51). This module therefore
+imports neither mnemonics.py nor device_profile.py, which import it.
 """
 
+import functools
 import json
 import re
 from dataclasses import dataclass
@@ -87,6 +90,13 @@ class XromFunction:
     @property
     def label(self) -> str:
         return xrom_label(self.module, self.function)
+
+    @property
+    def code(self) -> Tuple[int, int]:
+        """The function's two bytes, (0xA0 + module // 4,
+        (module % 4) << 6 | function) -- an XROM Op's code in
+        mnemonics.py and a key assignment's bytes."""
+        return 0xA0 | (self.module >> 2), ((self.module & 0x03) << 6) | self.function
 
 
 @dataclass(frozen=True)
@@ -317,6 +327,52 @@ def _check_fits(library: XromLibrary, by_id: dict, builtin_for: dict) -> None:
                 f"{where}: the {model} already has a built-in library, "
                 f"{builtin_for[model].title}"
             )
+
+
+# -- The built-in libraries --------------------------------------------------
+
+
+@functools.lru_cache(maxsize=None)
+def _shipped_builtins() -> Dict[str, XromLibrary]:
+    """model -> its built-in library, read once from the shipped files.
+    A shipped file that cannot be used is a packaging error, not a user's
+    mistake, so it raises rather than being skipped."""
+    libraries, errors = load_libraries()
+    if errors:
+        raise XromLibraryError(
+            "the XROM libraries shipped with DM41_Explorer are damaged: "
+            + "; ".join(str(e) for e in errors)
+        )
+    builtins = {}
+    for model in KNOWN_MODELS:
+        library = builtin_library(libraries, model)
+        if library is None:
+            raise XromLibraryError(f"no shipped built-in XROM library for the {model}")
+        builtins[model] = library
+    return builtins
+
+
+def builtin_xrom_names(model: Optional[str] = None) -> Dict[Tuple[int, int], str]:
+    """(byte1, byte2) -> display name for each function built into `model`
+    (section headers left out, as they are never named in a program). With
+    no `model`, every model's, merged -- what the instruction registry
+    knows whatever the mode. Raises XromLibraryError if two models' built-in
+    libraries give the same function different names, which would make a
+    name depend on the mode. Returns a new dict each time."""
+    models = KNOWN_MODELS if model is None else (model,)
+    names: Dict[Tuple[int, int], str] = {}
+    for each in models:
+        library = _shipped_builtins()[each]
+        for function in library.functions():
+            if function.header:
+                continue
+            previous = names.setdefault(function.code, function.name)
+            if previous != function.name:
+                raise XromLibraryError(
+                    f"{function.label} is {previous} in one built-in library "
+                    f"and {function.name} in {library.title}"
+                )
+    return names
 
 
 # -- The active set ---------------------------------------------------------

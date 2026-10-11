@@ -10,7 +10,8 @@ then key_bytes_for() gives the Key Assignment Register encoding.
 
 import pytest
 
-from memory.functions import SINGLE_BYTE_FUNCTIONS, XROM_FUNCTIONS
+from memory.functions import SINGLE_BYTE_FUNCTIONS
+from memory.xrom_library import builtin_xrom_names
 from memory.mnemonics import (
     XROM_FIRST_BYTES,
     assignable_display_names,
@@ -23,6 +24,8 @@ from memory.mnemonics import (
     xrom_text,
 )
 
+ALL_XROMS = builtin_xrom_names()
+
 
 def _key_bytes(typed):
     return key_bytes_for(resolve(typed, programmable_only=False))
@@ -32,17 +35,17 @@ def _key_bytes(typed):
 
 
 def test_names_use_only_hp41_display_glyphs():
-    for name in list(SINGLE_BYTE_FUNCTIONS.values()) + list(XROM_FUNCTIONS.values()):
+    for name in list(SINGLE_BYTE_FUNCTIONS.values()) + list(ALL_XROMS.values()):
         assert not set(name) & set("→≤≥√"), name
 
 
 def test_names_are_unique_across_both_tables():
-    names = list(SINGLE_BYTE_FUNCTIONS.values()) + list(XROM_FUNCTIONS.values())
+    names = list(SINGLE_BYTE_FUNCTIONS.values()) + list(ALL_XROMS.values())
     assert len(names) == len(set(names))
 
 
 def test_assignable_names_cover_both_tables_and_nothing_else():
-    names = set(SINGLE_BYTE_FUNCTIONS.values()) | set(XROM_FUNCTIONS.values())
+    names = set(SINGLE_BYTE_FUNCTIONS.values()) | set(ALL_XROMS.values())
     assert assignable_display_names() == sorted(names)
 
 
@@ -182,5 +185,5 @@ def test_text_format_keywords_are_not_assignable():
 def test_every_known_name_is_reachable_case_insensitively():
     for byte, name in SINGLE_BYTE_FUNCTIONS.items():
         assert _key_bytes(name.lower()) == byte, name
-    for pair, name in XROM_FUNCTIONS.items():
+    for pair, name in ALL_XROMS.items():
         assert _key_bytes(name.lower()) == pair, name

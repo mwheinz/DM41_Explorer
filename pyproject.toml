@@ -32,6 +32,10 @@ package-dir = { "" = "src" }
 packages = ["engine", "gui", "memory"]
 py-modules = ["config"]
 
+# The XROM library files, which memory/xrom_library.py reads at import time.
+[tool.setuptools.package-data]
+memory = ["xroms/*.json"]
+
 [tool.setuptools_scm]
 
 [tool.pytest.ini_options]
