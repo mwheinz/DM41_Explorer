@@ -45,6 +45,7 @@ Modules, by area (each module's docstring has the details):
     mnemonic_dialects.py alternate spellings folded into the registry
     mnemonic_doc.py      the generated mnemonic reference
     trigraphs.py         the FOCAL character set's non-ASCII symbols
+    xrom_library.py      XROM library files: loading, priority, conflicts
 """
 
 from .registers import (
@@ -109,6 +110,19 @@ from .profile_fit import (
     check_profile_fit,
     evaluate_mode_switch,
     format_findings,
+)
+from .xrom_library import (
+    ActiveSet,
+    XromFinding,
+    XromFunction,
+    XromLibrary,
+    XromLibraryError,
+    XromModule,
+    active_set,
+    builtin_library,
+    find_conflicts,
+    load_libraries,
+    load_library,
 )
 
 __all__ = [
@@ -177,4 +191,15 @@ __all__ = [
     "check_profile_fit",
     "evaluate_mode_switch",
     "format_findings",
+    "ActiveSet",
+    "XromFinding",
+    "XromFunction",
+    "XromLibrary",
+    "XromLibraryError",
+    "XromModule",
+    "active_set",
+    "builtin_library",
+    "find_conflicts",
+    "load_libraries",
+    "load_library",
 ]
