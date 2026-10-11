@@ -22,7 +22,7 @@ from pathlib import Path
 from typing import List, Tuple
 
 from .mnemonic_dialects import DIALECTS
-from .mnemonics import Entry, OpKind, character_substitutions, entries
+from .mnemonics import Entry, OpKind, character_substitutions, entries, xrom_text
 from .trigraphs import shorthand_trigraphs, unicode_to_trigraphs
 
 logger = logging.getLogger(__name__)
@@ -54,9 +54,7 @@ def _encoding(entry: Entry) -> str:
     if kind is OpKind.FUNCTION:
         return f"0x{code:02X}"
     if kind is OpKind.XROM:
-        byte1, byte2 = code
-        mm = ((byte1 & 0x07) << 2) | (byte2 >> 6)
-        return f"XROM {mm:02d},{byte2 & 0x3F:02d}"
+        return xrom_text(*code)
     return ""
 
 

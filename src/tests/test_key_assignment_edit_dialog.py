@@ -31,6 +31,17 @@ from memory.functions import XROM_FUNCTIONS
 from memory.mnemonics import key_bytes_for, resolve
 
 
+@pytest.fixture(autouse=True)
+def no_unexpected_questions(monkeypatch):
+    """A real askyesno() would wait for a click and hang the run. A test
+    that expects the question patches it itself, inside this one."""
+    monkeypatch.setattr(
+        messagebox,
+        "askyesno",
+        mock.Mock(side_effect=AssertionError("unexpected askyesno() question")),
+    )
+
+
 @pytest.fixture
 def root():
     r = ctk.CTk()
@@ -396,11 +407,11 @@ def test_the_hint_stays_empty_for_a_function_both_models_have(root):
     assert dialog._dm41x_hint.cget("text") == ""
 
 
-def test_an_existing_dm41x_assignment_opens_on_raw_hex_in_dm41l_mode(root):
+def test_an_existing_dm41x_assignment_opens_on_the_xrom_tab_in_dm41l_mode(root):
     """A state can already have LKAOFF on a key (saved in DM41X mode, or
     made on the calculator). The Function tab cannot offer that name in
-    DM41L mode, so the dialog opens on Raw Hex rather than silently
-    showing some unrelated function."""
+    DM41L mode, so the dialog opens on the XROM tab, with LKAOFF's numbers
+    filled in, rather than silently showing some unrelated function."""
     byte1, byte2 = key_bytes_for(resolve("LKAOFF", programmable_only=False))
     assignment = KeyAssignment(
         name="LKAOFF",
@@ -411,4 +422,196 @@ def test_an_existing_dm41x_assignment_opens_on_raw_hex_in_dm41l_mode(root):
         raw_key_byte=0x01,
     )
     dialog = _make_dialog(root, assignment=assignment, profile=DM41L)
-    assert dialog._tabs.get() == "Raw Hex"
+    assert dialog._tabs.get() == "XROM"
+    assert dialog._xrom_module_var.get() == "26"
+    assert dialog._xrom_function_var.get() == "48"
+
+
+# ---- XROM tab (GitHub issue #49) ----
+
+
+def _xrom_assignment(byte1, byte2, name):
+    return KeyAssignment(
+        name=name,
+        fn_byte1=byte1,
+        fn_byte2=byte2,
+        key_number=1,
+        shifted=False,
+        raw_key_byte=0x01,
+    )
+
+
+def _save_on_xrom_tab(dialog, module, function):
+    dialog._tabs.set("XROM")
+    dialog._xrom_module_var.set(module)
+    dialog._xrom_function_var.set(function)
+    dialog._on_save_clicked()
+
+
+@pytest.mark.parametrize(
+    "module, function, expected",
+    [
+        ("26", "38", (0xA6, 0xA6)),  # ABSP, a known function
+        ("1", "9", (0xA0, 0x49)),  # Math Pac SOLVE: no table names it yet
+        ("31", "63", (0xA7, 0xFF)),
+        (" 7 ", "0", (0xA1, 0xC0)),
+    ],
+)
+def test_xrom_tab_saves_the_encoded_bytes(root, module, function, expected):
+    on_save = mock.Mock()
+    dialog = _make_dialog(root, on_save=on_save, profile=DM41X)
+
+    with mock.patch.object(messagebox, "showerror") as error:
+        _save_on_xrom_tab(dialog, module, function)
+
+    error.assert_not_called()
+    on_save.assert_called_once_with("function", expected)
+
+
+@pytest.mark.parametrize(
+    "module, function",
+    [("0", "5"), ("32", "0"), ("26", "64"), ("", "3"), ("x", "1"), ("-1", "0")],
+)
+def test_xrom_tab_rejects_missing_or_out_of_range_numbers(root, module, function):
+    on_save = mock.Mock()
+    dialog = _make_dialog(root, on_save=on_save, profile=DM41X)
+
+    with mock.patch.object(messagebox, "showerror") as error:
+        _save_on_xrom_tab(dialog, module, function)
+
+    on_save.assert_not_called()
+    assert error.called
+
+
+def test_xrom_tab_shows_the_bytes_and_a_known_name(root):
+    dialog = _make_dialog(root, profile=DM41X)
+    dialog._xrom_module_var.set("26")
+    dialog._xrom_function_var.set("38")
+    assert dialog._xrom_info.cget("text") == "Bytes A6 A6: ABSP"
+
+
+def test_xrom_tab_says_an_unknown_xrom_can_still_be_assigned(root):
+    dialog = _make_dialog(root, profile=DM41X)
+    dialog._xrom_module_var.set("1")
+    dialog._xrom_function_var.set("9")
+    text = dialog._xrom_info.cget("text")
+    assert "A0 49" in text and "Not a known function" in text
+    assert "can still be assigned" in text
+
+
+def test_xrom_tab_explains_out_of_range_input(root):
+    dialog = _make_dialog(root, profile=DM41X)
+    dialog._xrom_module_var.set("40")
+    dialog._xrom_function_var.set("1")
+    assert "out of range" in dialog._xrom_info.cget("text")
+
+
+def test_an_unknown_xrom_assignment_opens_on_the_xrom_tab(root):
+    assignment = _xrom_assignment(0xA0, 0x49, "XROM 01,09")
+    dialog = _make_dialog(root, assignment=assignment, profile=DM41X)
+    assert dialog._tabs.get() == "XROM"
+    assert dialog._xrom_module_var.get() == "1"
+    assert dialog._xrom_function_var.get() == "9"
+
+
+def test_a_known_xrom_assignment_still_opens_on_the_function_tab(root):
+    dialog = _make_dialog(
+        root, assignment=_xrom_assignment(0xA6, 0xB1, "LKAON"), profile=DM41X
+    )
+    assert dialog._tabs.get() == "Function"
+    assert dialog._xrom_module_var.get() == "26"
+    assert dialog._xrom_function_var.get() == "49"
+
+
+def test_a_single_byte_assignment_leaves_the_xrom_fields_empty(root):
+    assignment = KeyAssignment(
+        name="COS",
+        fn_byte1=0x5A,
+        fn_byte2=None,
+        key_number=1,
+        shifted=False,
+        raw_key_byte=0x01,
+    )
+    dialog = _make_dialog(root, assignment=assignment)
+    assert dialog._xrom_module_var.get() == ""
+    assert dialog._xrom_function_var.get() == ""
+
+
+@pytest.mark.parametrize("answer", [True, False])
+def test_xrom_tab_asks_before_assigning_what_a_dm41l_lacks(root, answer):
+    """Unlike a function picked by name, an XROM given by its numbers is
+    allowed in DM41L mode -- after asking."""
+    on_save = mock.Mock()
+    dialog = _make_dialog(root, on_save=on_save, profile=DM41L)
+
+    with mock.patch.object(messagebox, "askyesno", return_value=answer) as ask:
+        _save_on_xrom_tab(dialog, "26", "48")
+
+    assert "XROM 26,48 (LKAOFF)" in ask.call_args.args[1]
+    assert "DM41L" in ask.call_args.args[1]
+    if answer:
+        on_save.assert_called_once_with("function", (0xA6, 0xB0))
+    else:
+        on_save.assert_not_called()
+
+
+def test_dm41l_xrom_tab_says_the_model_lacks_an_unknown_xrom(root):
+    dialog = _make_dialog(root, profile=DM41L)
+    dialog._xrom_module_var.set("1")
+    dialog._xrom_function_var.set("9")
+    assert "A DM41L does not have this function." in dialog._xrom_info.cget("text")
+
+
+def test_dm41x_does_not_ask_about_an_xrom_from_a_module(root):
+    """A DM41X can plug in modules, so an XROM it doesn't have built in
+    (Math Pac's 01,09) may still run there."""
+    on_save = mock.Mock()
+    dialog = _make_dialog(root, on_save=on_save, profile=DM41X)
+    _save_on_xrom_tab(dialog, "1", "9")
+    on_save.assert_called_once_with("function", (0xA0, 0x49))
+
+
+def test_xrom_tab_does_not_ask_for_what_the_model_has(root):
+    on_save = mock.Mock()
+    dialog = _make_dialog(root, on_save=on_save, profile=DM41L)
+
+    with mock.patch.object(messagebox, "askyesno") as ask:
+        _save_on_xrom_tab(dialog, "25", "1")  # ALENG
+
+    ask.assert_not_called()
+    on_save.assert_called_once_with("function", (0xA6, 0x41))
+
+
+@pytest.mark.parametrize("typed", ["XROM 26,38", "xrom 26, 38", "XROM 26 38"])
+def test_function_tab_accepts_typed_xrom_numbers(root, typed):
+    on_save = mock.Mock()
+    dialog = _make_dialog(root, on_save=on_save, profile=DM41X)
+    dialog._function_var.set(typed)
+
+    dialog._on_save_clicked()
+
+    on_save.assert_called_once_with("function", (0xA6, 0xA6))
+
+
+def test_function_tab_rejects_typed_xrom_numbers_out_of_range(root):
+    on_save = mock.Mock()
+    dialog = _make_dialog(root, on_save=on_save, profile=DM41X)
+    dialog._function_var.set("XROM 26,64")
+
+    with mock.patch.object(messagebox, "showerror") as error:
+        dialog._on_save_clicked()
+
+    on_save.assert_not_called()
+    assert "out of range" in error.call_args.args[1]
+
+
+def test_function_tab_asks_before_a_typed_xrom_a_dm41l_lacks(root):
+    on_save = mock.Mock()
+    dialog = _make_dialog(root, on_save=on_save, profile=DM41L)
+    dialog._function_var.set("XROM 26,48")
+
+    with mock.patch.object(messagebox, "askyesno", return_value=False) as ask:
+        dialog._on_save_clicked()
+
+    assert ask.called
+    on_save.assert_not_called()

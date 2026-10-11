@@ -43,6 +43,7 @@ import difflib
 import enum
 import itertools
 import logging
+import re
 from dataclasses import dataclass
 from typing import Dict, Hashable, Iterable, List, Optional, Set, Tuple, Union
 
@@ -75,6 +76,51 @@ def function_op(byte: int) -> Op:
 
 def xrom_op(byte1: int, byte2: int) -> Op:
     return Op(OpKind.XROM, (byte1, byte2))
+
+
+# -- XROM numbers -----------------------------------------------------------
+#
+# An XROM is written "XROM mm,ff": module mm (00-31) and function ff
+# (00-63). Its two bytes are byte1 = 0xA0 + mm // 4 and
+# byte2 = (mm % 4) << 6 | ff (docs/key_assignments.md sec 4.2), so the
+# first byte is always 0xA0-0xA7.
+
+XROM_FIRST_BYTES = range(0xA0, 0xA8)
+
+# "XROM 26,38", "xrom 26, 38" or "XROM 26 38".
+_XROM_TEXT_RE = re.compile(r"^XROM\s+(\d{1,2})\s*[,\s]\s*(\d{1,2})$", re.IGNORECASE)
+
+
+def xrom_bytes(module: int, function: int) -> Tuple[int, int]:
+    """The (byte1, byte2) of XROM module,function. Raises ValueError if
+    either number is out of range (module 0-31, function 0-63)."""
+    if not (0 <= module <= 31 and 0 <= function <= 63):
+        raise ValueError(
+            f"XROM {module},{function:02d} is out of range: the module must be "
+            "00-31 and the function 00-63"
+        )
+    return 0xA0 | (module >> 2), ((module & 0x03) << 6) | function
+
+
+def xrom_numbers(byte1: int, byte2: int) -> Tuple[int, int]:
+    """The (module, function) numbers an XROM's two bytes encode."""
+    return ((byte1 & 0x07) << 2) | (byte2 >> 6), byte2 & 0x3F
+
+
+def xrom_text(byte1: int, byte2: int) -> str:
+    """ "XROM mm,ff" for an XROM's two bytes, hp41uc's spelling."""
+    module, function = xrom_numbers(byte1, byte2)
+    return f"XROM {module:02d},{function:02d}"
+
+
+def parse_xrom_text(text: str) -> Optional[Tuple[int, int]]:
+    """(module, function) if `text` is "XROM mm,ff" (or "XROM mm ff", in
+    any case), else None. The numbers are not range-checked here:
+    xrom_bytes() does that, with a message that names them."""
+    match = _XROM_TEXT_RE.match(text.strip())
+    if match is None:
+        return None
+    return int(match.group(1)), int(match.group(2))
 
 
 # Instructions program_text.py dispatches on by identity.
@@ -398,13 +444,16 @@ def key_bytes_for(op: Op) -> Union[int, Tuple[int, int]]:
 
 def display_for_key_bytes(fn_byte1: int, fn_byte2: Optional[int]) -> str:
     """The display name for a Key Assignment Register entry's function
-    byte(s), or a "0xNN" / "0xNN 0xNN" fallback if they aren't a known
-    function. Never raises."""
+    byte(s). One that isn't a known function falls back to "XROM mm,ff"
+    for an XROM (first byte 0xA0-0xA7), or to "0xNN" / "0xNN 0xNN" for
+    anything else. Never raises."""
     op = op_for_key_bytes(fn_byte1, fn_byte2)
     if is_known(op):
         return display(op)
     if fn_byte2 is None:
         return f"0x{fn_byte1:02X}"
+    if fn_byte1 in XROM_FIRST_BYTES:
+        return xrom_text(fn_byte1, fn_byte2)
     return f"0x{fn_byte1:02X} 0x{fn_byte2:02X}"
 
 

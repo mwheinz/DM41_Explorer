@@ -12,10 +12,15 @@ import pytest
 
 from memory.functions import SINGLE_BYTE_FUNCTIONS, XROM_FUNCTIONS
 from memory.mnemonics import (
+    XROM_FIRST_BYTES,
     assignable_display_names,
     display_for_key_bytes,
     key_bytes_for,
+    parse_xrom_text,
     resolve,
+    xrom_bytes,
+    xrom_numbers,
+    xrom_text,
 )
 
 
@@ -53,11 +58,65 @@ def test_assignable_names_cover_both_tables_and_nothing_else():
         (0x00, None, "CAT"),
         (0xA6, 0x78, "ΣREG?"),
         (0x05, None, "0x05"),
-        (0xA6, 0x3F, "0xA6 0x3F"),
+        # An unknown XROM shows as its numbers; any other unknown pair as hex.
+        (0xA6, 0x3F, "XROM 24,63"),
+        (0xA0, 0x05, "XROM 00,05"),
+        (0xA7, 0xFF, "XROM 31,63"),
+        (0x04, 0x05, "0x04 0x05"),
     ],
 )
 def test_display_for_key_bytes(fn1, fn2, expected):
     assert display_for_key_bytes(fn1, fn2) == expected
+
+
+# -- XROM numbers -----------------------------------------------------------
+
+
+def test_xrom_numbers_round_trip_for_every_module_and_function():
+    seen = set()
+    for module in range(32):
+        for function in range(64):
+            byte1, byte2 = xrom_bytes(module, function)
+            assert byte1 in XROM_FIRST_BYTES
+            assert xrom_numbers(byte1, byte2) == (module, function)
+            seen.add((byte1, byte2))
+    assert len(seen) == 32 * 64
+
+
+@pytest.mark.parametrize(
+    "module, function, expected",
+    [
+        (25, 63, (0xA6, 0x7F)),  # X<I>Y
+        (26, 38, (0xA6, 0xA6)),  # ABSP
+        (29, 18, (0xA7, 0x52)),  # PRΣ
+        (1, 9, (0xA0, 0x49)),
+    ],
+)
+def test_xrom_bytes_known_pairs(module, function, expected):
+    assert xrom_bytes(module, function) == expected
+    assert xrom_text(*expected) == f"XROM {module:02d},{function:02d}"
+
+
+@pytest.mark.parametrize("module, function", [(32, 0), (0, 64), (-1, 0)])
+def test_xrom_bytes_rejects_out_of_range_numbers(module, function):
+    with pytest.raises(ValueError, match="out of range"):
+        xrom_bytes(module, function)
+
+
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("XROM 26,38", (26, 38)),
+        ("xrom 26, 38", (26, 38)),
+        ("XROM 1 9", (1, 9)),
+        ("  XROM 99,99  ", (99, 99)),  # parsed; xrom_bytes() checks range
+        ("XROM 26", None),
+        ("XROM26,38", None),
+        ("ABSP", None),
+    ],
+)
+def test_parse_xrom_text(text, expected):
+    assert parse_xrom_text(text) == expected
 
 
 # -- Typed input ------------------------------------------------------------

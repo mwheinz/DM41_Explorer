@@ -119,6 +119,14 @@ def test_a_new_profile_has_to_opt_into_serial():
     assert quiet.supports_serial is False
 
 
+def test_only_the_dm41x_loads_modules():
+    """The DM41X plugs in .mod files; the DM41L has only its built-in
+    ROMs, and a new profile has to opt in."""
+    assert DM41X.loads_modules is True
+    assert DM41L.loads_modules is False
+    assert DeviceProfile("quiet", ((0x40, 0xBF),), frozenset()).loads_modules is False
+
+
 def test_a_profile_can_declare_serial_and_three_regions():
     """What a DM41XN profile will look like: the DM41X's memory with a
     serial console. Nothing in the profile forbids the combination."""

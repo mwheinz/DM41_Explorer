@@ -43,15 +43,13 @@ from typing import List, Optional, Tuple
 from .device_profile import DeviceProfile, PROFILES
 from .functions import XROM_FUNCTIONS
 from .memory import Memory
+from .mnemonics import XROM_FIRST_BYTES, xrom_text
 from .opcode_scan import NUMBER_ENTRY_FIRST, NUMBER_ENTRY_LAST, iter_instructions
 from .registers import DM41MemoryError
 from .xm_file import XMFile
 
 ERROR = "error"
 WARNING = "warning"
-
-# First bytes of a two-byte XROM instruction: 0xA0 + (module // 4).
-_XROM_FIRST_BYTES = range(0xA0, 0xA8)
 
 
 @dataclass(frozen=True)
@@ -272,11 +270,9 @@ def _check_leftover_data(view: Memory, profile: DeviceProfile) -> List[ProfileFi
 def _xrom_message(pair: Tuple[int, int], profile: DeviceProfile) -> str:
     """ "LKAOFF is not built into a DM41L", or the XROM's numbers when the
     function is not one the registry knows."""
-    byte1, byte2 = pair
     name = XROM_FUNCTIONS.get(pair)
     if name is None:
-        module = ((byte1 & 0x07) << 2) | (byte2 >> 6)
-        name = f"XROM {module:02d},{byte2 & 0x3F:02d}"
+        name = xrom_text(*pair)
     return f"{name} is not built into a {profile.name}"
 
 
@@ -295,7 +291,7 @@ def _check_instructions(
         if not (is_number and in_number):
             step += 1  # the digits of one number are one program line
         in_number = is_number
-        if first in _XROM_FIRST_BYTES and length == 2:
+        if first in XROM_FIRST_BYTES and length == 2:
             pair = (first, data[start + 1])
             if pair not in profile.builtin_xroms:
                 findings.append(
@@ -348,7 +344,7 @@ def _check_key_assignments(
     findings = []
     for assignment in view.key_assignments.list_assignments():
         byte1, byte2 = assignment.fn_byte1, assignment.fn_byte2
-        if byte2 is None or byte1 not in _XROM_FIRST_BYTES:
+        if byte2 is None or byte1 not in XROM_FIRST_BYTES:
             continue
         if (byte1, byte2) in profile.builtin_xroms:
             continue

@@ -5,10 +5,11 @@ tab design. This dialog itself never touches the Memory object; it hands
 the resolved assignment back to the caller via `on_save`, and signals a
 delete via `on_delete`, exactly like RegisterEditDialog.
 
-Three tabs, matching the two independent storage mechanisms docs/
-key_assignments.md sec 4.1 describes: "Function" and "Raw Hex" both write
-a built-in/peripheral function into the Key Assignment Registers (sec
-4.2), while "Program" assigns a user's global label instead (sec 4.6) --
+Four tabs, matching the two independent storage mechanisms docs/
+key_assignments.md sec 4.1 describes: "Function", "XROM" and "Raw Hex"
+all write a built-in/peripheral function into the Key Assignment
+Registers (sec 4.2), while "Program" assigns a user's global label
+instead (sec 4.6) --
 a completely different storage location (the label's own header) with
 different constraints (a program can hold only one key assignment at a
 time, so picking one here MOVES it if it's already on another key).
@@ -27,11 +28,19 @@ from gui.dialog_common import build_dialog_button_row, scaled
 from gui.contrast import SECONDARY_TEXT
 from gui.tab_common import MONOSPACE_FONT_FAMILY
 from memory.mnemonics import (
+    XROM_FIRST_BYTES,
     assignable_display_names,
+    display,
     is_available_on,
     is_dm41x_only,
+    is_known,
     key_bytes_for,
+    parse_xrom_text,
     resolve,
+    xrom_bytes,
+    xrom_numbers,
+    xrom_op,
+    xrom_text,
 )
 
 logger = logging.getLogger(__name__)
@@ -69,6 +78,40 @@ def _unavailable_message(name: str, profile) -> str:
         f"A {profile.name} cannot run it, so it cannot be assigned to a "
         "key here. Switch to DM41X mode to use it."
     )
+
+
+# The XROM tab's module numbers. Module 00 is not a real module, so the
+# tab does not offer it; Raw Hex can still write one.
+_XROM_MODULES = range(1, 32)
+_XROM_FUNCTIONS = range(0, 64)
+
+
+def _xrom_numbers_for_assignment(assignment):
+    """(module, function) strings for the XROM tab, from an existing XROM
+    assignment, or ("", "") when there isn't one."""
+    if (
+        assignment is None
+        or assignment.fn_byte2 is None
+        or assignment.fn_byte1 not in XROM_FIRST_BYTES
+    ):
+        return "", ""
+    module, function = xrom_numbers(assignment.fn_byte1, assignment.fn_byte2)
+    return str(module), str(function)
+
+
+def _parse_xrom_fields(module_text: str, function_text: str):
+    """(byte1, byte2) from the XROM tab's two fields. Raises ValueError,
+    with a message for the user, if either is missing or out of range."""
+    try:
+        module, function = int(module_text.strip()), int(function_text.strip())
+    except ValueError:
+        raise ValueError("Enter a module number and a function number.") from None
+    if module not in _XROM_MODULES or function not in _XROM_FUNCTIONS:
+        raise ValueError(
+            f"XROM {module},{function} is out of range: the module must be "
+            "1-31 and the function 0-63."
+        )
+    return xrom_bytes(module, function)
 
 
 def _hex_for_assignment(assignment) -> str:
@@ -169,6 +212,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         tabs = ctk.CTkTabview(self, width=scaled(360))
         tabs.pack(padx=16, pady=8, fill="both", expand=True)
         tabs.add("Function")
+        tabs.add("XROM")
         tabs.add("Program")
         tabs.add("Raw Hex")
 
@@ -200,6 +244,47 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         self._dm41x_hint.pack(anchor="w", padx=8, pady=(8, 0))
         self._function_var.trace_add("write", self._update_dm41x_hint)
         self._update_dm41x_hint()
+
+        # -- XROM tab: any module (1-31) and function (0-63) -------------
+        # For a module function the Function tab doesn't list, without
+        # working out its bytes by hand. A pair no table names can still
+        # be assigned: the module may simply not be known here.
+        module_text, function_text = _xrom_numbers_for_assignment(assignment)
+        self._xrom_module_var = ctk.StringVar(value=module_text)
+        self._xrom_function_var = ctk.StringVar(value=function_text)
+        xrom_tab = tabs.tab("XROM")
+        ctk.CTkLabel(
+            xrom_tab,
+            text="Module (1-31) and function (0-63), as in XROM mm,ff:",
+            wraplength=scaled(320),
+            justify="left",
+        ).pack(anchor="w", padx=8, pady=(12, 4))
+        fields = ctk.CTkFrame(xrom_tab, fg_color="transparent")
+        fields.pack(anchor="w", padx=8)
+        ctk.CTkLabel(fields, text="XROM").pack(side="left")
+        for var, after in (
+            (self._xrom_module_var, ","),
+            (self._xrom_function_var, None),
+        ):
+            ctk.CTkEntry(
+                fields,
+                textvariable=var,
+                width=scaled(48),
+                font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+            ).pack(side="left", padx=(6, 0))
+            if after:
+                ctk.CTkLabel(fields, text=after).pack(side="left", padx=(2, 0))
+        self._xrom_info = ctk.CTkLabel(
+            xrom_tab,
+            text="",
+            text_color=SECONDARY_TEXT,
+            wraplength=scaled(320),
+            justify="left",
+        )
+        self._xrom_info.pack(anchor="w", padx=8, pady=(8, 0))
+        self._xrom_module_var.trace_add("write", self._update_xrom_info)
+        self._xrom_function_var.trace_add("write", self._update_xrom_info)
+        self._update_xrom_info()
 
         # -- Raw Hex tab: 2 hex digits (single-byte) or 4 (XROM 2-byte) --
         self._hex_var = ctk.StringVar(value=_hex_for_assignment(assignment))
@@ -253,16 +338,16 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
             ).pack(anchor="w", padx=8, pady=(12, 4))
 
         # Whichever tab already matches the current assignment (if any)
-        # opens first -- an unknown/raw-hex assignment (fn2 present but no
-        # matching function name, or a name outside the known list) should
-        # land on Raw Hex rather than silently defaulting to some
-        # unrelated function.
+        # opens first. One the Function tab can't show -- an unknown
+        # function, or a name outside the list -- opens on XROM when it is
+        # an XROM, and on Raw Hex otherwise, rather than silently
+        # defaulting to some unrelated function.
         # A name this model does not have counts as unrepresentable here
         # too, not just an unknown one: in DM41L mode a state that already
-        # has LKAOFF on a key opens on Raw Hex, which is honest -- the
+        # has LKAOFF on a key opens on the XROM tab, which is honest -- the
         # Function tab cannot offer that name.
         if assignment is not None and assignment.name not in self._function_names:
-            tabs.set("Raw Hex")
+            tabs.set("XROM" if module_text else "Raw Hex")
         elif assignment is None and program_assignment is not None:
             tabs.set("Program")
         self._tabs = tabs
@@ -295,6 +380,50 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         )
         self._dm41x_hint.configure(text=_DM41X_ONLY_HINT if dm41x_only else "")
 
+    def _update_xrom_info(self, *_trace_args):
+        """Under the XROM tab's fields: the bytes, and the function's name
+        when it is a known one -- or why the numbers can't be saved."""
+        try:
+            byte1, byte2 = _parse_xrom_fields(
+                self._xrom_module_var.get(), self._xrom_function_var.get()
+            )
+        except ValueError as e:
+            text = "" if not self._xrom_module_var.get().strip() else str(e)
+            self._xrom_info.configure(text=text)
+            return
+        op = xrom_op(byte1, byte2)
+        name = display(op) if is_known(op) else "Not a known function"
+        lines = [f"Bytes {byte1:02X} {byte2:02X}: {name}"]
+        if self._lacks_xrom(op):
+            lines.append(f"A {self._profile.name} does not have this function.")
+        elif not is_known(op):
+            lines.append("It can still be assigned.")
+        self._xrom_info.configure(text="\n".join(lines))
+
+    def _lacks_xrom(self, op) -> bool:
+        """True if this model certainly cannot run the XROM `op`: it isn't
+        built in, and the model can't plug in a module that might have
+        it. On a model that loads modules, any XROM may be there."""
+        return not (is_available_on(op, self._profile) or self._profile.loads_modules)
+
+    def _confirm_xrom(self, byte1: int, byte2: int) -> bool:
+        """Whether to go ahead with an XROM given by its numbers. One this
+        model can't run is allowed, after asking -- the state may be
+        meant for another calculator -- unlike a function picked by name,
+        which is refused (see _unavailable_message)."""
+        op = xrom_op(byte1, byte2)
+        if not self._lacks_xrom(op):
+            return True
+        what = xrom_text(byte1, byte2)
+        if is_known(op):
+            what += f" ({display(op)})"
+        return messagebox.askyesno(
+            "Not on This Calculator",
+            f"{what} is not built into a {self._profile.name}, so pressing "
+            "the key there will not run it.\n\nAssign it anyway?",
+            parent=self,
+        )
+
     def _on_save_clicked(self):
         which = self._tabs.get()
         try:
@@ -302,6 +431,14 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
                 name = self._function_var.get().strip()
                 if not name:
                     raise ValueError("Choose a function.")
+                numbers = parse_xrom_text(name)
+                if numbers is not None:
+                    value = _parse_xrom_fields(*map(str, numbers))
+                    if not self._confirm_xrom(*value):
+                        return
+                    self._on_save("function", value)
+                    self.destroy()
+                    return
                 # Typed input doesn't have to match the display name's
                 # exact spelling or case: any spelling program-text import
                 # accepts works here too ("sigma+", "x^2", "p->r", "\\EREG";
@@ -315,6 +452,13 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
                 if not is_available_on(op, self._profile):
                     raise ValueError(_unavailable_message(name, self._profile))
                 kind, value = "function", key_bytes_for(op)
+            elif which == "XROM":
+                value = _parse_xrom_fields(
+                    self._xrom_module_var.get(), self._xrom_function_var.get()
+                )
+                if not self._confirm_xrom(*value):
+                    return
+                kind = "function"
             elif which == "Raw Hex":
                 text = self._hex_var.get().strip().replace(" ", "")
                 if len(text) == 2:

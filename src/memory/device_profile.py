@@ -44,12 +44,18 @@ class DeviceProfile:
     its mode. It is a property of the model, deliberately not a test against
     `name`: the DM41XN has both a FAT disk and a serial interface, so adding
     its profile later must not require revisiting every gating decision.
-    Defaults to False, so a new profile has to opt in."""
+    Defaults to False, so a new profile has to opt in.
+
+    `loads_modules` is whether the model can plug in other ROM modules
+    (.mod files), so whether an XROM outside `builtin_xroms` may still
+    run on it. The DM41X can; the DM41L has only its built-in ROMs. Also
+    defaults to False."""
 
     name: str
     xm_regions: Tuple[Tuple[int, int], ...]
     builtin_xroms: FrozenSet[Tuple[int, int]]
     supports_serial: bool = False
+    loads_modules: bool = False
 
     def __post_init__(self):
         if not self.xm_regions:
@@ -115,6 +121,7 @@ DM41X = DeviceProfile(
     ((0x40, 0xBF), (0x201, 0x2EF), (0x301, 0x3EF)),
     frozenset(XROM_FUNCTIONS),
     supports_serial=False,
+    loads_modules=True,
 )
 
 PROFILES = {profile.name: profile for profile in (DM41L, DM41X)}

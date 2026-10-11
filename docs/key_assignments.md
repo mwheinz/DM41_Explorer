@@ -226,5 +226,13 @@ One consequence for the edit dialog: in DM41L mode its function list
 offers only the functions a DM41L has, and a DM41X-only name typed into
 it is refused rather than merely flagged. A state that already carries
 such an assignment (saved in DM41X mode, or made on the calculator)
-still displays it; the dialog opens on its Raw Hex tab, because the
+still displays it; the dialog opens on its XROM tab, with the
+function's module and function numbers filled in, because the
 Function tab cannot offer that name in that mode.
+
+The XROM tab takes any module (1-31) and function (0-63), whether or
+not a table here names it, and encodes them as in sec 4.2. Given by
+its numbers, an XROM the model does not have is allowed after a
+confirmation, unlike one picked by name. The Function tab also accepts
+a typed `XROM mm,ff`. An XROM that no table names displays as
+`XROM mm,ff` rather than as raw hex.

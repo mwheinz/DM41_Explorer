@@ -79,6 +79,8 @@ from .mnemonics import (
     function_op,
     is_known,
     resolve,
+    xrom_bytes,
+    xrom_numbers,
     xrom_op,
 )
 from .program_chain import decode_chain_marker, encode_chain_marker
@@ -447,8 +449,7 @@ def _decode_xrom(byte1: int, byte2: int) -> str:
     checking multiple known (byte1, byte2) pairs from functions.py's own
     XROM_FUNCTIONS table against tower.txt's "mm,ff" comments (SEEKPT,
     ARCLREC, GETKEY, X<>F all check out exactly)."""
-    mm = ((byte1 & 0x07) << 2) | (byte2 >> 6)
-    ff = byte2 & 0x3F
+    mm, ff = xrom_numbers(byte1, byte2)
     text = f"{canonical(XROM)} {mm:02d},{ff:02d}"  # hp41uc: "%02d" (decomp.c)
     op = xrom_op(byte1, byte2)
     if is_known(op):
@@ -1005,15 +1006,7 @@ def _encode_xrom(tokens: List[str]) -> bytes:
     match = _XROM_RE.match(tokens[1])
     if not match:
         raise ValueError(f"malformed XROM operand (expected 'mm,ff'): {tokens[1]!r}")
-    mm, ff = int(match.group(1)), int(match.group(2))
-    if not (0 <= mm <= 31 and 0 <= ff <= 63):
-        raise ValueError(
-            f"XROM {mm},{ff:02d} out of range -- module must be 00-31 and "
-            "function 00-63"
-        )
-    byte1 = 0xA0 | ((mm >> 2) & 0x07)
-    byte2 = ((mm & 0x03) << 6) | (ff & 0x3F)
-    return bytes([byte1, byte2])
+    return bytes(xrom_bytes(int(match.group(1)), int(match.group(2))))
 
 
 def _encode_gto_xeq(is_xeq: bool, tokens: List[str]) -> bytes:
