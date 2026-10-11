@@ -1,0 +1,44 @@
+{
+  "format": "dm41-xrom-library",
+  "format_version": 1,
+  "id": "machine",
+  "title": "Machine Design Pac",
+  "version": "A",
+  "part_number": "00041-15020",
+  "author": "Hewlett-Packard",
+  "source": "FAT of MACHINE.MOD",
+  "builtin_on": [],
+  "modules": [
+    {
+      "xrom": 12,
+      "page_id": "MD1A",
+      "functions": [
+        {"fn": 0, "name": "MACHINE 1A", "type": "mcode", "header": true},
+        {"fn": 1, "name": "CAM", "type": "focal"},
+        {"fn": 2, "name": "HAR", "type": "focal"},
+        {"fn": 3, "name": "CYC", "type": "focal"},
+        {"fn": 4, "name": "PAR", "type": "focal"},
+        {"fn": 5, "name": "DWELL", "type": "focal"},
+        {"fn": 6, "name": "GEN4BAR", "type": "focal"},
+        {"fn": 7, "name": "4BAR", "type": "focal"},
+        {"fn": 8, "name": "CRANK", "type": "focal"},
+        {"fn": 9, "name": "GEAR", "type": "focal"},
+        {"fn": 10, "name": "SPUR", "type": "focal"},
+        {"fn": 11, "name": "INV", "type": "focal"},
+        {"fn": 12, "name": "SPRING", "type": "focal"},
+        {"fn": 13, "name": "MOTION", "type": "focal"},
+        {"fn": 14, "name": "COORD", "type": "focal"},
+        {"fn": 15, "name": "POINTS", "type": "focal"},
+        {"fn": 16, "name": "3POINTS", "type": "focal"},
+        {"fn": 17, "name": "FCON", "type": "mcode"},
+        {"fn": 18, "name": "BCON", "type": "mcode"},
+        {"fn": 19, "name": "INI", "type": "focal"},
+        {"fn": 20, "name": "*?", "type": "focal"},
+        {"fn": 21, "name": "*IN", "type": "focal"},
+        {"fn": 22, "name": "+360", "type": "focal"},
+        {"fn": 23, "name": "*OUT", "type": "focal"},
+        {"fn": 24, "name": "KEY", "type": "focal"}
+      ]
+    }
+  ]
+}

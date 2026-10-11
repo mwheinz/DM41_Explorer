@@ -1,0 +1,52 @@
+{
+  "format": "dm41-xrom-library",
+  "format_version": 1,
+  "id": "survey",
+  "title": "Surveying Pac",
+  "version": "B",
+  "part_number": "00041-15005",
+  "author": "Hewlett-Packard",
+  "source": "FAT of SURVEY.MOD",
+  "builtin_on": [],
+  "modules": [
+    {
+      "xrom": 3,
+      "page_id": "SU1B",
+      "functions": [
+        {"fn": 0, "name": "SURVEY 1B", "type": "mcode", "header": true},
+        {"fn": 1, "name": "TRAV", "type": "focal"},
+        {"fn": 2, "name": "COMP", "type": "focal"},
+        {"fn": 3, "name": "TRANSIT", "type": "focal"},
+        {"fn": 4, "name": "ADJUST", "type": "focal"},
+        {"fn": 5, "name": "INTER", "type": "focal"},
+        {"fn": 6, "name": "CURVE", "type": "focal"},
+        {"fn": 7, "name": "HORIZ", "type": "focal"},
+        {"fn": 8, "name": "VERT", "type": "focal"},
+        {"fn": 9, "name": "RESECT", "type": "focal"},
+        {"fn": 10, "name": "PREAREA", "type": "focal"},
+        {"fn": 11, "name": "ENDVOL", "type": "focal"},
+        {"fn": 12, "name": "PIT", "type": "focal"},
+        {"fn": 13, "name": "COORD", "type": "focal"},
+        {"fn": 14, "name": "ACRES", "type": "focal"},
+        {"fn": 15, "name": "AZ", "type": "focal"},
+        {"fn": 16, "name": "BRG", "type": "focal"},
+        {"fn": 17, "name": "CIR", "type": "focal"},
+        {"fn": 18, "name": "INVERSE", "type": "focal"},
+        {"fn": 19, "name": "NE", "type": "focal"},
+        {"fn": 20, "name": "TS", "type": "focal"},
+        {"fn": 21, "name": "*AO", "type": "focal"},
+        {"fn": 22, "name": "*∡", "type": "focal"},
+        {"fn": 23, "name": "*BR", "type": "focal"},
+        {"fn": 24, "name": "*DL", "type": "focal"},
+        {"fn": 25, "name": "*DS", "type": "focal"},
+        {"fn": 26, "name": "*EL", "type": "focal"},
+        {"fn": 27, "name": "*H", "type": "focal"},
+        {"fn": 28, "name": "*S", "type": "focal"},
+        {"fn": 29, "name": "*A1", "type": "focal"},
+        {"fn": 30, "name": "*B1", "type": "focal"},
+        {"fn": 31, "name": "*IN", "type": "focal"},
+        {"fn": 32, "name": "*YN", "type": "focal"}
+      ]
+    }
+  ]
+}

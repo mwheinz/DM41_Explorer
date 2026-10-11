@@ -1,0 +1,49 @@
+{
+  "format": "dm41-xrom-library",
+  "format_version": 1,
+  "id": "thermal",
+  "title": "Thermal & Transport Science Pac",
+  "version": "A",
+  "part_number": "00041-15019",
+  "author": "Hewlett-Packard",
+  "source": "FAT of Thermal.mod",
+  "builtin_on": [],
+  "modules": [
+    {
+      "xrom": 13,
+      "page_id": "TT1A",
+      "functions": [
+        {"fn": 0, "name": "THRML 1A", "type": "mcode", "header": true},
+        {"fn": 1, "name": "KWONG", "type": "focal"},
+        {"fn": 2, "name": "IDEAL", "type": "focal"},
+        {"fn": 3, "name": "POLYTRP", "type": "focal"},
+        {"fn": 4, "name": "ISNFLOW", "type": "focal"},
+        {"fn": 5, "name": "FLOW", "type": "focal"},
+        {"fn": 6, "name": "FLOW2", "type": "focal"},
+        {"fn": 7, "name": "H2O", "type": "focal"},
+        {"fn": 8, "name": "Re", "type": "focal"},
+        {"fn": 9, "name": "ENERGY", "type": "focal"},
+        {"fn": 10, "name": "HEATEX", "type": "focal"},
+        {"fn": 11, "name": "A0", "type": "focal"},
+        {"fn": 12, "name": "E0", "type": "focal"},
+        {"fn": 13, "name": "ACNT", "type": "focal"},
+        {"fn": 14, "name": "ECNT", "type": "focal"},
+        {"fn": 15, "name": "APAR", "type": "focal"},
+        {"fn": 16, "name": "EPAR", "type": "focal"},
+        {"fn": 17, "name": "APRC", "type": "focal"},
+        {"fn": 18, "name": "EPRC", "type": "focal"},
+        {"fn": 19, "name": "ACRS", "type": "focal"},
+        {"fn": 20, "name": "ECRS", "type": "focal"},
+        {"fn": 21, "name": "BLKBODY", "type": "focal"},
+        {"fn": 22, "name": "EbL", "type": "focal"},
+        {"fn": 23, "name": "UNIT?", "type": "focal"},
+        {"fn": 24, "name": "SZ?", "type": "focal"},
+        {"fn": 25, "name": "INPUT", "type": "focal"},
+        {"fn": 26, "name": "OUTPUT", "type": "focal"},
+        {"fn": 27, "name": "KEY", "type": "focal"},
+        {"fn": 28, "name": "-SI", "type": "mcode"},
+        {"fn": 29, "name": "SI-", "type": "mcode"}
+      ]
+    }
+  ]
+}

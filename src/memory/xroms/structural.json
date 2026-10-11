@@ -1,0 +1,61 @@
+{
+  "format": "dm41-xrom-library",
+  "format_version": 1,
+  "id": "structural",
+  "title": "Structural Analysis Pac",
+  "version": "BA",
+  "part_number": "00041-15021",
+  "author": "Hewlett-Packard",
+  "source": "FAT of Structural.mod",
+  "builtin_on": [],
+  "modules": [
+    {
+      "xrom": 7,
+      "page_id": "CE1B",
+      "functions": [
+        {"fn": 0, "name": "STRCTA 1B", "type": "mcode", "header": true},
+        {"fn": 1, "name": "SECTION", "type": "focal"},
+        {"fn": 2, "name": "SIMPLE", "type": "focal"},
+        {"fn": 3, "name": "CANT", "type": "focal"},
+        {"fn": 4, "name": "FIXED", "type": "focal"},
+        {"fn": 5, "name": "PROPPED", "type": "focal"},
+        {"fn": 6, "name": "SPAN", "type": "focal"},
+        {"fn": 7, "name": "NSPAN", "type": "focal"},
+        {"fn": 8, "name": "FIXL", "type": "focal"},
+        {"fn": 9, "name": "FIXR", "type": "focal"},
+        {"fn": 10, "name": "MOMENTS", "type": "focal"},
+        {"fn": 11, "name": "SETTLE", "type": "focal"},
+        {"fn": 12, "name": "CFRAME", "type": "focal"},
+        {"fn": 13, "name": "VECTOR", "type": "focal"},
+        {"fn": 14, "name": "SIZE?", "type": "focal"},
+        {"fn": 15, "name": "SZ?", "type": "focal"},
+        {"fn": 16, "name": "ATANY/X", "type": "focal"},
+        {"fn": 17, "name": "BEAM", "type": "focal"},
+        {"fn": 18, "name": "*B", "type": "focal"},
+        {"fn": 19, "name": "*AI", "type": "focal"},
+        {"fn": 20, "name": "*L1", "type": "focal"},
+        {"fn": 21, "name": "*P1", "type": "focal"},
+        {"fn": 22, "name": "*M1", "type": "focal"},
+        {"fn": 23, "name": "*W1", "type": "focal"},
+        {"fn": 24, "name": "*P", "type": "focal"},
+        {"fn": 25, "name": "*M", "type": "focal"},
+        {"fn": 26, "name": "*L", "type": "focal"},
+        {"fn": 27, "name": "*W", "type": "focal"}
+      ]
+    },
+    {
+      "xrom": 19,
+      "page_id": "CB1A",
+      "functions": [
+        {"fn": 0, "name": "STRCTB 1A", "type": "mcode", "header": true},
+        {"fn": 1, "name": "COLE", "type": "focal"},
+        {"fn": 2, "name": "COLSI", "type": "focal"},
+        {"fn": 3, "name": "TBEAM", "type": "focal"},
+        {"fn": 4, "name": "RBEAM", "type": "focal"},
+        {"fn": 5, "name": "CONCOL", "type": "focal"},
+        {"fn": 6, "name": "ITCON", "type": "focal"},
+        {"fn": 7, "name": "IRCON", "type": "focal"}
+      ]
+    }
+  ]
+}

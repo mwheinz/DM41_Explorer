@@ -1,0 +1,43 @@
+{
+  "format": "dm41-xrom-library",
+  "format_version": 1,
+  "id": "home-mgt",
+  "title": "Home Management Pac",
+  "version": "A",
+  "part_number": "00041-15023",
+  "author": "Hewlett-Packard",
+  "source": "FAT of HOME-MGT.MOD",
+  "builtin_on": [],
+  "modules": [
+    {
+      "xrom": 9,
+      "page_id": "HM1A",
+      "functions": [
+        {"fn": 0, "name": "HOME MN 1A", "type": "mcode", "header": true},
+        {"fn": 1, "name": "BUDGET", "type": "focal"},
+        {"fn": 2, "name": "TRAVEL", "type": "focal"},
+        {"fn": 3, "name": "STOCKS", "type": "focal"},
+        {"fn": 4, "name": "FINANCE", "type": "focal"},
+        {"fn": 5, "name": "BAL", "type": "focal"},
+        {"fn": 6, "name": "IRA", "type": "focal"},
+        {"fn": 7, "name": "INS", "type": "focal"},
+        {"fn": 8, "name": "CHECK", "type": "focal"},
+        {"fn": 9, "name": "HOME", "type": "focal"},
+        {"fn": 10, "name": "BUY?", "type": "focal"},
+        {"fn": 11, "name": "STORE", "type": "focal"},
+        {"fn": 12, "name": "RELOAD", "type": "focal"},
+        {"fn": 13, "name": "CL", "type": "focal"},
+        {"fn": 14, "name": "*", "type": "focal"},
+        {"fn": 15, "name": "*0", "type": "focal"},
+        {"fn": 16, "name": "*e", "type": "focal"},
+        {"fn": 17, "name": "N", "type": "focal"},
+        {"fn": 18, "name": "*I", "type": "focal"},
+        {"fn": 19, "name": "PV", "type": "focal"},
+        {"fn": 20, "name": "PMT", "type": "focal"},
+        {"fn": 21, "name": "FV", "type": "focal"},
+        {"fn": 22, "name": "*J", "type": "focal"},
+        {"fn": 23, "name": "*H", "type": "focal"}
+      ]
+    }
+  ]
+}

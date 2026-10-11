@@ -1,0 +1,52 @@
+{
+  "format": "dm41-xrom-library",
+  "format_version": 1,
+  "id": "stress",
+  "title": "Stress Analysis Pac",
+  "version": "A",
+  "part_number": "00041-15027",
+  "author": "Hewlett-Packard",
+  "source": "FAT of Stress.mod",
+  "builtin_on": [],
+  "modules": [
+    {
+      "xrom": 8,
+      "page_id": "ME1A",
+      "functions": [
+        {"fn": 0, "name": "STRESS 1A", "type": "mcode", "header": true},
+        {"fn": 1, "name": "SIMPLE", "type": "focal"},
+        {"fn": 2, "name": "CANT", "type": "focal"},
+        {"fn": 3, "name": "FIXED", "type": "focal"},
+        {"fn": 4, "name": "PROPPED", "type": "focal"},
+        {"fn": 5, "name": "SPAN", "type": "focal"},
+        {"fn": 6, "name": "NSPAN", "type": "focal"},
+        {"fn": 7, "name": "FIXL", "type": "focal"},
+        {"fn": 8, "name": "FIXR", "type": "focal"},
+        {"fn": 9, "name": "MOMENTS", "type": "focal"},
+        {"fn": 10, "name": "COLUMN", "type": "focal"},
+        {"fn": 11, "name": "SECTION", "type": "focal"},
+        {"fn": 12, "name": "MOHR", "type": "focal"},
+        {"fn": 13, "name": "DELTA", "type": "focal"},
+        {"fn": 14, "name": "REC", "type": "focal"},
+        {"fn": 15, "name": "SODER", "type": "focal"},
+        {"fn": 16, "name": "VECTOR", "type": "focal"},
+        {"fn": 17, "name": "SIZE?", "type": "focal"},
+        {"fn": 18, "name": "ATANY/X", "type": "focal"},
+        {"fn": 19, "name": "BEAM", "type": "focal"},
+        {"fn": 20, "name": "*B", "type": "focal"},
+        {"fn": 21, "name": "*AI", "type": "focal"},
+        {"fn": 22, "name": "*L1", "type": "focal"},
+        {"fn": 23, "name": "*L", "type": "focal"},
+        {"fn": 24, "name": "*P1", "type": "focal"},
+        {"fn": 25, "name": "*P", "type": "focal"},
+        {"fn": 26, "name": "*M1", "type": "focal"},
+        {"fn": 27, "name": "*M", "type": "focal"},
+        {"fn": 28, "name": "*W1", "type": "focal"},
+        {"fn": 29, "name": "*W", "type": "focal"},
+        {"fn": 30, "name": "*ROS", "type": "focal"},
+        {"fn": 31, "name": "*MO", "type": "focal"},
+        {"fn": 32, "name": "*COL", "type": "focal"}
+      ]
+    }
+  ]
+}

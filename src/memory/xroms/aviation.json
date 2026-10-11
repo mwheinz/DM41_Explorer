@@ -1,0 +1,41 @@
+{
+  "format": "dm41-xrom-library",
+  "format_version": 1,
+  "id": "aviation",
+  "title": "Aviation Pac",
+  "version": "A",
+  "part_number": "00041-15018",
+  "author": "Hewlett-Packard",
+  "source": "FAT of Aviation.mod",
+  "builtin_on": [],
+  "modules": [
+    {
+      "xrom": 19,
+      "page_id": "AV1A",
+      "functions": [
+        {"fn": 0, "name": "AVIATIN 1A", "type": "mcode", "header": true},
+        {"fn": 1, "name": "FM", "type": "focal"},
+        {"fn": 2, "name": "WB", "type": "focal"},
+        {"fn": 3, "name": "CG", "type": "focal"},
+        {"fn": 4, "name": "CLWB", "type": "focal"},
+        {"fn": 5, "name": "PLAN", "type": "focal"},
+        {"fn": 6, "name": "DP", "type": "focal"},
+        {"fn": 7, "name": "WA", "type": "focal"},
+        {"fn": 8, "name": "PERF", "type": "focal"},
+        {"fn": 9, "name": "FLY", "type": "focal"},
+        {"fn": 10, "name": "CLIMB", "type": "focal"},
+        {"fn": 11, "name": "CRUISE", "type": "focal"},
+        {"fn": 12, "name": "360+", "type": "focal"},
+        {"fn": 13, "name": "WALT", "type": "focal"},
+        {"fn": 14, "name": "DISP", "type": "focal"},
+        {"fn": 15, "name": "IFW", "type": "focal"},
+        {"fn": 16, "name": "HCW", "type": "focal"},
+        {"fn": 17, "name": "1VOR", "type": "focal"},
+        {"fn": 18, "name": "R2", "type": "focal"},
+        {"fn": 19, "name": "2VOR", "type": "focal"},
+        {"fn": 20, "name": "TAS", "type": "focal"},
+        {"fn": 21, "name": "*T", "type": "focal"}
+      ]
+    }
+  ]
+}

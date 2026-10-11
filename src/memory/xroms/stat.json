@@ -1,0 +1,49 @@
+{
+  "format": "dm41-xrom-library",
+  "format_version": 1,
+  "id": "stat",
+  "title": "Stat Pac",
+  "version": "B",
+  "part_number": "00041-15002",
+  "author": "Hewlett-Packard",
+  "source": "FAT of Stat.mod",
+  "builtin_on": [],
+  "modules": [
+    {
+      "xrom": 2,
+      "page_id": "ST1B",
+      "functions": [
+        {"fn": 0, "name": "STAT 1B", "type": "mcode", "header": true},
+        {"fn": 1, "name": "ΣBSTAT", "type": "focal"},
+        {"fn": 2, "name": "ΣBSTG", "type": "focal"},
+        {"fn": 3, "name": "*BE", "type": "focal"},
+        {"fn": 4, "name": "ΣMMTUG", "type": "focal"},
+        {"fn": 5, "name": "ΣMMTGD", "type": "focal"},
+        {"fn": 6, "name": "*MT", "type": "focal"},
+        {"fn": 7, "name": "*MD", "type": "focal"},
+        {"fn": 8, "name": "ΣAOVONE", "type": "focal"},
+        {"fn": 9, "name": "ΣAOVTWO", "type": "focal"},
+        {"fn": 10, "name": "ΣANOCOV", "type": "focal"},
+        {"fn": 11, "name": "ΣLIN", "type": "focal"},
+        {"fn": 12, "name": "ΣEXP", "type": "focal"},
+        {"fn": 13, "name": "ΣLOG", "type": "focal"},
+        {"fn": 14, "name": "ΣPOW", "type": "focal"},
+        {"fn": 15, "name": "ΣPOLYP", "type": "focal"},
+        {"fn": 16, "name": "ΣPOLYC", "type": "focal"},
+        {"fn": 17, "name": "ΣMLRXY", "type": "focal"},
+        {"fn": 18, "name": "ΣMLRXYZ", "type": "focal"},
+        {"fn": 19, "name": "ΣPTST", "type": "focal"},
+        {"fn": 20, "name": "ΣTSTAT", "type": "focal"},
+        {"fn": 21, "name": "ΣXSQEV", "type": "focal"},
+        {"fn": 22, "name": "ΣEEFXSQ", "type": "focal"},
+        {"fn": 23, "name": "ΣCTKK", "type": "focal"},
+        {"fn": 24, "name": "ΣCTKKK", "type": "focal"},
+        {"fn": 25, "name": "ΣSPEAR", "type": "focal"},
+        {"fn": 26, "name": "ΣNORMD", "type": "focal"},
+        {"fn": 27, "name": "ΣCHISQD", "type": "focal"},
+        {"fn": 28, "name": "*a", "type": "focal"},
+        {"fn": 29, "name": "*b", "type": "focal"}
+      ]
+    }
+  ]
+}

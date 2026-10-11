@@ -1,0 +1,41 @@
+{
+  "format": "dm41-xrom-library",
+  "format_version": 1,
+  "id": "dm41x-thermal-printer",
+  "title": "Thermal Printer (HP 82143A), preloaded in DM41X flash",
+  "part_number": "82143A",
+  "source": "hp41uc (-PRINTER 2E); LIST (29,07) and PRP (29,13) placed by FAT order, not yet confirmed",
+  "builtin_on": [],
+  "modules": [
+    {
+      "xrom": 29,
+      "functions": [
+        {"fn": 1, "name": "ACA"},
+        {"fn": 2, "name": "ACCHR"},
+        {"fn": 3, "name": "ACCOL"},
+        {"fn": 4, "name": "ACSPEC"},
+        {"fn": 5, "name": "ACX"},
+        {"fn": 6, "name": "BLDSPEC"},
+        {"fn": 7, "name": "LIST"},
+        {"fn": 8, "name": "PRA"},
+        {"fn": 9, "name": "PRAXIS"},
+        {"fn": 10, "name": "PRBUF"},
+        {"fn": 11, "name": "PRFLAGS"},
+        {"fn": 12, "name": "PRKEYS"},
+        {"fn": 13, "name": "PRP"},
+        {"fn": 14, "name": "PRPLOT"},
+        {"fn": 15, "name": "PRPLOTP"},
+        {"fn": 16, "name": "PRREG"},
+        {"fn": 17, "name": "PRREGX"},
+        {"fn": 18, "name": "PRΣ"},
+        {"fn": 19, "name": "PRSTK"},
+        {"fn": 20, "name": "PRX"},
+        {"fn": 21, "name": "REGPLOT"},
+        {"fn": 22, "name": "SKPCHR"},
+        {"fn": 23, "name": "SKPCOL"},
+        {"fn": 24, "name": "STKPLOT"},
+        {"fn": 25, "name": "FMT"}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "format": "dm41-xrom-library",
+  "format_version": 1,
+  "id": "securities",
+  "title": "Securities Pac",
+  "version": "A",
+  "part_number": "00041-15026",
+  "author": "Hewlett-Packard",
+  "source": "FAT of Securities.mod",
+  "builtin_on": [],
+  "modules": [
+    {
+      "xrom": 19,
+      "page_id": "SE1A",
+      "functions": [
+        {"fn": 0, "name": "SECUR 1A", "type": "mcode", "header": true},
+        {"fn": 1, "name": "BONDS", "type": "focal"},
+        {"fn": 2, "name": "STOCK", "type": "focal"},
+        {"fn": 3, "name": "CALL", "type": "focal"},
+        {"fn": 4, "name": "OPTION", "type": "focal"},
+        {"fn": 5, "name": "HEDGING", "type": "focal"},
+        {"fn": 6, "name": "BFLY", "type": "focal"},
+        {"fn": 7, "name": "BULL", "type": "focal"},
+        {"fn": 8, "name": "CSEC", "type": "focal"},
+        {"fn": 9, "name": "CBOND", "type": "focal"},
+        {"fn": 10, "name": "SPEC", "type": "focal"},
+        {"fn": 11, "name": "PRC", "type": "focal"},
+        {"fn": 12, "name": "YLD", "type": "focal"},
+        {"fn": 13, "name": "ATY", "type": "focal"},
+        {"fn": 14, "name": "ATP", "type": "focal"},
+        {"fn": 15, "name": "JDAY", "type": "mcode"},
+        {"fn": 16, "name": "BEP", "type": "focal"},
+        {"fn": 17, "name": "*BFLY", "type": "focal"},
+        {"fn": 18, "name": "DBEP", "type": "focal"},
+        {"fn": 19, "name": "UBEP", "type": "focal"},
+        {"fn": 20, "name": "CONV", "type": "focal"}
+      ]
+    }
+  ]
+}
