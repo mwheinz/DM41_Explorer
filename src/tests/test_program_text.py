@@ -21,16 +21,14 @@ from memory.program_text import decode_program_txt, encode_program_txt
 
 DATA_DIR = Path(__file__).parent / "data"
 
-APPTEST_BYTES = bytes.fromhex(
-    "c000f8004150505445535410021140111010468475b200c40309"
-)
+APPTEST_BYTES = bytes.fromhex("c000f8004150505445535410021140111010468475b200c40309")
 
 
 def _strip_trailing_comment(line: str) -> str:
-    '''Quote-aware removal of a trailing `;` comment (tower.txt only ever
+    """Quote-aware removal of a trailing `;` comment (tower.txt only ever
     uses `;`, never `#`, for a real comment -- and a couple of its
     mnemonics, like "X#Y?", contain a literal '#' that must NOT be
-    mistaken for one).'''
+    mistaken for one)."""
     in_quotes = False
     for i, ch in enumerate(line):
         if ch == '"':
@@ -125,7 +123,7 @@ def test_encode_program_txt_matches_tower_reference():
 
 
 def test_decode_program_txt_matches_tower_raw_bytes():
-    '''The strongest available check: tower.raw is
+    """The strongest available check: tower.raw is
     *hp41uc's own compiled output* from tower.txt, so a byte-identical
     match here confirms this module's compiler against a real,
     third-party-generated program, not just against its own decompiler.
@@ -134,7 +132,7 @@ def test_decode_program_txt_matches_tower_raw_bytes():
     confirming 1088 on real DM41 hardware -- see this module's own
     docstring's "point 2", now historical) -- decode_program_txt() never
     looks at that comment text either way, only at the actual END
-    keyword.'''
+    keyword."""
     raw_bytes = decode_program_raw((DATA_DIR / "tower.raw").read_bytes())
     assert len(raw_bytes) == 1088
 
@@ -145,17 +143,17 @@ def test_decode_program_txt_matches_tower_raw_bytes():
 
 
 def test_decode_program_txt_round_trips_encode_program_txt_on_tower():
-    '''A second, independent round trip in the other direction: feed
+    """A second, independent round trip in the other direction: feed
     tower.raw's own bytes through this module's own decompiler, then
     straight back through the compiler, and expect the exact same bytes
     back out -- decode(encode(x)) == x, not just decode(hp41uc's text) ==
-    hp41uc's bytes.'''
+    hp41uc's bytes."""
     raw_bytes = decode_program_raw((DATA_DIR / "tower.raw").read_bytes())
     assert decode_program_txt(encode_program_txt(raw_bytes)) == raw_bytes
 
 
 def _normalize_memory_state_fields(data: bytes) -> bytes:
-    '''Zeroes out exactly the fields decode_program_txt() can never
+    """Zeroes out exactly the fields decode_program_txt() can never
     recover from text alone, because encode_program_txt() never renders
     them into text in the first place -- every one of these is
     live-memory state, not program *content*:
@@ -194,7 +192,7 @@ def _normalize_memory_state_fields(data: bytes) -> bytes:
     nothing in hp41uc-style source to say ".END." vs "END" with), not
     something a normalizing helper should paper over -- tests that care
     about it (see test_decode_program_txt_cannot_recover_permanent_end_marker
-    below) check it directly instead.'''
+    below) check it directly instead."""
     out = bytearray(data)
     for marker in scan_global_markers_forward(data):
         idx = marker.index
@@ -210,9 +208,9 @@ def _normalize_memory_state_fields(data: bytes) -> bytes:
 
 
 def _zero_cached_jump_bytes(data: bytes, out: bytearray) -> None:
-    '''Walks `data` instruction by instruction (the same length classes
+    """Walks `data` instruction by instruction (the same length classes
     opcode_scan.find_program_end() uses) and clears every GTO/XEQ's cached
-    jump distance in `out` -- see _normalize_memory_state_fields().'''
+    jump distance in `out` -- see _normalize_memory_state_fields()."""
     i, n = 0, len(data)
     while i < n:
         c = data[i]
@@ -239,10 +237,10 @@ def _zero_cached_jump_bytes(data: bytes, out: bytearray) -> None:
 
 
 def _dm41_sample_programs():
-    '''Yields (filename, program, instruction_bytes) for every real
+    """Yields (filename, program, instruction_bytes) for every real
     program in every .dm41 sample state -- the same fixture set
     test_encode_program_txt_never_raises_on_every_sample_program()
-    already exercises for decompile-only coverage.'''
+    already exercises for decompile-only coverage."""
     from memory import Memory
 
     for filename in sorted(os.listdir(DATA_DIR)):
@@ -254,7 +252,7 @@ def _dm41_sample_programs():
 
 
 def test_decode_program_txt_round_trips_every_sample_program_modulo_memory_state():
-    '''Broader coverage than the tower fixture alone: every real program
+    """Broader coverage than the tower fixture alone: every real program
     in every .dm41 sample state, decompiled and recompiled, should
     reproduce the original bytes exactly once the memory-state-only
     fields _normalize_memory_state_fields() describes are normalized
@@ -267,7 +265,7 @@ def test_decode_program_txt_round_trips_every_sample_program_modulo_memory_state
     Unneeded NULLs (an unpacked program's) are dropped on decompile, as
     hp41uc does, so a program containing them recompiles shorter. For
     those, the check is that the recompiled program decompiles to the
-    same listing (apart from the END trailer's byte count).'''
+    same listing (apart from the END trailer's byte count)."""
     mismatches = []
     nulls_dropped = 0
     for filename, program, instruction_bytes in _dm41_sample_programs():
@@ -293,13 +291,13 @@ def test_decode_program_txt_round_trips_every_sample_program_modulo_memory_state
 
 
 def test_decode_program_txt_cannot_recover_permanent_end_marker():
-    '''Documents the one known, inherent round-trip gap: a program whose
+    """Documents the one known, inherent round-trip gap: a program whose
     real terminator is the permanent ".END." sentinel (end_type 2, not a
     plain END's end_type 0) decompiles to text indistinguishable from a
     plain END (encode_program_txt()'s own docstring says as much), so
     recompiling that text always produces a plain END back -- not a bug,
     a property of the text format itself having no distinct spelling for
-    ".END.".'''
+    ".END."."""
     from memory import Memory
     from memory.program_chain import decode_chain_marker
 
@@ -332,31 +330,65 @@ ROUND_TRIPS = [
     (['>":"'], "f27f3a", None),
     (["XROM 25,46"], "a66e", ["XROM 25,46 ;X<>F"]),
     # Any module 00-31 and function 00-63, emulated or not, as hp41uc does.
-    (["XROM 30,03", "XROM 1,01", "XROM 25,00", "XROM 31,63"], "a783a041a640a7ff",
-     ["XROM 30,03", "XROM 01,01", "XROM 25,00", "XROM 31,63"]),
+    (
+        ["XROM 30,03", "XROM 1,01", "XROM 25,00", "XROM 31,63"],
+        "a783a041a640a7ff",
+        ["XROM 30,03", "XROM 01,01", "XROM 25,00", "XROM 31,63"],
+    ),
     # XROM functions by name, in any case and with ASCII stand-ins.
     (["SEEKPT"], "a66a", ["XROM 25,42 ;SEEKPT"]),
     (["seekpt"], "a66a", ["XROM 25,42 ;SEEKPT"]),
     (["TIME"], "a69c", ["XROM 26,28 ;TIME"]),
     (["sigmareg?"], "a678", ["XROM 25,56 ;SREG?"]),
     # Compact forms stop at RCL/STO 15, LBL/GTO 14.
-    (["RCL 15", "RCL 16", "STO 15", "STO 16", "LBL 14", "LBL 15", "GTO 14", "GTO 15"],
-     "2f90103f91100fcf0fbf00d0000f", None),
+    (
+        [
+            "RCL 15",
+            "RCL 16",
+            "STO 15",
+            "STO 16",
+            "LBL 14",
+            "LBL 15",
+            "GTO 14",
+            "GTO 15",
+        ],
+        "2f90103f91100fcf0fbf00d0000f",
+        None,
+    ),
     # GTO IND and XEQ never use a compact form; XEQ IND sets the operand's
     # high bit (Wickes: AE 2A is GTO IND 42).
     (["GTO IND X", "XEQ 03"], "ae73e00003", None),
     (["XEQ IND 05", "XEQ IND X", "GTO IND 42"], "ae85aef3ae2a", None),
-    (["GTO IND 05", "XEQ IND 05", "XEQ IND L", "GTO IND a", "XEQ IND e"],
-     "ae05ae85aef4ae7baeff", None),
+    (
+        ["GTO IND 05", "XEQ IND 05", "XEQ IND L", "GTO IND a", "XEQ IND e"],
+        "ae05ae85aef4ae7baeff",
+        None,
+    ),
     # Synthetic status registers M-Q and a-e (0x75-0x7F) and R (0x7A).
-    (["STO M", "RCL N", "X<> O", "STO IND P", "RCL IND Q",
-      "STO a", "STO b", "STO c", "STO d", "STO IND e"],
-     "91759076ce7791f890f9917b917c917d917e91ff", None),
+    (
+        [
+            "STO M",
+            "RCL N",
+            "X<> O",
+            "STO IND P",
+            "RCL IND Q",
+            "STO a",
+            "STO b",
+            "STO c",
+            "STO d",
+            "STO IND e",
+        ],
+        "91759076ce7791f890f9917b917c917d917e91ff",
+        None,
+    ),
     (["STO R", "RCL IND r"], "917a90fa", ["STO R", "RCL IND R"]),
     # Lowercase a-e are status registers, uppercase A-E local labels;
     # M-Q are case-insensitive.
-    (["STO a", "STO A", "STO e", "STO E", "STO m"], "917b9166917f916a9175",
-     ["STO a", "STO A", "STO e", "STO E", "STO M"]),
+    (
+        ["STO a", "STO A", "STO e", "STO E", "STO m"],
+        "917b9166917f916a9175",
+        ["STO a", "STO A", "STO e", "STO E", "STO M"],
+    ),
 ]
 
 
@@ -376,8 +408,10 @@ DECOMPILES = [
     ("91f0001192 04", ["STO IND T", "1", "ST+ 04"]),  # NULL before a number
     ("0000870085", ["CLA", "RTN"]),  # stray NULLs
     ("a783a041a66a", ["XROM 30,03", "XROM 01,01", "XROM 25,42 ;SEEKPT"]),
-    ("ae05ae85ae73aef3aeaa",
-     ["GTO IND 05", "XEQ IND 05", "GTO IND X", "XEQ IND X", "XEQ IND 42"]),
+    (
+        "ae05ae85ae73aef3aeaa",
+        ["GTO IND 05", "XEQ IND 05", "GTO IND X", "XEQ IND X", "XEQ IND 42"],
+    ),
     ("91f590fb91fe", ["STO IND M", "RCL IND a", "STO IND d"]),
     ("917a90fa", ["STO R", "RCL IND R"]),
     # Compact GTO: the second byte is the cached jump, never part of the label.
@@ -401,7 +435,9 @@ DECOMPILES = [
 
 @pytest.mark.parametrize("raw, listing", DECOMPILES, ids=lambda v: None)
 def test_bytes_decompile_to_a_listing(raw, listing):
-    assert encode_program_txt(bytes.fromhex(raw.replace(" ", ""))).splitlines() == listing
+    assert (
+        encode_program_txt(bytes.fromhex(raw.replace(" ", ""))).splitlines() == listing
+    )
 
 
 COMPILE_ERRORS = [
@@ -430,8 +466,8 @@ def test_bad_program_text_is_rejected(text, message):
 
 
 def test_decode_program_txt_alpha_escape_byte_values():
-    '''Narrower, less error-prone version of the escape test above --
-    each escape checked individually against its own expected byte.'''
+    """Narrower, less error-prone version of the escape test above --
+    each escape checked individually against its own expected byte."""
     from memory.program_text import _decode_alpha_text_literal
 
     assert _decode_alpha_text_literal("\\X41") == b"A"  # hex escape
@@ -444,11 +480,11 @@ def test_decode_program_txt_alpha_escape_byte_values():
 
 
 def test_decode_program_txt_unknown_opcode_passthrough_round_trips():
-    '''A synthetic/unassigned opcode (one of the two confirmed-spare
+    """A synthetic/unassigned opcode (one of the two confirmed-spare
     bytes, 0xAF -- see this module's own _SPARE_OPCODES) renders as an
     informational comment on decompile; recompiling that comment,
     unedited, must reproduce the exact original bytes, so a
-    decompile-edit-recompile round trip is lossless.'''
+    decompile-edit-recompile round trip is lossless."""
     original = bytes([0xAF, 0x03])
     text = encode_program_txt(original)
     assert text.splitlines() == ["; UNKNOWN OPCODE: AF 03"]
@@ -457,8 +493,8 @@ def test_decode_program_txt_unknown_opcode_passthrough_round_trips():
 
 
 def test_null_before_number_dropped_on_round_trip():
-    '''The unneeded NULL is gone after a round trip; the one separating
-    two adjacent numbers is re-inserted.'''
+    """The unneeded NULL is gone after a round trip; the one separating
+    two adjacent numbers is re-inserted."""
     text = encode_program_txt(
         bytes([0x91, 0xF0, 0x00, 0x11, 0x00, 0x12, 0xC0, 0x00, 0x0D])
     )  # STO IND T, NULL, 1, NULL, 2, END
@@ -467,13 +503,13 @@ def test_null_before_number_dropped_on_round_trip():
 
 
 def test_encode_program_txt_resolved_jumps_recompile_as_unresolved():
-    '''The cached jump distance isn't preserved through text (there's
+    """The cached jump distance isn't preserved through text (there's
     nowhere in the text to put it), so recompiling gives the unresolved
     form -- which the calculator re-resolves on first run -- and
-    decompiling *that* gives back the same text.'''
-    original = bytes.fromhex("b2b1" "b188" "e42204" "c0000d")
+    decompiling *that* gives back the same text."""
+    original = bytes.fromhex("b2b1b188e42204c0000d")
     text = encode_program_txt(original)
     assert text.splitlines()[:3] == ["GTO 01", "GTO 00", "XEQ 04"]
     recompiled = decode_program_txt(text)
-    assert recompiled.startswith(bytes.fromhex("b200" "b100" "e00004"))
+    assert recompiled.startswith(bytes.fromhex("b200b100e00004"))
     assert encode_program_txt(recompiled) == text

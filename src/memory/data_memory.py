@@ -1,4 +1,4 @@
-'''
+"""
 DataMemory: the main (primary) data registers -- R00 upward to
 PRIMARY_DATA_END.
 
@@ -14,7 +14,7 @@ means: R00, R01, R02 ... are *register numbers* relative to the partition
 boundary (what a user types into an HP-41 `STO`/`RCL`), while the hex
 addresses in the state are absolute. `address_for()`/`number_for()` convert
 between them.
-'''
+"""
 
 from .registers import Register
 from .regions import MemoryRegion
@@ -22,7 +22,7 @@ from .constants import PRIMARY_DATA_END
 
 
 class DataMemory(MemoryRegion):
-    '''The primary data registers, R00 up to PRIMARY_DATA_END.'''
+    """The primary data registers, R00 up to PRIMARY_DATA_END."""
 
     key = "data"
     label = "Data Memory"
@@ -31,29 +31,29 @@ class DataMemory(MemoryRegion):
 
     @property
     def start(self) -> int:
-        '''
+        """
         Absolute address of R00. Reports an empty region when the state has no
         sane R00/`.END.` partition -- a corrupt or never-loaded one -- rather
         than treating a meaningless R00 as a real boundary. See
         `Memory.has_program_partition()`.
-        '''
+        """
         if not self._memory.has_program_partition():
             return PRIMARY_DATA_END + 1
         return self._memory.status_registers.R00
 
     @property
     def end(self) -> int:
-        '''Always PRIMARY_DATA_END: data memory runs from R00 to the top.
+        """Always PRIMARY_DATA_END: data memory runs from R00 to the top.
         Without a sane partition `start` is past it, so the region is
-        empty.'''
+        empty."""
         return PRIMARY_DATA_END
 
     # -- Numbered access -------------------------------------------------
 
     def address_for(self, number: int) -> int:
-        '''Absolute address of data register `number` (0 = R00). Raises
+        """Absolute address of data register `number` (0 = R00). Raises
         ValueError if that register doesn't exist in the current
-        partition.'''
+        partition."""
         count = self.count
         if number < 0 or number >= count:
             if count == 0:
@@ -68,19 +68,19 @@ class DataMemory(MemoryRegion):
         return self.start + number
 
     def number_for(self, addr: int) -> int:
-        '''Data register number (0 = R00) for an absolute address in this
-        region. Raises ValueError for an address outside it.'''
+        """Data register number (0 = R00) for an absolute address in this
+        region. Raises ValueError for an address outside it."""
         self._check_addr(addr)
         return addr - self.start
 
     def get(self, number: int) -> Register:
-        '''Reads data register `number` (0 = R00).'''
+        """Reads data register `number` (0 = R00)."""
         return self._memory.get_register(self.address_for(number))
 
     def set(self, number: int, register: Register):
-        '''Writes data register `number` (0 = R00).'''
+        """Writes data register `number` (0 = R00)."""
         self._memory.set_register(self.address_for(number), register)
 
     def numbers(self) -> list:
-        '''Every data register's BCD value, R00 first.'''
+        """Every data register's BCD value, R00 first."""
         return [self._memory.get_register(addr).get_bcd_number() for addr in self]

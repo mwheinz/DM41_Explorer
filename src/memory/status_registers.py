@@ -1,4 +1,4 @@
-'''
+"""
 StatusRegisters: the 16 named CPU/system registers at 0x00-0x0F (T
 through e), and the fields packed inside two of them -- register c's
 partition pointers (SigmaReg/R00/.END.) and register d's 56 status flags.
@@ -7,7 +7,7 @@ This is the one region whose extent genuinely never moves, but it is
 where the pointers that define where every *other* region starts and ends
 are stored, so `Memory` reads its own partition boundaries back out
 through here.
-'''
+"""
 
 from typing import Optional, TYPE_CHECKING
 
@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 
 class StatusRegisters(MemoryRegion):
-    '''The 16 named CPU/system registers, T through e.'''
+    """The 16 named CPU/system registers, T through e."""
 
     key = "status"
     label = "Status Registers"
@@ -79,9 +79,9 @@ class StatusRegisters(MemoryRegion):
         return self.get_register(9)
 
     def R(self) -> Register:
-        '''Status register 0x0A. Also called "F" or "Append" by some
+        """Status register 0x0A. Also called "F" or "Append" by some
         sources; "R" matches hp41uc and program-text postfix 0x7A (see
-        docs/memory.md sec 3.1).'''
+        docs/memory.md sec 3.1)."""
         return self.get_register(10)
 
     def a(self) -> Register:
@@ -104,10 +104,10 @@ class StatusRegisters(MemoryRegion):
 
     @property
     def alpha(self) -> AlphaRegister:
-        '''The ALPHA register, assembled from the tail of P and all of
+        """The ALPHA register, assembled from the tail of P and all of
         O/N/M. Read live on every access rather than captured once at
         construction, so it can't go stale after an edit to any of those
-        four registers.'''
+        four registers."""
         data = (
             self.get_register(8).get_bytes()[4:7]
             + self.get_register(7).get_bytes()
@@ -117,8 +117,8 @@ class StatusRegisters(MemoryRegion):
         return AlphaRegister(data=data)
 
     def label_for(self, addr: int) -> Optional[str]:
-        '''The system-register name (e.g. 'X') for an address in this
-        region, with its decoded value.'''
+        """The system-register name (e.g. 'X') for an address in this
+        region, with its decoded value."""
         if 0x00 <= addr <= 0x04:
             return (
                 f"{STATUS_REGISTER_LABELS[addr]}: "
@@ -126,13 +126,11 @@ class StatusRegisters(MemoryRegion):
             )
         if 0x05 <= addr <= 0x08:
             return (
-                f"{STATUS_REGISTER_LABELS[addr]}: "
-                f"{self.get_register(addr).get_ascii()}"
+                f"{STATUS_REGISTER_LABELS[addr]}: {self.get_register(addr).get_ascii()}"
             )
         if 0x09 <= addr <= 0x0F:
             return (
-                f"{STATUS_REGISTER_LABELS[addr]}: "
-                f"{self.get_register(addr).get_hex()}"
+                f"{STATUS_REGISTER_LABELS[addr]}: {self.get_register(addr).get_hex()}"
             )
         return None
 
@@ -140,7 +138,7 @@ class StatusRegisters(MemoryRegion):
 
     @staticmethod
     def _nibbles_to_int(nibbles) -> int:
-        '''Combine a list of nibbles into an integer.'''
+        """Combine a list of nibbles into an integer."""
         value = 0
         for n in nibbles:
             value = (value << 4) | n
@@ -150,9 +148,9 @@ class StatusRegisters(MemoryRegion):
         return self.get_register(self.REG_C_ADDR).get_nibbles()
 
     def _write_reg_c_address(self, first_nibble: int, addr: int, what: str):
-        '''Rewrites the 3-nibble address field starting at `first_nibble`
+        """Rewrites the 3-nibble address field starting at `first_nibble`
         of register c. Shared by set_R00()/set_DotEnd(), which differ only
-        in which field they touch and what they call it in the error.'''
+        in which field they touch and what they call it in the error."""
         if not (0 <= addr <= 0xFFF):
             raise ValueError(
                 f"{what} must fit in a 3-nibble address (0-0xFFF), got 0x{addr:x}"
@@ -165,25 +163,25 @@ class StatusRegisters(MemoryRegion):
 
     @property
     def SigmaReg(self) -> int:
-        '''Absolute address of SIGMA-REG, decoded from register c.'''
+        """Absolute address of SIGMA-REG, decoded from register c."""
         return self._nibbles_to_int(self._reg_c_nibbles()[0:3])
 
     @property
     def DotEnd(self) -> int:
-        '''Absolute address of the end of loaded program memory (".END.").'''
+        """Absolute address of the end of loaded program memory (".END.")."""
         return self._nibbles_to_int(self._reg_c_nibbles()[11:14])
 
     @property
     def R00(self) -> int:
-        '''
+        """
         Absolute address of data register 00 -- the boundary between
         program memory (below R00) and main data memory (R00 up to
         PRIMARY_DATA_END, inclusive).
-        '''
+        """
         return self._nibbles_to_int(self._reg_c_nibbles()[8:11])
 
     def set_R00(self, addr: int):
-        '''
+        """
         Directly rewrites the R00 pointer in register c.
 
         This only moves the partition marker -- it does NOT move, clear, or
@@ -195,17 +193,17 @@ class StatusRegisters(MemoryRegion):
         careful use of R00 movement can be used to create special "byte
         jumper" and "byte loader" instructions that are the foundation of
         synthetic programming.
-        '''
+        """
         self._write_reg_c_address(8, addr, "R00")
 
     def set_DotEnd(self, addr: int):
-        '''
+        """
         Directly rewrites the `.END.` pointer in register c, used by
         `ProgramMemory` to move the permanent `.END.` sentinel to the top of
         whatever program memory it just wrote. Like `set_R00()`, this only
         moves the pointer itself; it doesn't touch, clear, or validate any
         register contents on either side of it.
-        '''
+        """
         self._write_reg_c_address(11, addr, ".END.")
 
     # -- Register d: the 56 user/system flags ----------------------------
@@ -253,7 +251,7 @@ class StatusRegisters(MemoryRegion):
         self._set_bit(self.REG_D_ADDR, n, value)
 
     def get_all_flags(self) -> list:
-        '''Returns a list of FLAG_COUNT bools, flag 0 first.'''
+        """Returns a list of FLAG_COUNT bools, flag 0 first."""
         bits = int.from_bytes(self._flags_register().get_bytes(), "big")
         binary = format(bits, f"0{self.FLAG_COUNT}b")
         return [c == "1" for c in binary]

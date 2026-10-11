@@ -1,4 +1,4 @@
-'''
+"""
 ProgramInfo: one entry ("chain link") found while walking the global
 label/END chain in program memory -- see ProgramMemory.list_global_chain() in
 program_memory.py, and docs/program.md sec 5, for the full derivation.
@@ -8,13 +8,13 @@ chain -- what ProgramMemory.list_programs() returns, and what the Program tab an
 program export actually work with. See docs/program.md sec 5.3 for why
 this grouping is necessary at all (a program is not required to have a
 global label, or may have several) and Program's own docstring below.
-'''
+"""
 
 from typing import Optional
 
 
 class ProgramInfo:
-    '''
+    """
     One entry found while walking the "global chain" -- the backward-
     linked list of every global alpha label and END marker in program
     memory, described in docs/program.md sec 5 (reverse-engineered from
@@ -42,7 +42,7 @@ class ProgramInfo:
     The last entry can be the permanent `.END.` itself (`end_type == 2`) --
     the newest thing in program memory, sitting right where the most-recently-
     created chain link's own "next END" would otherwise be.
-    '''
+    """
 
     def __init__(
         self,
@@ -70,9 +70,9 @@ class ProgramInfo:
 
     @property
     def kind(self) -> str:
-        '''"LBL" for a global-label header, "END" for a plain END marker,
+        """ "LBL" for a global-label header, "END" for a plain END marker,
         or ".END." for the one permanent end-of-program-memory marker
-        (end_type == 2) -- the newest entry in the chain, when present.'''
+        (end_type == 2) -- the newest entry in the chain, when present."""
         if self.is_named:
             return "LBL"
         return ".END." if self.end_type == 2 else "END"
@@ -97,13 +97,13 @@ class ProgramInfo:
 
 
 class ProgramLabel:
-    '''
+    """
     One global alpha label attached to a `Program` (below) -- what CAT 1
     shows as a catalog entry, and whose header
     `Memory.set_program_key_assignment()`/`get_program_for_key()` write a
     key-assignment byte into. A `Program` can have zero, one, or several of
     these (docs/program.md sec 5.3).
-    '''
+    """
 
     def __init__(
         self,
@@ -128,7 +128,7 @@ class ProgramLabel:
 
 
 class Program:
-    '''
+    """
     One real, END-delimited program in program memory -- see
     `ProgramMemory.list_programs()` and docs/program.md sec 5.3.
 
@@ -145,7 +145,7 @@ class Program:
     `labels` lists every global label found within this program's own bytes,
     in on-calculator/forward reading order. `length` is this program's real
     byte count -- the same number CAT 1 reports.
-    '''
+    """
 
     def __init__(
         self,
@@ -167,15 +167,15 @@ class Program:
 
     @property
     def is_last(self) -> bool:
-        '''True for the newest program in memory -- the only one that can
-        lack an explicit END of its own (see class docstring).'''
+        """True for the newest program in memory -- the only one that can
+        lack an explicit END of its own (see class docstring)."""
         return self.terminator == ".END."
 
     @property
     def names_label(self) -> str:
-        '''Every label this program has, comma-joined in forward/creation
+        """Every label this program has, comma-joined in forward/creation
         order, or "(unlabelled)" if it has none at all -- see
-        `tests/data/unlabelled.dm41`.'''
+        `tests/data/unlabelled.dm41`."""
         if not self.labels:
             return "(unlabelled)"
         return ", ".join(label.name for label in self.labels)

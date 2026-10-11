@@ -1,4 +1,4 @@
-'''
+"""
 ProgramMemory: the user-program region -- everything between the `.END.`
 sentinel and R00 -- plus the "global chain" of END lines and global alpha
 labels threaded through it (docs/program.md sec 5).
@@ -16,7 +16,7 @@ address in that register; offset 6 = the last/rightmost byte = the
 *lowest*) -- see docs/program.md's "Addressing within program memory".
 `addr_for()`/`pos_for()` convert between the two; every chain-distance
 calculation below goes through them.
-'''
+"""
 
 from typing import Optional
 
@@ -45,7 +45,7 @@ from .program_chain import (
 
 
 class ProgramMemory(MemoryRegion):
-    '''User program storage, from `.END.` up to (but not including) R00.'''
+    """User program storage, from `.END.` up to (but not including) R00."""
 
     key = "program"
     label = "User Programs"
@@ -54,20 +54,20 @@ class ProgramMemory(MemoryRegion):
 
     @property
     def start(self) -> int:
-        '''The register holding the permanent `.END.` sentinel -- the
+        """The register holding the permanent `.END.` sentinel -- the
         lowest register program memory currently occupies. Reports an
         empty region (start one past PRIMARY_DATA_END) when the state has
         no sane R00/`.END.` partition at all -- a corrupt or never-loaded
         one -- rather than inventing a span out of meaningless pointer
-        values. See Memory.has_program_partition().'''
+        values. See Memory.has_program_partition()."""
         if not self._memory.has_program_partition():
             return PRIMARY_DATA_END + 1
         return self._memory.status_registers.DotEnd
 
     @property
     def end(self) -> int:
-        '''The register just below R00. R00 itself belongs to data memory,
-        not here.'''
+        """The register just below R00. R00 itself belongs to data memory,
+        not here."""
         if not self._memory.has_program_partition():
             return PRIMARY_DATA_END
         return self._memory.status_registers.R00 - 1
@@ -76,29 +76,29 @@ class ProgramMemory(MemoryRegion):
 
     @staticmethod
     def addr_for(reg: int, offset: int) -> int:
-        '''Absolute byte address of (register, offset).'''
+        """Absolute byte address of (register, offset)."""
         return REGISTER_SIZE_BYTES * reg + (REGISTER_SIZE_BYTES - 1 - offset)
 
     @staticmethod
     def pos_for(addr: int) -> tuple:
-        '''(register, offset) for an absolute byte address.'''
+        """(register, offset) for an absolute byte address."""
         reg, remainder = divmod(addr, REGISTER_SIZE_BYTES)
         return reg, REGISTER_SIZE_BYTES - 1 - remainder
 
     def top_addr(self) -> int:
-        '''Address just below R00 -- the top of program memory, where the
+        """Address just below R00 -- the top of program memory, where the
         very first program ever written begins (see docs/program.md's
         "Addressing within program memory"). R00 itself belongs to the
-        free/data-register side of the partition, not to program memory.'''
+        free/data-register side of the partition, not to program memory."""
         return self.addr_for(self._memory.status_registers.R00 - 1, 0)
 
     def read_bytes_forward(self, reg: int, offset: int, count: int) -> bytes:
-        '''Reads `count` bytes starting at (reg, offset) in the direction
+        """Reads `count` bytes starting at (reg, offset) in the direction
         chain markers and global-label names read correctly in (increasing
         program line number / decreasing address -- see docs/program.md).
         Running past offset 6 continues at offset 0 of the next LOWER
         register, matching how program memory actually continues across a
-        register boundary.'''
+        register boundary."""
         out = bytearray()
         r, o = reg, offset
         for _ in range(count):
@@ -110,13 +110,13 @@ class ProgramMemory(MemoryRegion):
         return bytes(out)
 
     def write_bytes_forward(self, addr: int, data: bytes):
-        '''Writes `data` starting at absolute byte-address `addr`,
+        """Writes `data` starting at absolute byte-address `addr`,
         continuing in the same forward/decreasing-address direction
         `read_bytes_forward()` reads in (and crossing register boundaries
         the same way) -- the write-side counterpart used by
         `import_program()` to splice a program's bytes into program
         memory. Each byte is its own register read-modify-write, same
-        granularity as `_write_program_key_byte()` already uses below.'''
+        granularity as `_write_program_key_byte()` already uses below."""
         reg, offset = self.pos_for(addr)
         for byte in data:
             reg_data = bytearray(self._memory.get_register(reg).get_bytes())
@@ -128,11 +128,11 @@ class ProgramMemory(MemoryRegion):
                 reg -= 1
 
     def _has_nonzero_bytes(self, addr: int, count: int) -> bool:
-        '''True if any of the `count` bytes forward from `addr` (same
+        """True if any of the `count` bytes forward from `addr` (same
         addressing convention as `read_bytes_forward`) is non-zero.
         `count <= 0` is trivially False -- used by `list_programs()` to
         tell real (if unnamed) trailing program content apart from mere
-        register-alignment padding before the permanent `.END.` marker.'''
+        register-alignment padding before the permanent `.END.` marker."""
         if count <= 0:
             return False
         reg, offset = self.pos_for(addr)
@@ -141,26 +141,26 @@ class ProgramMemory(MemoryRegion):
     # -- The global chain (docs/program.md sec 5) ------------------------
 
     def _decode_chain_marker(self, reg: int, offset: int) -> Optional[ChainMarker]:
-        '''Decodes the 3-byte marker at (reg, offset) -- docs/program.md
+        """Decodes the 3-byte marker at (reg, offset) -- docs/program.md
         sec 5.1 -- by reading those bytes forward and handing them to
         `program_chain.decode_chain_marker()`. None if there is no marker
-        there.'''
+        there."""
         return decode_chain_marker(self.read_bytes_forward(reg, offset, 3), 0)
 
     def _decode_label_name(self, reg: int, offset: int, length: int) -> tuple:
-        '''Decodes a global label's name and key-assignment byte, given
+        """Decodes a global label's name and key-assignment byte, given
         where its 4-byte header starts -- docs/program.md sec 5.2 -- by
         reading the header and name forward and handing them to
         `program_chain.decode_label_name()`. They are read in one
         continuous pass so a name longer than 3 characters correctly
         spills into the preceding register (`read_bytes_forward` only
         wraps registers within a single call). Returns
-        (name, key_assignment).'''
+        (name, key_assignment)."""
         data = self.read_bytes_forward(reg, offset, 4 + max(length, 0))
         return decode_label_name(data, 0, length)
 
     def list_global_chain(self) -> list:
-        '''Walks the global chain backward from `.END.` toward R00 and returns
+        """Walks the global chain backward from `.END.` toward R00 and returns
         every global label and END marker on it as ProgramInfo, oldest first --
         the order CAT 1 lists them (docs/program.md sec 5).
 
@@ -177,7 +177,7 @@ class ProgramMemory(MemoryRegion):
         real partition. Never raises: the walk stops at the first position that
         doesn't hold a marker (a model mismatch or corrupt data), and it is
         bounded and never revisits a position, so a circular chain can't loop
-        forever.'''
+        forever."""
         status = self._memory.status_registers
         r00 = status.R00
         dend = status.DotEnd
@@ -210,12 +210,18 @@ class ProgramMemory(MemoryRegion):
 
             if marker.is_label:
                 name, key = self._decode_label_name(reg, offset, marker.label_length)
-                entries.append(ProgramInfo(
-                    header_addr=reg, header_offset=offset, name=name,
-                    key_assignment=key, distance_bytes=distance_bytes,
-                    bbb=marker.bbb, distance_registers=marker.distance_registers,
-                    end_type=None,
-                ))
+                entries.append(
+                    ProgramInfo(
+                        header_addr=reg,
+                        header_offset=offset,
+                        name=name,
+                        key_assignment=key,
+                        distance_bytes=distance_bytes,
+                        bbb=marker.bbb,
+                        distance_registers=marker.distance_registers,
+                        end_type=None,
+                    )
+                )
             else:
                 # The first marker examined is always the permanent `.END.`
                 # (the walk starts there). It is skipped only when it has no
@@ -224,17 +230,21 @@ class ProgramMemory(MemoryRegion):
                 # CAT 1 counts as part of the newest program (see
                 # ProgramInfo's docstring).
                 is_empty_partition_marker = (
-                    len(entries) == 0
-                    and marker.end_type == 2
-                    and distance_bytes == 0
+                    len(entries) == 0 and marker.end_type == 2 and distance_bytes == 0
                 )
                 if not is_empty_partition_marker:
-                    entries.append(ProgramInfo(
-                        header_addr=reg, header_offset=offset, name=None,
-                        key_assignment=None, distance_bytes=distance_bytes,
-                        bbb=marker.bbb, distance_registers=marker.distance_registers,
-                        end_type=marker.end_type,
-                    ))
+                    entries.append(
+                        ProgramInfo(
+                            header_addr=reg,
+                            header_offset=offset,
+                            name=None,
+                            key_assignment=None,
+                            distance_bytes=distance_bytes,
+                            bbb=marker.bbb,
+                            distance_registers=marker.distance_registers,
+                            end_type=marker.end_type,
+                        )
+                    )
 
             if distance_bytes == 0:
                 break  # no predecessor -- first global line in memory
@@ -252,7 +262,7 @@ class ProgramMemory(MemoryRegion):
         return entries
 
     def list_programs(self) -> list:
-        '''Groups `list_global_chain()` into real, END-delimited programs -- one
+        """Groups `list_global_chain()` into real, END-delimited programs -- one
         Program per program CAT 1 shows, oldest first (docs/program.md sec 5.3).
 
         A program is delimited by an END marker, never by a label: it can have
@@ -268,7 +278,7 @@ class ProgramMemory(MemoryRegion):
         program needs no label at all). If every such byte is zero, that gap is
         register-alignment padding, not a program, and is skipped.
 
-        Returns [] if `list_global_chain()` does.'''
+        Returns [] if `list_global_chain()` does."""
         chain = self.list_global_chain()
         if not chain:
             return []
@@ -281,12 +291,14 @@ class ProgramMemory(MemoryRegion):
             marker_addr = self.addr_for(entry.header_addr, entry.header_offset)
 
             if entry.is_named:
-                pending_labels.append(ProgramLabel(
-                    name=entry.name,
-                    key_assignment=entry.key_assignment,
-                    header_addr=entry.header_addr,
-                    header_offset=entry.header_offset,
-                ))
+                pending_labels.append(
+                    ProgramLabel(
+                        name=entry.name,
+                        key_assignment=entry.key_assignment,
+                        header_addr=entry.header_addr,
+                        header_offset=entry.header_offset,
+                    )
+                )
                 continue
 
             marker_last_byte_addr = marker_addr - 2  # 3-byte marker
@@ -300,20 +312,22 @@ class ProgramMemory(MemoryRegion):
                 ):
                     break  # pure padding -- not a program, nothing to add
             start_reg, start_offset = self.pos_for(group_start_addr)
-            programs.append(Program(
-                start_addr=start_reg,
-                start_offset=start_offset,
-                length=length,
-                labels=pending_labels,
-                terminator=".END." if entry.end_type == 2 else "END",
-            ))
+            programs.append(
+                Program(
+                    start_addr=start_reg,
+                    start_offset=start_offset,
+                    length=length,
+                    labels=pending_labels,
+                    terminator=".END." if entry.end_type == 2 else "END",
+                )
+            )
             pending_labels = []
             group_start_addr = marker_last_byte_addr - 1
 
         return programs
 
     def get_program_bytes(self, program: Program) -> bytes:
-        '''Returns one program's instruction bytes (a `list_programs()` entry), in
+        """Returns one program's instruction bytes (a `list_programs()` entry), in
         on-calculator reading order (decreasing address), up to and including
         its own END or `.END.` -- the byte sequence a program file export
         (RAW/DAT/...) contains; see program_files.py.
@@ -328,7 +342,7 @@ class ProgramMemory(MemoryRegion):
         Raises ValueError if `program` doesn't match the current program list
         (it is stale, from before the state changed), and DM41MemoryError if
         the opcode scan disagrees with the chain (corrupt data, or bytes that
-        aren't well-formed HP-41 code).'''
+        aren't well-formed HP-41 code)."""
         for candidate in self.list_programs():
             if (
                 candidate.start_addr == program.start_addr
@@ -354,7 +368,7 @@ class ProgramMemory(MemoryRegion):
     # -- Import (splicing a program in) ----------------------------------
 
     def _convert_dot_end_to_real_end(self, entry: ProgramInfo):
-        '''Rewrites the permanent `.END.` marker's own end-type nibble
+        """Rewrites the permanent `.END.` marker's own end-type nibble
         (docs/program.md sec 5.1's high `eeee` nibble) from `2` to `0` in
         place, at its existing (`entry.header_addr`, `entry.header_offset`)
         position -- turning it into a genuine closing `END` for whatever
@@ -363,7 +377,7 @@ class ProgramMemory(MemoryRegion):
         whatever preceded it -- see `import_program()`'s "Case A"). Used
         only when the program `.END.` used to terminate is no longer the
         newest thing in memory -- i.e. right before a fresh `.END.` gets
-        written further down by `import_program()`.'''
+        written further down by `import_program()`."""
         marker_addr = self.addr_for(entry.header_addr, entry.header_offset)
         third_byte_addr = marker_addr - 2
         reg, offset = self.pos_for(third_byte_addr)
@@ -372,7 +386,7 @@ class ProgramMemory(MemoryRegion):
         self._memory.set_register(reg, Register(data=bytes(data)))
 
     def import_program(self, instruction_bytes: bytes) -> Program:
-        '''Splices a standalone program's instruction bytes -- from
+        """Splices a standalone program's instruction bytes -- from
         `get_program_bytes()`, or from `decode_program_raw()`/
         `decode_program_dat()` reading a RAW/DAT file -- into this region as the
         newest program, updating the global chain (docs/program.md sec 5) and
@@ -416,12 +430,12 @@ class ProgramMemory(MemoryRegion):
 
         All-or-nothing: if any step raises, including the final consistency
         check after the bytes are written, this Memory is left exactly as it
-        was (see Memory.transaction()).'''
+        was (see Memory.transaction())."""
         with self._memory.transaction():
             return self._splice_program(instruction_bytes)
 
     def _splice_program(self, instruction_bytes: bytes) -> Program:
-        '''import_program()'s body, run inside its transaction.'''
+        """import_program()'s body, run inside its transaction."""
         status = self._memory.status_registers
         if not instruction_bytes:
             raise ValueError("Nothing to import -- the program is empty.")
@@ -465,7 +479,9 @@ class ProgramMemory(MemoryRegion):
             data[trailing.index + 2] &= 0x0F
 
         # Step 2 (continued): recompute the outermost marker's own link.
-        self._relink_outermost_marker(data, chain_entries[-1], insertion_addr, link_addr)
+        self._relink_outermost_marker(
+            data, chain_entries[-1], insertion_addr, link_addr
+        )
 
         # Step 7: is there room? This has to run -- and be allowed to
         # raise -- before anything below actually touches a live register
@@ -504,10 +520,10 @@ class ProgramMemory(MemoryRegion):
         return programs[-1]
 
     def _check_no_duplicate_labels(self, chain_entries: list):
-        '''Raises ValueError if any global label name found by
+        """Raises ValueError if any global label name found by
         `walk_chain()` (in a program about to be imported) already exists
         somewhere in this memory's own global chain -- see
-        `import_program()`'s step 3.'''
+        `import_program()`'s step 3."""
         existing_names = {p.name for p in self.list_global_chain() if p.is_named}
         for entry in chain_entries:
             if entry.is_label and entry.name in existing_names:
@@ -518,7 +534,7 @@ class ProgramMemory(MemoryRegion):
                 )
 
     def _resolve_import_link(self) -> tuple:
-        '''
+        """
         `import_program()`'s step 5: figures out where a new program
         should be written (the highest address it can start at) and what
         its outermost marker's distance should now point back to.
@@ -541,7 +557,7 @@ class ProgramMemory(MemoryRegion):
         non-empty but doesn't resolve to any real program at all (would
         only happen for corrupt data -- see `list_programs()`'s
         docstring).
-        '''
+        """
         chain = self.list_global_chain()
         if not chain:
             return self.top_addr(), None, None
@@ -579,7 +595,7 @@ class ProgramMemory(MemoryRegion):
         insertion_addr: int,
         link_addr: Optional[int],
     ):
-        '''`import_program()`'s step 2 finish: overwrites `outermost`'s
+        """`import_program()`'s step 2 finish: overwrites `outermost`'s
         `bbb`/`distance_registers` fields in `data` (in place) so it
         correctly links back to `link_addr` once `data` is written
         starting at `insertion_addr` -- or to "no predecessor" (`bbb =
@@ -591,7 +607,7 @@ class ProgramMemory(MemoryRegion):
         possible gap, from the Key Assignments floor (`0xC0`) to
         `PRIMARY_DATA_END` (`0x1FF`), is only 319 registers, well inside
         the 511 the 9-bit field can hold. Left in place as cheap
-        insurance in case those bounds ever change.'''
+        insurance in case those bounds ever change."""
         if link_addr is None:
             new_bbb, new_dr = 0, 0
         else:
@@ -610,13 +626,13 @@ class ProgramMemory(MemoryRegion):
         data[index : index + 3] = encode_chain_marker(new_bbb, new_dr, third)
 
     def _check_import_room(self, insertion_addr: int, data_len: int) -> tuple:
-        '''`import_program()`'s step 7: works out where the fresh `.END.`
+        """`import_program()`'s step 7: works out where the fresh `.END.`
         marker would land -- register-aligned to the last 3 bytes of a
         register, right after `data_len` bytes written starting at
         `insertion_addr` and however much zero-padding gets it to that
         boundary -- and checks that against the Alarms/Key Assignments
         boundary. Returns `(end_marker_addr, next_free_addr)` if there's
-        room; raises `DM41MemoryError` if not.'''
+        room; raises `DM41MemoryError` if not."""
         floor_reg = self._memory.alarms.end_exclusive
         program_end_addr = insertion_addr - data_len + 1
         next_free_addr = program_end_addr - 1
@@ -636,7 +652,7 @@ class ProgramMemory(MemoryRegion):
     # -- Rebuild / pack / remove -----------------------------------------
 
     def _forward_scan_programs(self) -> list:
-        '''Re-derives every program in this region by scanning its opcodes
+        """Re-derives every program in this region by scanning its opcodes
         forward from `top_addr()` to `.END.`, without trusting the chain's
         backward links. This is PACK's real job: a state written by something
         other than a calculator (or this app) can have those links zeroed or
@@ -662,7 +678,7 @@ class ProgramMemory(MemoryRegion):
 
         Raises DM41MemoryError when the scan can't be sure it has found every
         program: non-zero bytes with no marker at all, a final label never
-        closed by an END, or non-zero bytes after the last marker.'''
+        closed by an END, or non-zero bytes after the last marker."""
         status = self._memory.status_registers
         r00 = status.R00
         dend = status.DotEnd
@@ -719,9 +735,7 @@ class ProgramMemory(MemoryRegion):
         # register; _rebuild() does that once these byte ranges are
         # re-imported.
         for i, marker in enumerate(markers):
-            distance_bytes = (
-                0 if i == 0 else marker.index - markers[i - 1].index
-            )
+            distance_bytes = 0 if i == 0 else marker.index - markers[i - 1].index
             distance_registers, bbb = divmod(distance_bytes, REGISTER_SIZE_BYTES)
             if distance_registers > 0x1FF:
                 # Defensive only -- dead in practice, same reasoning as
@@ -777,7 +791,7 @@ class ProgramMemory(MemoryRegion):
         return programs
 
     def _rebuild(self, programs: list, collapse_trailing_end: bool = True):
-        '''Rewrites this region from scratch so it holds exactly `programs`: a
+        """Rewrites this region from scratch so it holds exactly `programs`: a
         list of `(instruction_bytes, key_assignments)`, oldest first, where
         `key_assignments` maps each label name to its key byte (only labels
         that have one). Shared by `remove_program()` and `repack()`.
@@ -794,7 +808,7 @@ class ProgramMemory(MemoryRegion):
 
         `collapse_trailing_end` runs `_collapse_trailing_end_into_dot_end()`
         afterwards, which `remove_program()` wants; `repack()` passes False,
-        since a real PACK never does that.'''
+        since a real PACK never does that."""
         status = self._memory.status_registers
         for reg in range(self._memory.alarms.end_exclusive, status.R00):
             self._memory.set_register(reg, zero_register())
@@ -813,7 +827,7 @@ class ProgramMemory(MemoryRegion):
             self._collapse_trailing_end_into_dot_end()
 
     def _collapse_trailing_end_into_dot_end(self):
-        '''After `_rebuild()`, the newest program ends with its own END followed
+        """After `_rebuild()`, the newest program ends with its own END followed
         by a separate, empty `.END.` (`import_program()` always writes both).
         When that END already sits where a `.END.` can go -- the last 3 bytes
         of a register, offset 4 -- this turns it into the `.END.` itself (only
@@ -826,7 +840,7 @@ class ProgramMemory(MemoryRegion):
         Called only by `remove_program()`, and only when `_rebuild()` imported
         at least one program. `repack()` doesn't use it: a real PACK always
         leaves an END plus an empty `.END.` (docs/program.md "What a real PACK
-        does").'''
+        does")."""
         status = self._memory.status_registers
         chain = self.list_global_chain()
         sentinel = chain[-1]  # the fresh, empty .END. just written
@@ -851,7 +865,7 @@ class ProgramMemory(MemoryRegion):
             self._memory.set_register(stale, zero_register())
 
     def remove_program(self, program: Program):
-        '''Removes `program` and closes up the gap it leaves, so the remaining
+        """Removes `program` and closes up the gap it leaves, so the remaining
         programs stay contiguous (GitHub issue #6).
 
         Programs grow down from R00 and older ones never move, so removing
@@ -869,17 +883,18 @@ class ProgramMemory(MemoryRegion):
 
         All-or-nothing: if anything raises part-way through (e.g. a kept
         program's bytes fail get_program_bytes()'s cross-check), this Memory is
-        left exactly as it was (see Memory.transaction()).'''
+        left exactly as it was (see Memory.transaction())."""
         with self._memory.transaction():
             self._remove_program(program)
 
     def _remove_program(self, program: Program):
-        '''remove_program()'s body, run inside its transaction.'''
+        """remove_program()'s body, run inside its transaction."""
         key_assignments_region = self._memory.key_assignments
         programs = self.list_programs()
         match = next(
             (
-                p for p in programs
+                p
+                for p in programs
                 if p.start_addr == program.start_addr
                 and p.start_offset == program.start_offset
             ),
@@ -917,7 +932,7 @@ class ProgramMemory(MemoryRegion):
         self._rebuild(keep)
 
     def repack(self):
-        '''The program-memory half of `Memory.pack()` (GitHub issue #31).
+        """The program-memory half of `Memory.pack()` (GitHub issue #31).
 
         Rebuilds the global chain from a forward opcode scan
         (`_forward_scan_programs()`) rather than the existing backward links, so
@@ -938,7 +953,7 @@ class ProgramMemory(MemoryRegion):
 
         Raises DM41MemoryError if `_forward_scan_programs()` can't safely
         determine program memory's content; nothing is changed then. The
-        rebuild after it is all-or-nothing too (see Memory.transaction()).'''
+        rebuild after it is all-or-nothing too (see Memory.transaction())."""
         keep = self._forward_scan_programs()
         if keep:
             with self._memory.transaction():
@@ -956,26 +971,26 @@ class ProgramMemory(MemoryRegion):
     # which has independent unshifted/shifted slots.
 
     def find_program_by_name(self, name: str) -> Optional[ProgramInfo]:
-        '''First named global label matching `name` (oldest-created, i.e.
+        """First named global label matching `name` (oldest-created, i.e.
         list_global_chain()'s own order, in the rare case of a duplicate
         name) -- shared by set_program_key_assignment()/
         clear_program_key_assignment()/get_program_for_key(). A key
         assignment lives on one label's own header (sec 4.6/5.2)
         regardless of how many labels its program has, so this works off
-        the flat per-label chain, not the grouped `list_programs()`.'''
+        the flat per-label chain, not the grouped `list_programs()`."""
         for program in self.list_global_chain():
             if program.is_named and program.name == name:
                 return program
         return None
 
     def _write_program_key_byte(self, header_addr: int, header_offset: int, value: int):
-        '''Overwrites the key-assignment byte (the 4th byte, sec 4.2/5.2)
+        """Overwrites the key-assignment byte (the 4th byte, sec 4.2/5.2)
         of the global-label header starting at (header_addr,
         header_offset) -- the write-side counterpart to
         _decode_label_name() reading it. `addr_for`/`pos_for` convert to
         and from the linear address space so this doesn't need its own
         register-boundary-crossing loop (see read_bytes_forward for why
-        register offset and address run in opposite directions).'''
+        register offset and address run in opposite directions)."""
         reg, offset = self.pos_for(self.addr_for(header_addr, header_offset) - 3)
         data = bytearray(self._memory.get_register(reg).get_bytes())
         data[offset] = value
@@ -984,7 +999,7 @@ class ProgramMemory(MemoryRegion):
     def clear_assignments_for_key_byte(
         self, key_byte: int, except_name: Optional[str] = None
     ):
-        '''Writes 0x00 (unassigned) into the header of every global label
+        """Writes 0x00 (unassigned) into the header of every global label
         currently holding `key_byte`, except one named `except_name` (used
         by set_program_key_assignment() while moving that program itself
         onto this key -- its own old byte is handled separately there).
@@ -992,7 +1007,7 @@ class ProgramMemory(MemoryRegion):
         usually end up set (by whatever new assignment is replacing these)
         rather than cleared. Also called by
         KeyAssignments.set_assignment(), which is claiming the same key
-        for the other storage mechanism.'''
+        for the other storage mechanism."""
         for program in self.list_global_chain():
             if (
                 program.is_named
@@ -1003,8 +1018,10 @@ class ProgramMemory(MemoryRegion):
                     program.header_addr, program.header_offset, 0x00
                 )
 
-    def get_program_for_key(self, key_number: int, shifted: bool) -> Optional[ProgramInfo]:
-        '''Looks up the global label (if any) assigned to `key_number`/
+    def get_program_for_key(
+        self, key_number: int, shifted: bool
+    ) -> Optional[ProgramInfo]:
+        """Looks up the global label (if any) assigned to `key_number`/
         `shifted` via sec 4.6 -- the counterpart to
         KeyAssignments.get_assignment() for the other storage mechanism
         (sec 4.1). Per the real lookup order (sec 4.7), a Key Assignment
@@ -1012,7 +1029,7 @@ class ProgramMemory(MemoryRegion):
         global-label one, but this method only checks global labels --
         callers wanting "whatever's actually assigned to this key" should
         check KeyAssignments.get_assignment() first and fall back to this
-        (see gui/key_assignments_tab.py).'''
+        (see gui/key_assignments_tab.py)."""
         key_byte = self._memory.key_assignments.key_byte_for(key_number, shifted)
         for program in self.list_global_chain():
             if program.is_named and program.key_assignment == key_byte:
@@ -1020,7 +1037,7 @@ class ProgramMemory(MemoryRegion):
         return None
 
     def set_program_key_assignment(self, name: str, key_number: int, shifted: bool):
-        '''Assigns the global label `name` to `key_number`/`shifted` (sec
+        """Assigns the global label `name` to `key_number`/`shifted` (sec
         4.6) -- `ASN "name" [key]` on a real calculator. Unlike
         KeyAssignments.set_assignment(), this never touches the Key
         Assignment Registers; it writes directly into the label's own
@@ -1039,7 +1056,7 @@ class ProgramMemory(MemoryRegion):
         would be misleading rather than a real dual assignment. Same
         silent-overwrite precedent as KeyAssignments.set_assignment().
 
-        Raises ValueError if no global label named `name` exists.'''
+        Raises ValueError if no global label named `name` exists."""
         key_assignments_region = self._memory.key_assignments
         program = self.find_program_by_name(name)
         if program is None:
@@ -1051,8 +1068,8 @@ class ProgramMemory(MemoryRegion):
         # (0x00 means "never assigned" -- nothing to move off of).
         if program.key_assignment:
             try:
-                old_key_number, old_shifted = key_assignments_region.key_number_for_byte(
-                    program.key_assignment
+                old_key_number, old_shifted = (
+                    key_assignments_region.key_number_for_byte(program.key_assignment)
                 )
                 key_assignments_region.set_key_flag(old_key_number, old_shifted, False)
             except ValueError:
@@ -1068,11 +1085,11 @@ class ProgramMemory(MemoryRegion):
         key_assignments_region.set_key_flag(key_number, shifted, True)
 
     def clear_program_key_assignment(self, name: str):
-        '''Removes global label `name`'s key assignment (sec 4.6), if it
+        """Removes global label `name`'s key assignment (sec 4.6), if it
         has one -- writes 0x00 back into its header and clears the
         corresponding KEYFLAGS bit. No-op if the label has no key
         assignment. Raises ValueError if no global label named `name`
-        exists.'''
+        exists."""
         key_assignments_region = self._memory.key_assignments
         program = self.find_program_by_name(name)
         if program is None:
@@ -1086,6 +1103,4 @@ class ProgramMemory(MemoryRegion):
             key_assignments_region.set_key_flag(key_number, shifted, False)
         except ValueError:
             pass
-        self._write_program_key_byte(
-            program.header_addr, program.header_offset, 0x00
-        )
+        self._write_program_key_byte(program.header_addr, program.header_offset, 0x00)

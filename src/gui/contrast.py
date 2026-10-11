@@ -154,7 +154,9 @@ def adjust_text(text, bg, minimum=MIN_TEXT_CONTRAST) -> str:
     other = (255, 255, 255) if away == (0, 0, 0) else (0, 0, 0)
     for target in (away, other):
         for step in range(101):
-            candidate = tuple(int(round(c)) for c in _blend(text_rgb, target, step / 100))
+            candidate = tuple(
+                int(round(c)) for c in _blend(text_rgb, target, step / 100)
+            )
             if contrast_ratio(candidate, bg_rgb) >= minimum:
                 return to_hex(candidate)
     return to_hex(away)
@@ -191,17 +193,46 @@ def improve_pair(text, bg, minimum=MIN_TEXT_CONTRAST):
 # the other primaries and the secondaries (hover states) then only have
 # their backgrounds adjusted, so one text color serves all of them.
 _THEME_GROUPS = (
-    ("CTkButton", "text_color", ("fg_color",), ("hover_color",),
-     "text_color_disabled", MIN_DISABLED_CONTRAST),
-    ("CTkOptionMenu", "text_color", ("fg_color",), (),
-     "text_color_disabled", MIN_DISABLED_CONTRAST),
-    ("CTkComboBox", "text_color", ("fg_color",), (),
-     "text_color_disabled", MIN_DISABLED_CONTRAST),
-    ("CTkSegmentedButton", "text_color", ("selected_color", "unselected_color"),
-     ("selected_hover_color", "unselected_hover_color"),
-     "text_color_disabled", MIN_DISABLED_CONTRAST),
-    ("CTkEntry", "text_color", ("fg_color",), (),
-     "placeholder_text_color", MIN_TEXT_CONTRAST),
+    (
+        "CTkButton",
+        "text_color",
+        ("fg_color",),
+        ("hover_color",),
+        "text_color_disabled",
+        MIN_DISABLED_CONTRAST,
+    ),
+    (
+        "CTkOptionMenu",
+        "text_color",
+        ("fg_color",),
+        (),
+        "text_color_disabled",
+        MIN_DISABLED_CONTRAST,
+    ),
+    (
+        "CTkComboBox",
+        "text_color",
+        ("fg_color",),
+        (),
+        "text_color_disabled",
+        MIN_DISABLED_CONTRAST,
+    ),
+    (
+        "CTkSegmentedButton",
+        "text_color",
+        ("selected_color", "unselected_color"),
+        ("selected_hover_color", "unselected_hover_color"),
+        "text_color_disabled",
+        MIN_DISABLED_CONTRAST,
+    ),
+    (
+        "CTkEntry",
+        "text_color",
+        ("fg_color",),
+        (),
+        "placeholder_text_color",
+        MIN_TEXT_CONTRAST,
+    ),
     ("CTkTextbox", "text_color", ("fg_color",), (), None, None),
     ("DropdownMenu", "text_color", ("fg_color",), ("hover_color",), None, None),
 )

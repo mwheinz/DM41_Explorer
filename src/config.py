@@ -42,7 +42,7 @@ class ProjectConfig:
     """Centralized configuration with file-based persistence."""
 
     # Persistent storage location in the user's home directory. This is the
-    # DM41_Explorer's file. 
+    # DM41_Explorer's file.
     PREFS_FILE = Path.home() / ".dm41_explorer.json"
 
     # Default values
@@ -52,9 +52,9 @@ class ProjectConfig:
         # device, so it is the default; note that an existing user has no
         # such key, and so gets DM41X whichever calculator they own.
         "mode": DEFAULT_MODE.value,
-        "baudrate": 38400, # The only speed the DM41L currently supports.
+        "baudrate": 38400,  # The only speed the DM41L currently supports.
         "console_timeout_minutes": 10,
-        "serial_port": "/dev/tty.usbmodem14101", # MacOS default(?)
+        "serial_port": "/dev/tty.usbmodem14101",  # MacOS default(?)
         "logging_level": "INFO",
         "log_directory": str(Path.home()),
         "appearance_mode": "System",  # "System", "Light", "Dark"

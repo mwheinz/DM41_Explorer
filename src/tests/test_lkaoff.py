@@ -54,8 +54,9 @@ def test_saving_an_lkaoff_state_keeps_it_lkaoff():
     memory = Memory.from_string(text, profile=DM41X)
 
     assert _normalised(memory) == " ".join(text.split())
-    assert Memory.from_string(memory.to_string(), profile=DM41X).key_assignments \
-        .flag_clear_assignments() == [(11, False), (12, True)]
+    assert Memory.from_string(
+        memory.to_string(), profile=DM41X
+    ).key_assignments.flag_clear_assignments() == [(11, False), (12, True)]
 
 
 def test_editing_another_key_does_not_touch_the_clear_flags():

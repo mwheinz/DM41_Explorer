@@ -230,7 +230,9 @@ def build_tree_with_scrollbar(
     font_size = ctk.ThemeManager.theme["CTkFont"]["size"]
     for col, text, width, stretch in columns:
         tree.heading(col, text=text)
-        tree.column(col, width=scaled_width(width, font_size), anchor="w", stretch=stretch)
+        tree.column(
+            col, width=scaled_width(width, font_size), anchor="w", stretch=stretch
+        )
 
     vsb = tkinter.Scrollbar(parent, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=vsb.set)
@@ -266,9 +268,7 @@ def fit_columns(tree: ttk.Treeview, columns: list) -> None:
     heading_font = tkfont.Font(font=heading_spec)
     font_size = ctk.ThemeManager.theme["CTkFont"]["size"]
     ids = [col[0] for col in columns]
-    widest = {
-        col[0]: heading_font.measure(col[1]) + HEADING_PADDING for col in columns
-    }
+    widest = {col[0]: heading_font.measure(col[1]) + HEADING_PADDING for col in columns}
     for iid in tree.get_children()[:FIT_ROW_LIMIT]:
         for column_id, value in zip(ids, tree.item(iid, "values")):
             needed = cell_font.measure(str(value)) + CELL_PADDING
@@ -276,7 +276,9 @@ def fit_columns(tree: ttk.Treeview, columns: list) -> None:
                 widest[column_id] = needed
     for column_id, _text, width, stretch in columns:
         if not stretch:
-            tree.column(column_id, width=max(scaled_width(width, font_size), widest[column_id]))
+            tree.column(
+                column_id, width=max(scaled_width(width, font_size), widest[column_id])
+            )
 
 
 def build_tab_treeview(

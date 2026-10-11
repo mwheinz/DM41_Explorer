@@ -7,6 +7,7 @@ every one a process has already built -- the cost accumulates inside
 Tcl/Tk itself -- so building a new app per test made this file take
 minutes. Requires a display (Xvfb in CI).
 """
+
 import json
 import time
 from pathlib import Path
@@ -145,9 +146,10 @@ def test_save_after_replacing_a_loaded_file_asks_for_a_new_name(app, tmp_path, r
 def test_save_as_writes_the_file_and_makes_it_the_source(app, tmp_path):
     new_path = tmp_path / "renamed.dm41"
     app.memory.mark_modified()
-    with mock.patch(
-        "gui.app.filedialog.asksaveasfilename", return_value=str(new_path)
-    ), mock.patch("gui.app.messagebox.showinfo"):
+    with (
+        mock.patch("gui.app.filedialog.asksaveasfilename", return_value=str(new_path)),
+        mock.patch("gui.app.messagebox.showinfo"),
+    ):
         app.save_state_as()
 
     assert new_path.exists()
@@ -163,9 +165,11 @@ def test_saving_over_the_loaded_file_asks_first(app, tmp_path, confirm):
     app._load_state_into_buffer(str(path))
     app.memory.status_registers.set_flag(0, True)  # something to save
 
-    with mock.patch.object(app, "save_state_as") as save_as, mock.patch(
-        "gui.app.messagebox.showinfo"
-    ), mock.patch("gui.app.messagebox.askyesno", return_value=confirm) as ask:
+    with (
+        mock.patch.object(app, "save_state_as") as save_as,
+        mock.patch("gui.app.messagebox.showinfo"),
+        mock.patch("gui.app.messagebox.askyesno", return_value=confirm) as ask,
+    ):
         app.save_state_to_file()
 
     ask.assert_called_once()
@@ -235,9 +239,10 @@ def _send(app, name, *, answer=True):
     note in send_state_to_calculator()."""
     app.memory = Memory.from_file(DATA_DIR / name, profile=DM41X)
     app.memory_source = DATA_DIR / name
-    with mock.patch("gui.app.messagebox.showerror") as error, mock.patch(
-        "gui.app.messagebox.askyesno", return_value=answer
-    ) as confirm:
+    with (
+        mock.patch("gui.app.messagebox.showerror") as error,
+        mock.patch("gui.app.messagebox.askyesno", return_value=answer) as confirm,
+    ):
         app.send_state_to_calculator()
     return error, confirm
 
@@ -256,7 +261,9 @@ def test_send_refuses_xm_the_dm41l_does_not_have(connected_app):
 
 
 @pytest.mark.parametrize("answer", [True, False])
-def test_send_lists_what_a_dm41l_cannot_run_and_sends_only_on_yes(connected_app, answer):
+def test_send_lists_what_a_dm41l_cannot_run_and_sends_only_on_yes(
+    connected_app, answer
+):
     error, confirm = _send(connected_app, "xrom.d41", answer=answer)
 
     error.assert_not_called()
@@ -266,7 +273,7 @@ def test_send_lists_what_a_dm41l_cannot_run_and_sends_only_on_yes(connected_app,
     assert "These will not work on a DM41L:" in message
     assert '- Program "DM41X", step 3: X<I>Y is not built into a DM41L' in message
     # 18 warnings; the dialog shows 12 and counts the rest.
-    assert "- Program \"DM41X\", step 14:" in message
+    assert '- Program "DM41X", step 14:' in message
     assert "step 15" not in message
     assert "...and 6 more." in message
     assert message.endswith("Send it anyway?")
@@ -290,7 +297,9 @@ def test_send_lists_key_assignments_a_dm41l_cannot_run(connected_app):
         ("dm41x_manyfiles.dm41", DM41X),
     ],
 )
-def test_send_of_a_state_that_fits_asks_the_usual_question(connected_app, state, connection):
+def test_send_of_a_state_that_fits_asks_the_usual_question(
+    connected_app, state, connection
+):
     connected_app.serial.profile = connection
 
     error, confirm = _send(connected_app, state)
@@ -308,9 +317,10 @@ def test_send_when_not_connected_does_not_check_anything(dm41l_app):
     dm41l_app.memory = Memory.from_file(
         DATA_DIR / "dm41x_manyfiles.dm41", profile=DM41X
     )
-    with mock.patch("gui.app.messagebox.showwarning") as warn, mock.patch(
-        "gui.app.check_profile_fit"
-    ) as check:
+    with (
+        mock.patch("gui.app.messagebox.showwarning") as warn,
+        mock.patch("gui.app.check_profile_fit") as check,
+    ):
         dm41l_app.send_state_to_calculator()
 
     warn.assert_called_once()
@@ -420,9 +430,10 @@ def test_a_d41_file_saves_back_identically(app, tmp_path):
     app._load_state_into_buffer(str(DATA_DIR / "dm41x_xrom_keys.d41"))
     target = tmp_path / "copy.d41"
 
-    with mock.patch(
-        "gui.app.filedialog.asksaveasfilename", return_value=str(target)
-    ), mock.patch("gui.app.messagebox.showinfo"):
+    with (
+        mock.patch("gui.app.filedialog.asksaveasfilename", return_value=str(target)),
+        mock.patch("gui.app.messagebox.showinfo"),
+    ):
         app.save_state_as()
 
     assert " ".join(target.read_text().split()) == " ".join(text.split())
@@ -792,17 +803,22 @@ def test_the_connect_menu_follows_the_mode(app):
     assert set(_connect_entries(app)) == {"disabled"}
 
 
-@pytest.mark.parametrize("action", [
-    "show_connect_dialog",
-    "get_state_from_calculator",
-    "send_state_to_calculator",
-    "set_calculator_time",
-])
+@pytest.mark.parametrize(
+    "action",
+    [
+        "show_connect_dialog",
+        "get_state_from_calculator",
+        "send_state_to_calculator",
+        "set_calculator_time",
+    ],
+)
 def test_the_serial_actions_refuse_in_dm41x_mode(app, action):
     """The keyboard shortcuts never consult the menu's state, so each
     action guards itself as well."""
-    with mock.patch("gui.app.messagebox.showinfo") as info, \
-            mock.patch.object(app.serial, "connect") as connect:
+    with (
+        mock.patch("gui.app.messagebox.showinfo") as info,
+        mock.patch.object(app.serial, "connect") as connect,
+    ):
         getattr(app, action)()
 
     assert info.called, f"{action} said nothing"
@@ -811,11 +827,14 @@ def test_the_serial_actions_refuse_in_dm41x_mode(app, action):
 
 
 @pytest.mark.parametrize("confirm", [True, False])
-def test_switching_mode_while_connected_warns_and_disconnects_only_on_yes(dm41l_app, confirm):
+def test_switching_mode_while_connected_warns_and_disconnects_only_on_yes(
+    dm41l_app, confirm
+):
     dm41l_app.serial.is_connected = True
-    with mock.patch.object(dm41l_app, "disconnect") as disconnect, mock.patch(
-        "gui.app.messagebox.askyesno", return_value=confirm
-    ) as ask:
+    with (
+        mock.patch.object(dm41l_app, "disconnect") as disconnect,
+        mock.patch("gui.app.messagebox.askyesno", return_value=confirm) as ask,
+    ):
         assert dm41l_app.set_mode(DeviceMode.DM41X, persist=True) is confirm
 
     assert "serial connection will be closed" in ask.call_args.args[1]
@@ -825,8 +844,12 @@ def test_switching_mode_while_connected_warns_and_disconnects_only_on_yes(dm41l_
 # -- The Preferences dialog reports the mode rather than writing it ----------
 
 
-@pytest.mark.parametrize("confirm, expected", [(True, DeviceMode.DM41L), (False, DeviceMode.DM41X)])
-def test_preferences_can_change_the_mode_if_the_switch_is_confirmed(app, confirm, expected):
+@pytest.mark.parametrize(
+    "confirm, expected", [(True, DeviceMode.DM41L), (False, DeviceMode.DM41X)]
+)
+def test_preferences_can_change_the_mode_if_the_switch_is_confirmed(
+    app, confirm, expected
+):
     with mock.patch("gui.app.messagebox.askyesno", return_value=confirm):
         app._on_preferences_saved(requested_mode=DeviceMode.DM41L)
 
@@ -859,12 +882,13 @@ def test_preferences_saved_without_a_mode_still_works(app):
     assert app.mode is DeviceMode.DM41X
 
 
-
 # -- The status bar says nothing about a connection it cannot make ----------
 
 
 @pytest.mark.parametrize("mode, status", [("DM41X", ""), ("DM41L", "Not connected")])
-def test_the_status_mentions_a_connection_only_where_one_is_possible(app_in_mode, mode, status):
+def test_the_status_mentions_a_connection_only_where_one_is_possible(
+    app_in_mode, mode, status
+):
     assert app_in_mode(mode)._status_label.cget("text") == status
 
 
@@ -994,11 +1018,13 @@ def busy_app(dm41l_app):
     once, so deferred commands are attempted inside the test."""
     dm41l_app.serial.is_connected = True
     dm41l_app.serial.serial_inst = mock.Mock(port="/dev/tty.test")
-    with mock.patch.object(
-        dm41l_app.engine, "execute", return_value=False
-    ) as execute, mock.patch.object(
-        dm41l_app, "after", side_effect=lambda ms, fn=None: fn() if fn else None
-    ), mock.patch("gui.app.messagebox.showwarning") as warning:
+    with (
+        mock.patch.object(dm41l_app.engine, "execute", return_value=False) as execute,
+        mock.patch.object(
+            dm41l_app, "after", side_effect=lambda ms, fn=None: fn() if fn else None
+        ),
+        mock.patch("gui.app.messagebox.showwarning") as warning,
+    ):
         dm41l_app.execute = execute
         dm41l_app.warning = warning
         yield dm41l_app
@@ -1022,18 +1048,19 @@ def _assert_reported_busy(app):
     ],
     ids=["get state", "auto fetch", "set time", "startup step"],
 )
-def test_a_command_refused_as_busy_is_reported_and_the_status_restored(busy_app, action):
+def test_a_command_refused_as_busy_is_reported_and_the_status_restored(
+    busy_app, action
+):
     action(busy_app)
     _assert_reported_busy(busy_app)
 
 
 def test_busy_send_is_reported_and_nothing_is_transferred(busy_app):
     busy_app.memory = Memory.from_file(DATA_DIR / "6x-xm.dm41", profile=DM41L)
-    with mock.patch(
-        "gui.app.messagebox.askyesno", return_value=True
-    ), mock.patch(
-        "gui.app.LoadMemoryStringCommand.trigger_transfer"
-    ) as transfer:
+    with (
+        mock.patch("gui.app.messagebox.askyesno", return_value=True),
+        mock.patch("gui.app.LoadMemoryStringCommand.trigger_transfer") as transfer,
+    ):
         busy_app.send_state_to_calculator()
 
     _assert_reported_busy(busy_app)

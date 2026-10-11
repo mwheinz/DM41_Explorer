@@ -73,16 +73,22 @@ def test_sizes_never_exceed_the_screen():
 
 
 def test_a_saved_size_is_used():
-    assert initial_window_size((1000, 700), BASE_FONT_SIZE, NEEDED, BIG_SCREEN) == (1000, 700)
+    assert initial_window_size((1000, 700), BASE_FONT_SIZE, NEEDED, BIG_SCREEN) == (
+        1000,
+        700,
+    )
 
 
 def test_a_saved_size_below_the_minimum_is_raised_to_it():
-    assert initial_window_size((300, 200), BASE_FONT_SIZE, NEEDED, BIG_SCREEN) == BASE_MINIMUM_SIZE
+    assert (
+        initial_window_size((300, 200), BASE_FONT_SIZE, NEEDED, BIG_SCREEN)
+        == BASE_MINIMUM_SIZE
+    )
     # e.g. the font was enlarged since the size was saved.
     big = BASE_FONT_SIZE * 2
-    assert initial_window_size((1000, 700), big, NEEDED, BIG_SCREEN) == minimum_window_size(
-        big, NEEDED, BIG_SCREEN
-    )
+    assert initial_window_size(
+        (1000, 700), big, NEEDED, BIG_SCREEN
+    ) == minimum_window_size(big, NEEDED, BIG_SCREEN)
 
 
 def test_a_saved_size_larger_than_the_screen_is_reduced():
@@ -90,9 +96,14 @@ def test_a_saved_size_larger_than_the_screen_is_reduced():
     assert w <= SMALL_SCREEN[0] * 0.95 and h <= SMALL_SCREEN[1] * 0.90
 
 
-@pytest.mark.parametrize("bad", [None, (), (0, 0), (-5, 700), ("a", "b"), (1000,), "junk", 7])
+@pytest.mark.parametrize(
+    "bad", [None, (), (0, 0), (-5, 700), ("a", "b"), (1000,), "junk", 7]
+)
 def test_an_unusable_saved_size_falls_back_to_the_default(bad):
-    assert initial_window_size(bad, BASE_FONT_SIZE, NEEDED, BIG_SCREEN) == BASE_DEFAULT_SIZE
+    assert (
+        initial_window_size(bad, BASE_FONT_SIZE, NEEDED, BIG_SCREEN)
+        == BASE_DEFAULT_SIZE
+    )
 
 
 def test_scaled_row_height():

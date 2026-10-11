@@ -100,8 +100,11 @@ def test_dropdown_uses_hp41_display_names(root):
     dlg = _make_dialog(
         root,
         assignment=KeyAssignment(
-            key_number=1, shifted=False,
-            fn_byte1=0x4E, fn_byte2=None, name="P-R",
+            key_number=1,
+            shifted=False,
+            fn_byte1=0x4E,
+            fn_byte2=None,
+            name="P-R",
             raw_key_byte=0x01,
         ),
     )
@@ -138,8 +141,11 @@ def test_dm41x_only_hint_is_shown_for_the_current_assignment(root):
     dlg = _make_dialog(
         root,
         assignment=KeyAssignment(
-            key_number=1, shifted=False,
-            fn_byte1=0xA6, fn_byte2=0xB1, name="LKAON",
+            key_number=1,
+            shifted=False,
+            fn_byte1=0xA6,
+            fn_byte2=0xB1,
+            name="LKAON",
             raw_key_byte=0x01,
         ),
     )
@@ -226,9 +232,7 @@ def test_program_tab_defaults_to_current_program_assignment(root):
     opens pre-selected to it and is the tab that opens by default."""
     program = mock.Mock(name="AAA")
     program.name = "AAA"
-    dlg = _make_dialog(
-        root, program_assignment=program, program_names=["AAA", "BBB"]
-    )
+    dlg = _make_dialog(root, program_assignment=program, program_names=["AAA", "BBB"])
 
     assert dlg._tabs.get() == "Program"
     assert dlg._program_var.get() == "AAA"
@@ -261,8 +265,11 @@ def test_function_assignment_takes_display_priority_over_program(root):
     dlg = _make_dialog(
         root,
         assignment=KeyAssignment(
-            key_number=1, shifted=False,
-            fn_byte1=0x40, fn_byte2=None, name="+",
+            key_number=1,
+            shifted=False,
+            fn_byte1=0x40,
+            fn_byte2=None,
+            name="+",
             raw_key_byte=0x01,
         ),
         program_assignment=program,

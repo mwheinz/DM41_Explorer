@@ -6,6 +6,7 @@ The math and theme tests need no display. The palette tests import the real
 color constants from the GUI modules, so editing a color to something too
 faint fails here instead of being noticed by eye.
 """
+
 import copy
 import json
 from pathlib import Path
@@ -119,7 +120,14 @@ def test_improve_pair_returns_a_passing_pair_unchanged():
 
 def _text_pairs(theme):
     """Every (description, text, background, minimum) the pass promises."""
-    for widget, text_key, primaries, secondaries, quiet, quiet_min in contrast._THEME_GROUPS:
+    for (
+        widget,
+        text_key,
+        primaries,
+        secondaries,
+        quiet,
+        quiet_min,
+    ) in contrast._THEME_GROUPS:
         entry = theme[widget]
         for mode in MODES:
             text = resolve(entry[text_key], mode)
@@ -157,7 +165,8 @@ def test_the_builtin_themes_do_fail_without_the_pass():
     own, this pass (and the app calling it) is dead code."""
     theme = _load_theme("blue")
     assert any(
-        contrast_ratio(text, bg) < minimum for _, text, bg, minimum in _text_pairs(theme)
+        contrast_ratio(text, bg) < minimum
+        for _, text, bg, minimum in _text_pairs(theme)
     )
 
 
@@ -188,8 +197,13 @@ def test_hover_colors_stay_distinct_from_the_resting_color(name):
 
 
 def test_an_unparseable_theme_color_is_left_alone():
-    theme = {"CTkButton": {"text_color": "gray98", "fg_color": "transparent",
-                           "hover_color": ["#ffffff", "#000000"]}}
+    theme = {
+        "CTkButton": {
+            "text_color": "gray98",
+            "fg_color": "transparent",
+            "hover_color": ["#ffffff", "#000000"],
+        }
+    }
     improve_theme_contrast(theme)
     assert theme["CTkButton"]["fg_color"] == "transparent"
     assert theme["CTkButton"]["text_color"] == "gray98"
@@ -211,9 +225,12 @@ TEXT_BACKGROUNDS = {
 @pytest.mark.parametrize("name", sorted(TEXT_BACKGROUNDS))
 @pytest.mark.parametrize("mode", MODES)
 @pytest.mark.parametrize(
-    "color_name,color", [("SECONDARY_TEXT", SECONDARY_TEXT), ("WARNING_TEXT", WARNING_TEXT)]
+    "color_name,color",
+    [("SECONDARY_TEXT", SECONDARY_TEXT), ("WARNING_TEXT", WARNING_TEXT)],
 )
-def test_shared_palette_text_is_readable_on_every_background(name, mode, color_name, color):
+def test_shared_palette_text_is_readable_on_every_background(
+    name, mode, color_name, color
+):
     bg = resolve(TEXT_BACKGROUNDS[name], mode)
     assert contrast_ratio(resolve(color, mode), bg) >= MIN_TEXT_CONTRAST
 
@@ -272,7 +289,10 @@ def test_red_delete_buttons_do_not_depend_on_the_themes_text_color(mode):
 
     assert contrast_ratio(kw["text_color"], kw["fg_color"]) >= MIN_TEXT_CONTRAST
     assert contrast_ratio(kw["text_color"], kw["hover_color"]) >= MIN_TEXT_CONTRAST
-    assert contrast_ratio(kw["text_color_disabled"], kw["fg_color"]) >= MIN_DISABLED_CONTRAST
+    assert (
+        contrast_ratio(kw["text_color_disabled"], kw["fg_color"])
+        >= MIN_DISABLED_CONTRAST
+    )
 
 
 def test_every_remove_button_uses_the_shared_danger_style():
@@ -310,7 +330,8 @@ def test_the_app_applies_the_pass_before_building_widgets(tmp_path, monkeypatch)
         mode = ctk.get_appearance_mode()
         assert (
             contrast_ratio(
-                resolve(probe.cget("text_color"), mode), resolve(probe.cget("fg_color"), mode)
+                resolve(probe.cget("text_color"), mode),
+                resolve(probe.cget("fg_color"), mode),
             )
             >= MIN_TEXT_CONTRAST
         )

@@ -72,7 +72,11 @@ class AlarmsTab(ctk.CTkFrame):
 
         header, self._header_label = build_tab_header(
             self,
-            button_kwargs={"text": "Add Alarm", "width": 100, "command": self._add_alarm},
+            button_kwargs={
+                "text": "Add Alarm",
+                "width": 100,
+                "command": self._add_alarm,
+            },
         )
         edit_button = ctk.CTkButton(
             header, text="Edit", width=90, command=self._edit_selected
@@ -209,9 +213,7 @@ class AlarmsTab(ctk.CTkFrame):
             return
 
         def save(kwargs):
-            self._save_new_or_edited_alarm(
-                kwargs, replacing_addr=alarm.start_addr
-            )
+            self._save_new_or_edited_alarm(kwargs, replacing_addr=alarm.start_addr)
 
         AlarmEditDialog(self, save, existing=alarm)
 

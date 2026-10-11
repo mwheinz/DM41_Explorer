@@ -60,9 +60,9 @@ def test_register_bcd_roundtrip():
         reg.set_bcd_number(val)
         # We use pytest.approx because of float representation noise,
         # though BCD should be precise for the significant digits stored.
-        assert reg.get_bcd_number() == pytest.approx(
-            val, abs=1e-9
-        ), f"Failed roundtrip for {val}"
+        assert reg.get_bcd_number() == pytest.approx(val, abs=1e-9), (
+            f"Failed roundtrip for {val}"
+        )
 
 
 def test_register_bcd_invalid_size():
@@ -257,7 +257,9 @@ def test_data_line_roundtrip_through_format_and_parse():
     same register bytes, for all three line kinds."""
     number_reg = Register(size=7)
     number_reg.set_bcd_number(1234567890.0)
-    assert parse_data_line(format_data_line(number_reg)).get_hex() == number_reg.get_hex()
+    assert (
+        parse_data_line(format_data_line(number_reg)).get_hex() == number_reg.get_hex()
+    )
 
     alpha_reg = Register(size=7)
     alpha_reg.set_alpha_text("AB")
@@ -635,7 +637,9 @@ def test_xm_header_does_not_require_aaa_match_own_address():
     # so this must still succeed.
     assert ExtendedMemory._parse_header(real_header) is not None
 
-    phantom_header = bytes.fromhex("20555004574152")  # false header -- reserved nibbles non-zero.
+    phantom_header = bytes.fromhex(
+        "20555004574152"
+    )  # false header -- reserved nibbles non-zero.
     with pytest.raises(ValueError):
         ExtendedMemory._parse_header(phantom_header)
 
@@ -872,7 +876,8 @@ def test_xm_add_file_updates_region0_nnn_when_a_later_file_first_spans():
     # Nine 9-record files fit entirely within region 0.
     for i in range(1, 10):
         xm.add_file(
-            f"NOTES{i}", xm.TYPE_ASCII,
+            f"NOTES{i}",
+            xm.TYPE_ASCII,
             records=[f"RECORD{n}" for n in range(1, 10)],
         )
         assert nnn() == 0, f"NNN went non-zero before any file spans (after NOTES{i})"
@@ -892,9 +897,9 @@ def test_xm_add_file_updates_region0_nnn_when_a_later_file_first_spans():
 
     files = xm.list_files()
     assert len(files) == 20
-    assert {f.name.strip() for f in files} == {
-        f"NOTES{i}" for i in range(1, 11)
-    } | {f"DATA{i}" for i in range(1, 11)}
+    assert {f.name.strip() for f in files} == {f"NOTES{i}" for i in range(1, 11)} | {
+        f"DATA{i}" for i in range(1, 11)
+    }
 
 
 def test_xm_add_file_no_room_raises():
@@ -1348,12 +1353,22 @@ def test_program_and_chain_display_labels():
 @pytest.mark.parametrize(
     "key_number, shifted, key_byte",
     [
-        (11, False, 0x01), (21, True, 0x0A), (12, False, 0x11), (22, True, 0x1A),
-        (53, False, 0x25), (52, False, 0x15), (62, True, 0x1E), (64, True, 0x3E),
+        (11, False, 0x01),
+        (21, True, 0x0A),
+        (12, False, 0x11),
+        (22, True, 0x1A),
+        (53, False, 0x25),
+        (52, False, 0x15),
+        (62, True, 0x1E),
+        (64, True, 0x3E),
         # Row 4: the double-width ENTER^ takes physical columns 1-2, so keys
         # 42/43/44 sit at physical columns 3/4/5 (docs sec 4.3).
-        (41, False, 0x04), (41, True, 0x0C), (42, False, 0x24), (42, True, 0x2C),
-        (43, False, 0x34), (44, True, 0x4C),
+        (41, False, 0x04),
+        (41, True, 0x0C),
+        (42, False, 0x24),
+        (42, True, 0x2C),
+        (43, False, 0x34),
+        (44, True, 0x4C),
     ],
 )
 def test_key_byte_for(key_number, shifted, key_byte):
@@ -1373,8 +1388,11 @@ def test_set_key_assignment_single_byte_function():
     assignments = memory.key_assignments.list_assignments()
     assert len(assignments) == 1
     assert assignments[0] == KeyAssignment(
-        key_number=11, shifted=False,
-        fn_byte1=0x40, fn_byte2=None, name="+",
+        key_number=11,
+        shifted=False,
+        fn_byte1=0x40,
+        fn_byte2=None,
+        name="+",
         raw_key_byte=KeyAssignments.key_byte_for(11, False),
     )
     # Filler-first storage in the actual register (sec 4.2).
@@ -1391,7 +1409,9 @@ def test_set_key_assignment_xrom_function():
     assignments = memory.key_assignments.list_assignments()
     assert assignments[0].name == "ADATE"
     reg = memory.get_register(0xC0)
-    assert reg.get_bytes()[1:4] == bytes([0xA6, 0x81, KeyAssignments.key_byte_for(13, False)])
+    assert reg.get_bytes()[1:4] == bytes(
+        [0xA6, 0x81, KeyAssignments.key_byte_for(13, False)]
+    )
 
 
 def test_set_key_assignment_overwrites_existing_entry_for_same_key():
@@ -1459,7 +1479,9 @@ def test_delete_key_assignment_on_unassigned_key_is_a_noop():
 
 
 def test_alarms_end_on_fresh_memory():
-    assert Memory().alarms.end_exclusive == Memory().key_assignments.end_exclusive == 0xC0
+    assert (
+        Memory().alarms.end_exclusive == Memory().key_assignments.end_exclusive == 0xC0
+    )
 
 
 def test_relocate_alarms_moves_buffer_on_key_assignment_growth_and_shrinkage():
@@ -1472,7 +1494,9 @@ def test_relocate_alarms_moves_buffer_on_key_assignment_growth_and_shrinkage():
     memory = Memory()
     memory.key_assignments.set_assignment(11, False, 0x40)
     memory.key_assignments.set_assignment(12, True, 0x41)
-    assert memory.key_assignments.end_exclusive == 0xC1  # 2 entries still fit in 1 register
+    assert (
+        memory.key_assignments.end_exclusive == 0xC1
+    )  # 2 entries still fit in 1 register
 
     # Hand-build a minimal 3-register Alarms buffer (header + 1 entry +
     # delimiter) immediately above it, at 0xc1-0xc3.
@@ -1492,7 +1516,9 @@ def test_relocate_alarms_moves_buffer_on_key_assignment_growth_and_shrinkage():
     moved_header = memory.get_register(0xC2).get_bytes()
     assert moved_header[0] == Alarms.HEADER_MARKER
     assert moved_header[1] == 3
-    assert memory.get_register(0xC3).get_hex() == Register.from_hex(entry_bytes).get_hex()
+    assert (
+        memory.get_register(0xC3).get_hex() == Register.from_hex(entry_bytes).get_hex()
+    )
     assert memory.get_register(0xC4).get_bytes()[0] == 0xF0
 
     # Deleting that third assignment shrinks Key Assignments back to 1
@@ -1504,7 +1530,9 @@ def test_relocate_alarms_moves_buffer_on_key_assignment_growth_and_shrinkage():
     restored_header = memory.get_register(0xC1).get_bytes()
     assert restored_header[0] == Alarms.HEADER_MARKER
     assert restored_header[1] == 3
-    assert memory.get_register(0xC2).get_hex() == Register.from_hex(entry_bytes).get_hex()
+    assert (
+        memory.get_register(0xC2).get_hex() == Register.from_hex(entry_bytes).get_hex()
+    )
     assert memory.get_register(0xC3).get_bytes()[0] == 0xF0
     assert memory.get_register(0xC4).get_hex() == "00000000000000"
 
@@ -1546,14 +1574,19 @@ def test_key_assignment_round_trip_through_from_string_to_string():
     memory = Memory()
     memory.key_assignments.set_assignment(11, False, 0x40)
     memory.key_assignments.set_assignment(11, True, (0xA6, 0x81))
-    memory.key_assignments.set_assignment(84, False, 0x0F)  # ASN, low-code (sec 5 caveat)
+    memory.key_assignments.set_assignment(
+        84, False, 0x0F
+    )  # ASN, low-code (sec 5 caveat)
 
     reloaded = Memory.from_string(memory.to_string())
-    assert reloaded.key_assignments.list_assignments() == memory.key_assignments.list_assignments()
+    assert (
+        reloaded.key_assignments.list_assignments()
+        == memory.key_assignments.list_assignments()
+    )
     for key_number, shifted in [(11, False), (11, True), (84, False)]:
-        assert reloaded.key_assignments.get_key_flag(key_number, shifted) == memory.key_assignments.get_key_flag(
+        assert reloaded.key_assignments.get_key_flag(
             key_number, shifted
-        )
+        ) == memory.key_assignments.get_key_flag(key_number, shifted)
 
 
 def test_key_number_for_byte_inverts_key_byte_for():
@@ -1583,13 +1616,19 @@ def test_get_key_assignment_single_key_lookup():
     fixture); key 42 has no assignment there at all."""
     memory = Memory.from_file(DATA_DIR / "keyassigns.dm41")
     assert memory.key_assignments.get_assignment(11, False) == KeyAssignment(
-        key_number=11, shifted=False,
-        fn_byte1=0x4C, fn_byte2=None, name="%",
+        key_number=11,
+        shifted=False,
+        fn_byte1=0x4C,
+        fn_byte2=None,
+        name="%",
         raw_key_byte=KeyAssignments.key_byte_for(11, False),
     )
     assert memory.key_assignments.get_assignment(11, True) == KeyAssignment(
-        key_number=11, shifted=True,
-        fn_byte1=0x4C, fn_byte2=None, name="%",
+        key_number=11,
+        shifted=True,
+        fn_byte1=0x4C,
+        fn_byte2=None,
+        name="%",
         raw_key_byte=KeyAssignments.key_byte_for(11, True),
     )
     assert memory.key_assignments.get_assignment(42, False) is None
@@ -1717,11 +1756,17 @@ def test_program_key_assignment_round_trip_through_from_string_to_string():
     reloaded = Memory.from_string(memory.to_string())
 
     assert reloaded.programs.get_program_for_key(22, True).name == "PURXM"
-    assert reloaded.key_assignments.get_key_flag(22, True) == memory.key_assignments.get_key_flag(22, True)
+    assert reloaded.key_assignments.get_key_flag(
+        22, True
+    ) == memory.key_assignments.get_key_flag(22, True)
     reloaded_names = {
-        (p.name, p.key_assignment) for p in reloaded.programs.list_global_chain() if p.is_named
+        (p.name, p.key_assignment)
+        for p in reloaded.programs.list_global_chain()
+        if p.is_named
     }
     memory_names = {
-        (p.name, p.key_assignment) for p in memory.programs.list_global_chain() if p.is_named
+        (p.name, p.key_assignment)
+        for p in memory.programs.list_global_chain()
+        if p.is_named
     }
     assert reloaded_names == memory_names

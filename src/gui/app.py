@@ -1,7 +1,7 @@
-'''
+"""
 DM41_Explorer: a CustomTkinter GUI for DM41-series calculator memory states.
 
-'''
+"""
 
 import logging
 import logging.handlers
@@ -60,6 +60,7 @@ ENGINE_POLL_MS = 50
 
 PLATFORM_SYSTEM = platform.system()
 
+
 class TabSpec(NamedTuple):
     """One of the main window's tabs. `attr` is the DM41ExplorerApp
     attribute that holds it. `editable` tabs get the app's on_change
@@ -81,18 +82,27 @@ TABS = (
     TabSpec("Overview", "overview_tab", OverviewTab),
     TabSpec("Flags", "flags_tab", FlagsTab),
     TabSpec(
-        "Programs", "program_tab", ProgramTab,
-        export_method="_export_selected", import_method="_import_program",
+        "Programs",
+        "program_tab",
+        ProgramTab,
+        export_method="_export_selected",
+        import_method="_import_program",
     ),
     TabSpec("Key Assignments", "key_assignments_tab", KeyAssignmentsTab),
     TabSpec("Alarms", "alarms_tab", AlarmsTab),
     TabSpec(
-        "Data Registers", "data_registers_tab", DataRegistersTab,
-        export_method="_export_registers", import_method="_import_registers",
+        "Data Registers",
+        "data_registers_tab",
+        DataRegistersTab,
+        export_method="_export_registers",
+        import_method="_import_registers",
     ),
     TabSpec(
-        "XM Files", "xm_files_tab", XMFilesTab,
-        export_method="_export_selected", import_method="_import_file",
+        "XM Files",
+        "xm_files_tab",
+        XMFilesTab,
+        export_method="_export_selected",
+        import_method="_import_file",
     ),
     TabSpec("Hex View", "hex_view_tab", HexViewTab, editable=False),
 )
@@ -197,11 +207,11 @@ def _setup_logging(config_store, log_basename="dm41_explorer"):
 
 
 def _apply_color_theme(name):
-    '''Loads the CustomTkinter color theme `name` (a built-in theme's name,
+    """Loads the CustomTkinter color theme `name` (a built-in theme's name,
     or the path of a theme JSON file). A theme that can't be loaded -- a
     hand-edited preference naming a file that is gone, say -- is logged and
     replaced by the default theme instead of stopping the app from
-    starting. Must run before any widget is built.'''
+    starting. Must run before any widget is built."""
     try:
         ctk.set_default_color_theme(name)
     except (OSError, ValueError) as e:
@@ -211,7 +221,7 @@ def _apply_color_theme(name):
 
 
 def _apply_font_prefs(config_store):
-    '''Overrides CustomTkinter's default UI font family/size, if configured.
+    """Overrides CustomTkinter's default UI font family/size, if configured.
 
     CTkFont() instances read `ThemeManager.theme["CTkFont"]` at construction
     time for whichever of family/size/weight isn't explicitly passed in, so
@@ -224,7 +234,7 @@ def _apply_font_prefs(config_store):
 
     Leaves CTk's own per-platform default (set by `set_default_color_theme`
     above) alone for whichever of family/size the user hasn't overridden.
-    '''
+    """
     if config_store.font_family:
         ctk.ThemeManager.theme["CTkFont"]["family"] = config_store.font_family
     if config_store.font_size:
@@ -248,7 +258,7 @@ STATE_FILETYPES = [
 
 
 class DM41ExplorerApp(ctk.CTk):
-    '''Main application window.'''
+    """Main application window."""
 
     # How long after the last resize event the window size is saved.
     RESIZE_SAVE_DELAY_MS = 1000
@@ -269,8 +279,7 @@ class DM41ExplorerApp(ctk.CTk):
         try:
             self.config_store.load()
         except Exception as e:
-            messagebox.showerror("Unable to load preferences",
-                                  str(e))
+            messagebox.showerror("Unable to load preferences", str(e))
 
         _setup_logging(self.config_store)
 
@@ -496,14 +505,14 @@ class DM41ExplorerApp(ctk.CTk):
     # -- Window size ------------------------------------------------------
 
     def _apply_window_size(self):
-        '''Sets the minimum size and the opening size (GitHub issue #42).
+        """Sets the minimum size and the opening size (GitHub issue #42).
 
         Must run after _build_layout(): the minimum is never less than what
         the tab bar and status bar ask for, and both grow with the
         application font. The opening size is the one saved at the last
         close if there is one, else a default scaled with the font; see
         gui/window_geometry.py for the rules.
-        '''
+        """
         self.update_idletasks()
         needed = (
             self._reverse_window_scaling(self.winfo_reqwidth()),
@@ -533,9 +542,9 @@ class DM41ExplorerApp(ctk.CTk):
         self.bind("<Configure>", self._on_configure, add="+")
 
     def _on_configure(self, event):
-        '''Saves the window size a moment after the user stops resizing, so
+        """Saves the window size a moment after the user stops resizing, so
         it survives however the app ends (force quit, crash, a quit path
-        that never reaches on_close()).'''
+        that never reaches on_close())."""
         if event.widget is not self or not self._tracking_size:
             return
         if self._resize_after_id is not None:
@@ -549,8 +558,8 @@ class DM41ExplorerApp(ctk.CTk):
         self._remember_window_size()
 
     def destroy(self):
-        '''Cancels the pending size timers first, so none fires into a
-        window that no longer exists.'''
+        """Cancels the pending size timers first, so none fires into a
+        window that no longer exists."""
         for name in ("_tracking_after_id", "_resize_after_id"):
             after_id = getattr(self, name, None)
             if after_id is not None:
@@ -562,9 +571,9 @@ class DM41ExplorerApp(ctk.CTk):
         super().destroy()
 
     def _window_is_maximized(self) -> bool:
-        '''True if the window is maximized/zoomed, whose size must not be
+        """True if the window is maximized/zoomed, whose size must not be
         remembered (restoring it would open a normal window at full-screen
-        size).'''
+        size)."""
         try:
             if self.state() == "zoomed":
                 return True
@@ -576,9 +585,9 @@ class DM41ExplorerApp(ctk.CTk):
             return False
 
     def _remember_window_size(self):
-        '''Saves the current window size to the preferences, for the next
+        """Saves the current window size to the preferences, for the next
         launch. Never raises: failing to save a size mustn't stop the app
-        from closing.'''
+        from closing."""
         try:
             if self._window_is_maximized():
                 return
@@ -626,13 +635,9 @@ class DM41ExplorerApp(ctk.CTk):
             status_bar, text="", font=ui_font(), text_color=WARNING_TEXT
         )
         self._modified_label.pack(side="left", padx=8, pady=6)
-        self._battery_label = ctk.CTkLabel(
-            status_bar, text="", font=ui_font()
-        )
+        self._battery_label = ctk.CTkLabel(status_bar, text="", font=ui_font())
         self._battery_label.pack(side="right", padx=16, pady=6)
-        self._calc_time_label = ctk.CTkLabel(
-            status_bar, text="", font=ui_font()
-        )
+        self._calc_time_label = ctk.CTkLabel(status_bar, text="", font=ui_font())
         self._calc_time_label.pack(side="right", padx=16, pady=6)
         self._source_label = ctk.CTkLabel(
             status_bar,
@@ -657,8 +662,8 @@ class DM41ExplorerApp(ctk.CTk):
         self._tabs_dirty = {name: True for name in self._tabs}
 
     def _build_menus(self):
-        '''Builds the application's menu bar. Every basic function lives
-        here rather than in toolbar buttons, per the current design.'''
+        """Builds the application's menu bar. Every basic function lives
+        here rather than in toolbar buttons, per the current design."""
 
         acc = "Command" if PLATFORM_SYSTEM == "Darwin" else "Control"
 
@@ -782,9 +787,7 @@ class DM41ExplorerApp(ctk.CTk):
         # Help Menu
         help_menu = Menu(menubar, tearoff=0)
         if PLATFORM_SYSTEM != "Darwin":
-            help_menu.add_command(
-                label="About DM41_Explorer", command=self._show_about
-            )
+            help_menu.add_command(label="About DM41_Explorer", command=self._show_about)
             help_menu.add_separator()
         help_menu.add_command(
             label="Keyboard Shortcuts",
@@ -912,8 +915,7 @@ class DM41ExplorerApp(ctk.CTk):
             self.config_store.save()
         except Exception as e:
             logger.error(
-                "Could not save %s to %s: %s",
-                context, self.config_store.PREFS_FILE, e
+                "Could not save %s to %s: %s", context, self.config_store.PREFS_FILE, e
             )
             messagebox.showerror(
                 "Could Not Save Preferences", f"Could not save {context}: {e}"
@@ -939,14 +941,14 @@ class DM41ExplorerApp(ctk.CTk):
         self._render_active_tab()
 
     def _render_active_tab(self):
-        '''Renders only the tab currently on screen, if it's stale.
+        """Renders only the tab currently on screen, if it's stale.
 
         Tabs render lazily rather than all at once: building a tab's
         widgets from scratch for a big register table is genuinely slow,
         so there's no reason to pay that cost
         for tabs the user hasn't looked at yet, or to pay it twice for a
         tab that's already showing current content.
-        '''
+        """
         name = self.tabview.get()
         if not self._tabs_dirty.get(name, True):
             return
@@ -954,9 +956,9 @@ class DM41ExplorerApp(ctk.CTk):
         self._tabs_dirty[name] = False
 
     def _render_tabs(self):
-        '''Invalidates every tab (e.g. after loading a whole new state) and
+        """Invalidates every tab (e.g. after loading a whole new state) and
         immediately re-renders whichever one is currently visible; the
-        rest pick up the new memory next time they're selected.'''
+        rest pick up the new memory next time they're selected."""
         for name in self._tabs_dirty:
             self._tabs_dirty[name] = True
         self._render_active_tab()
@@ -1053,10 +1055,12 @@ class DM41ExplorerApp(ctk.CTk):
         try:
             self.config_store.save()
         except Exception as e:
-            logger.error("Could not save preferences to %s: %s",
-                         self.config_store.PREFS_FILE, e)
-            messagebox.showerror("Could not save preferences",
-                                 f"{self.config_store.PREFS_FILE}, {e}")
+            logger.error(
+                "Could not save preferences to %s: %s", self.config_store.PREFS_FILE, e
+            )
+            messagebox.showerror(
+                "Could not save preferences", f"{self.config_store.PREFS_FILE}, {e}"
+            )
         self._set_status(f"Connected to {port} -- verifying...")
 
         self._execute_command(
@@ -1198,12 +1202,12 @@ class DM41ExplorerApp(ctk.CTk):
     # -- Tools menu actions --------------------------------------------------
 
     def pack_memory(self):
-        '''Tools > Pack Memory: repacks Key Assignments/Alarms and program
+        """Tools > Pack Memory: repacks Key Assignments/Alarms and program
         memory the way a real PACK does (see Memory.pack()), reporting the
         registers reclaimed and any programs whose global labels became
         visible. Useful before an Import, to make the most free space
         available. It lives in the Tools menu rather than on the Programs
-        tab because it also changes Key Assignments and Alarms.'''
+        tab because it also changes Key Assignments and Alarms."""
         before_count = len(self.memory.programs.list_programs())
         try:
             freed = self.memory.pack()
@@ -1214,7 +1218,8 @@ class DM41ExplorerApp(ctk.CTk):
         recovered = len(self.memory.programs.list_programs()) - before_count
         logger.info(
             "Packed memory: %d register(s) reclaimed, %d program(s) recovered",
-            freed, recovered,
+            freed,
+            recovered,
         )
         self._on_memory_changed()
         self._render_tabs()
@@ -1308,7 +1313,7 @@ class DM41ExplorerApp(ctk.CTk):
         self._load_state_into_buffer(path)
 
     def _load_state_into_buffer(self, path):
-        '''Reads `path` into self.memory and refreshes the UI to match.
+        """Reads `path` into self.memory and refreshes the UI to match.
         This is the actual load step shared by every way of opening a state
         (File > Open..., a startup file argument, and double-clicking a
         .dm41 file) -- callers are responsible for checking `self.memory.modified`
@@ -1318,7 +1323,7 @@ class DM41ExplorerApp(ctk.CTk):
         A state is opened with the current mode's profile. If it does not
         fit that model, the user is offered DM41X mode instead
         (_offer_mode_switch_for_load); declining leaves the open state
-        alone, so nothing is assigned here until that is settled.'''
+        alone, so nothing is assigned here until that is settled."""
         try:
             # Parsed into a local first: the state only replaces the open
             # buffer once it is known to fit the mode (or the user has
@@ -1348,7 +1353,7 @@ class DM41ExplorerApp(ctk.CTk):
         self._remember_recent_file(path)
 
     def open_state_file(self, path):
-        '''Opens `path` as the app's current state, prompting to discard
+        """Opens `path` as the app's current state, prompting to discard
         unsaved changes first if needed (same prompt File > Open... uses).
 
         Public entry point for anything that hands the app a file path
@@ -1357,7 +1362,7 @@ class DM41ExplorerApp(ctk.CTk):
         launching fresh via double-click on macOS -- see
         `_handle_startup_file_arg`/main() below) and the macOS "Open
         Document" AppleEvent for double-clicking a .dm41 file while the
-        app is already running (see `_on_mac_open_document` below).'''
+        app is already running (see `_on_mac_open_document` below)."""
         if not Path(path).exists():
             logger.warning("Could not find file: %s", path)
             messagebox.showerror("Error", f"Could not find file: {path}")
@@ -1369,12 +1374,12 @@ class DM41ExplorerApp(ctk.CTk):
         self._load_state_into_buffer(path)
 
     def _on_mac_open_document(self, *paths):
-        '''Handles macOS's "Open Document" AppleEvent -- what Finder sends
+        """Handles macOS's "Open Document" AppleEvent -- what Finder sends
         for double-clicking a .dm41 file, whether that launches the app
         fresh or the app is already running. Tk surfaces this as a
         registered command (wired in __init__) rather than a normal
         widget-level event or sys.argv, per
-        https://www.tcl.tk/man/tcl/TkCmd/tk_mac.html.'''
+        https://www.tcl.tk/man/tcl/TkCmd/tk_mac.html."""
         if not paths:
             return
         # Finder can in principle hand over more than one path at once
@@ -1541,7 +1546,7 @@ class DM41ExplorerApp(ctk.CTk):
 
 
 def _handle_startup_file_arg(app):
-    '''Opens a state file passed on the command line at launch, if any --
+    """Opens a state file passed on the command line at launch, if any --
     the Windows/Linux half of "double-click a .dm41 file to open it": file
     associations on those platforms launch the app with the file's path as
     an argument. macOS instead delivers this via an "Open Document"
@@ -1552,7 +1557,7 @@ def _handle_startup_file_arg(app):
     Ignores anything that looks like a flag (starts with "-") rather than
     a path, since this app has no other command-line options of its own to
     parse -- a stray flag shouldn't be treated as a file to open.
-    '''
+    """
     if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
         app.open_state_file(sys.argv[1])
 

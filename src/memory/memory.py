@@ -1,4 +1,4 @@
-'''
+"""
 Memory: a representation of a DM41-series (DM41L, DM41X, ...) memory state
 and tools for manipulating it. See the memory package's __init__.py docstring
 for the on-disk state format overview.
@@ -9,7 +9,7 @@ agrees on, and the set of regions. Everything that is specific to one kind of
 memory lives on that kind's own region class (regions.py's module docstring
 has the map) and is reached through `Memory.region()` or one of the named
 region properties below.
-'''
+"""
 
 from contextlib import contextmanager
 from typing import Dict, Optional, Union
@@ -35,8 +35,8 @@ from .xm_file import ExtendedMemory
 
 
 class Memory:
-    '''A complete DM41-series memory state (a DM41L `.dm41` state or a DM41X
-    `.d41` state file -- the text format is identical).'''
+    """A complete DM41-series memory state (a DM41L `.dm41` state or a DM41X
+    `.d41` state file -- the text format is identical)."""
 
     def __init__(self, header: str = "DM41", profile: DeviceProfile = DM41L):
         self._header = header
@@ -44,9 +44,9 @@ class Memory:
         # doesn't say, so the caller chooses -- see device_profile.py.
         self._profile = profile
         self._core_memory: Dict[int, Register] = {}  # Keyed by register index
-        self._special_registers: Dict[str, Register] = (
-            {}
-        )  # Keyed by label order preservation
+        self._special_registers: Dict[
+            str, Register
+        ] = {}  # Keyed by label order preservation
 
         # Default values for some status registers. Taken from a memory
         # state in the "Memory Lost" state. Registers not initialized
@@ -108,11 +108,11 @@ class Memory:
 
     @classmethod
     def from_string(cls, buffer: str, profile: DeviceProfile = DM41L) -> "Memory":
-        '''
+        """
         Creates a new Memory object from a string that contains a DM41
         memory state. `profile` says which model's memory map to use (the
         text format is identical for every model).
-        '''
+        """
 
         memory = cls(profile=profile)
 
@@ -144,8 +144,7 @@ class Memory:
             if ":" not in token[0]:
                 if phase != 1:
                     raise ValueError(
-                        "Memory registers cannot follow special registers: "
-                        f"{line}"
+                        f"Memory registers cannot follow special registers: {line}"
                     )
                 # We're expecting a well-formed memory state.
                 # First token should be a hex base-addr.
@@ -153,13 +152,11 @@ class Memory:
                     base = int(token[0], 16)
                 except ValueError as e:
                     raise ValueError(
-                        f"{token[0]} is not a hexadecimal"
-                        f" number: {line}"
+                        f"{token[0]} is not a hexadecimal number: {line}"
                     ) from e
                 if base < next_base:
                     raise ValueError(
-                        "Memory state is not well-formed:"
-                        f"{base} < {next_base}. {line}"
+                        f"Memory state is not well-formed:{base} < {next_base}. {line}"
                     )
 
                 i = 0
@@ -220,14 +217,14 @@ class Memory:
     def from_file(
         cls, path: Union[str, Path], profile: DeviceProfile = DM41L
     ) -> "Memory":
-        '''Load a memory state from disk. A convenience wrapper: the pure,
+        """Load a memory state from disk. A convenience wrapper: the pure,
         filesystem-free API is from_string(), which is what portable code
-        (and the web decoder's port) uses.'''
+        (and the web decoder's port) uses."""
         with open(path, "r", encoding="utf-8") as f:
             return cls.from_string(f.read(), profile=profile)
 
     def to_string(self) -> str:
-        ''' Create a string representation of the memory state. '''
+        """Create a string representation of the memory state."""
 
         # Section I: "DM41"
         lines = [self._header]
@@ -281,25 +278,25 @@ class Memory:
         return "\n".join(lines) + "\n"
 
     def to_file(self, path: Union[str, Path]):
-        '''Write the state to disk (convenience wrapper over to_string())
+        """Write the state to disk (convenience wrapper over to_string())
         and clear the modified flag.
 
         The write is atomic (see atomic_write.py): a failure part-way
         through leaves any existing file at `path` untouched instead of
-        truncated, and the modified flag set.'''
+        truncated, and the modified flag set."""
         atomic_write_text(path, self.to_string())
         self._modified = False
 
     # -- Raw register access ---------------------------------------------
 
     def get_register(self, key: Union[int, str]) -> Optional[Register]:
-        '''A copy of the register at address `key` (an int), or of the
+        """A copy of the register at address `key` (an int), or of the
         special register named `key` (a str).
 
         Registers are values: changing the returned copy never changes
         this Memory -- write it back with set_register(). A core address
         with nothing stored reads as zero; a special register that is
-        absent reads as None.'''
+        absent reads as None."""
         if isinstance(key, int):
             reg = self._core_memory.get(key)
             # Memory is sparse: an address with nothing stored is zero.
@@ -308,22 +305,22 @@ class Memory:
         return None if reg is None else reg.copy()
 
     def set_register(self, key: Union[int, str], register: Register):
-        '''Stores a copy of `register` at address `key` (an int), or as the
+        """Stores a copy of `register` at address `key` (an int), or as the
         special register named `key` (a str). Changing `register`
-        afterwards does not change this Memory.'''
+        afterwards does not change this Memory."""
         if isinstance(key, int):
             self._core_memory[key] = register.copy()
         else:
             self._special_registers[key] = register.copy()
 
     def region(self, key: str):
-        '''Return the MemoryRegion registered under `key` Raises KeyError for
-        anything else if the region name does not exist.. '''
+        """Return the MemoryRegion registered under `key` Raises KeyError for
+        anything else if the region name does not exist.."""
         return self._regions[key]
 
     @property
     def profile(self) -> DeviceProfile:
-        '''This state's model profile (memory map).'''
+        """This state's model profile (memory map)."""
         return self._profile
 
     @property
@@ -333,12 +330,12 @@ class Memory:
     # -- Snapshots and transactions ---------------------------------------
 
     def snapshot(self):
-        '''An opaque copy of this state's full contents, for restore().
+        """An opaque copy of this state's full contents, for restore().
 
         Copies every Register (they are mutable) plus the one piece of
         derived state a region caches rather than recomputes -- the Key
         Assignments extent, see KeyAssignments.end -- so a restore puts
-        this Memory back exactly as it was.'''
+        this Memory back exactly as it was."""
         return (
             {addr: reg.copy() for addr, reg in self._core_memory.items()},
             {key: reg.copy() for key, reg in self._special_registers.items()},
@@ -347,8 +344,8 @@ class Memory:
         )
 
     def restore(self, snapshot):
-        '''Puts this Memory back to the contents captured by snapshot().
-        The snapshot can be restored more than once.'''
+        """Puts this Memory back to the contents captured by snapshot().
+        The snapshot can be restored more than once."""
         core, special, key_end, modified = snapshot
         self._core_memory = {a: r.copy() for a, r in core.items()}
         self._special_registers = {k: r.copy() for k, r in special.items()}
@@ -357,11 +354,11 @@ class Memory:
 
     @contextmanager
     def transaction(self):
-        '''Runs the body as one all-or-nothing edit: if it raises, this
+        """Runs the body as one all-or-nothing edit: if it raises, this
         Memory is restored to exactly what it was on entry and the
         exception propagates. Use it around any edit made of several
         steps, so a failure part-way through can't leave the state half
-        changed. Transactions nest; only the failing level is undone.'''
+        changed. Transactions nest; only the failing level is undone."""
         saved = self.snapshot()
         try:
             yield self
@@ -370,53 +367,53 @@ class Memory:
             raise
 
     def mark_modified(self):
-        '''Sets the modified flag (read it with `modified`).
+        """Sets the modified flag (read it with `modified`).
 
         Memory modifications can happen many different ways, so we can't
         just detect such changes automatically - checking every register
         change would be a bit expensive - instead we have whatever code
         changed the memory to set the modified flag; this permits the code to
-        set the flag just once when the change is complete.'''
+        set the flag just once when the change is complete."""
         self._modified = True
 
     @property
     def status_registers(self) -> StatusRegisters:
-        '''The 16 named CPU/system registers (0x00-0x0F), plus the flags
-        and the R00/.END./SIGMA-REG pointers packed inside them.'''
+        """The 16 named CPU/system registers (0x00-0x0F), plus the flags
+        and the R00/.END./SIGMA-REG pointers packed inside them."""
         return self._regions["status"]
 
     @property
     def key_assignments(self) -> KeyAssignments:
-        '''The Key Assignment Registers (docs/key_assignments.md sec 4).'''
+        """The Key Assignment Registers (docs/key_assignments.md sec 4)."""
         return self._regions["key"]
 
     @property
     def alarms(self) -> Alarms:
-        '''The alarms buffer (docs/alarms.md sec 3/4).'''
+        """The alarms buffer (docs/alarms.md sec 3/4)."""
         return self._regions["alarms"]
 
     @property
     def free_space(self) -> FreeSpace:
-        '''Unallocated registers between the alarms buffer and `.END.`.'''
+        """Unallocated registers between the alarms buffer and `.END.`."""
         return self._regions["unused"]
 
     @property
     def programs(self) -> ProgramMemory:
-        '''User program storage and the global chain (docs/program.md).'''
+        """User program storage and the global chain (docs/program.md)."""
         return self._regions["program"]
 
     @property
     def data_memory(self) -> DataMemory:
-        '''The primary data registers, R00 up to PRIMARY_DATA_END.'''
+        """The primary data registers, R00 up to PRIMARY_DATA_END."""
         return self._regions["data"]
 
     @property
     def extended_memory(self) -> ExtendedMemory:
-        '''Extended memory -- file storage (see xm_file.py).'''
+        """Extended memory -- file storage (see xm_file.py)."""
         return self._regions["xm"]
 
     def has_program_partition(self) -> bool:
-        '''True when R00/`.END.` describe a program/data partition worth
+        """True when R00/`.END.` describe a program/data partition worth
         trusting. False for a corrupt or never-loaded state, where the
         pointers decode to values that mean nothing -- ProgramMemory and
         DataMemory both report themselves empty in that case, and
@@ -428,7 +425,7 @@ class Memory:
         corrupt state file that omitted the status registers. About the only
         other way to create this situation is for the user to set the value
         of R00 to an illegal value.
-        '''
+        """
         try:
             r00 = self.status_registers.R00
             dot_end = self.status_registers.DotEnd
@@ -437,7 +434,7 @@ class Memory:
         return r00 >= MIN_SANE_R00 and dot_end <= r00
 
     def regions(self) -> list:
-        '''
+        """
         Every named region of the full addressable display range (0x000
         through `profile.display_end` -- 0x2EF for a DM41L, 0x3EF for a
         DM41X), as a flat, address-ordered list of RegionSpan(key, label,
@@ -447,7 +444,7 @@ class Memory:
         DM41X), since those spans aren't contiguous with each other. On a
         DM41X the 16 addresses 0x2F0-0x2FF between the second and third
         regions belong to no span.
-        '''
+        """
         xm = self.extended_memory
         xm0_lo, xm0_hi = self._profile.xm_regions[0]
 
@@ -472,10 +469,10 @@ class Memory:
         return spans
 
     def region_for(self, addr: int) -> Optional[RegionSpan]:
-        '''The RegionSpan containing `addr` (from regions()), or None if
+        """The RegionSpan containing `addr` (from regions()), or None if
         `addr` falls outside every span this method returns (shouldn't
         happen for any address in [0x000, profile.display_end] other than
-        the DM41X's 0x2F0-0x2FF gap, but this is a lookup, not a guarantee).'''
+        the DM41X's 0x2F0-0x2FF gap, but this is a lookup, not a guarantee)."""
         for span in self.regions():
             if addr in span:
                 return span
@@ -484,7 +481,7 @@ class Memory:
     # -- Whole-state operations -------------------------------------------
 
     def pack(self) -> int:
-        '''
+        """
         Explicitly repacks user memory -- This is one of the few operations
         that genuinely spans regions, which is why it lives here rather than
         on any one of them.
@@ -521,7 +518,7 @@ class Memory:
         `ProgramMemory._forward_scan_programs()` for exactly when that
         happens. All-or-nothing: if anything raises, nothing is changed
         (see transaction()).
-        '''
+        """
         before_free = self.status_registers.DotEnd - self.alarms.end_exclusive
 
         with self.transaction():

@@ -1,4 +1,4 @@
-r'''
+r"""
 Alarms: the alarms buffer (docs/alarms.md sec 3/4/5 -- also HP41CX Owner's
 Manual vol 2, Section 16, "Alarm Functions").
 
@@ -27,7 +27,7 @@ flowchart):
     two leading 0x5E's  -- a control alarm; same, two arrows
 A control alarm with nothing after the two arrows means "resume the
 current program line" rather than jumping to a label.
-'''
+"""
 
 import datetime
 import math
@@ -60,7 +60,7 @@ _UP_ARROW = 0x5E
 
 
 class Alarm:
-    '''
+    """
     One decoded entry from the Alarms buffer -- what `Alarms.list_alarms()`
     returns and `Alarms.add_alarm()` accepts the pieces of.
 
@@ -75,7 +75,7 @@ class Alarm:
     vol 2 sec 16) rather than naming one. `add_alarm()` rejects a bare
     (non-trigraph-escaped) lowercase letter above 'e' -- not a real FOCAL
     character, see `decode_trigraphs(restrict_literals=True)`.
-    '''
+    """
 
     TYPE_MESSAGE = "message"
     TYPE_CONTROL = "control"
@@ -135,11 +135,11 @@ class Alarm:
 
 
 class Alarms(MemoryRegion):
-    '''
+    """
     A variable memory region that begins the register after the last key
     assignment and extends for the number of registers defined in the first
     alarms register. If no alarms exist, this region will be 0-length.
-    '''
+    """
 
     key = "alarms"
     label = "Alarms"
@@ -149,26 +149,26 @@ class Alarms(MemoryRegion):
 
     @property
     def start(self) -> int:
-        '''Exactly where the Key Assignment Registers stop -- the two
+        """Exactly where the Key Assignment Registers stop -- the two
         regions are always back-to-back with no gap (docs/alarms.md sec 3).
         Read live, so a key-assignment edit that grows or shrinks that
-        region moves this one with it.'''
+        region moves this one with it."""
         return self._memory.key_assignments.end_exclusive
 
     @property
     def end(self) -> int:
-        '''Highest address in the buffer (the closing 0xF0 delimiter), or
-        `start - 1` when there is no buffer here at all.'''
+        """Highest address in the buffer (the closing 0xF0 delimiter), or
+        `start - 1` when there is no buffer here at all."""
         return self.span_end_at(self.start) - 1
 
     def span_end_at(self, start: int) -> int:
-        '''Calculates the end of the alarm buffer+1.
+        """Calculates the end of the alarm buffer+1.
         returns `start` itself if there is no real buffer there.
 
         This takes the start address as an argument and then walks the alarms
         and calculates a new end value to allow the caller to relocate the
         alarms buffer when new key assignments are inserted.
-        '''
+        """
         header = self._memory.get_register(start).get_bytes()
         if header[0] != self.HEADER_MARKER:
             return start
@@ -179,8 +179,7 @@ class Alarms(MemoryRegion):
         return end
 
     def relocate(self, old_start: int, new_start: int):
-
-        '''
+        """
         Moves the buffer (if any) from old_start to new_start.
         `new_start`, with no gap -- called from
         KeyAssignments._encode_entries() with that region's boundary before
@@ -204,7 +203,7 @@ class Alarms(MemoryRegion):
         since nothing else is about to write there. (Strictly speaking, this
         isn't necessary, but it helps avoid confusion if the user looks at the
         raw memory state.)
-        '''
+        """
 
         delta = new_start - old_start
         if delta == 0:
@@ -249,8 +248,7 @@ class Alarms(MemoryRegion):
         nibbles = cls._bcd_nibbles(reg_bytes[:6])
         if not all(0 <= n <= 9 for n in nibbles):
             raise DM41MemoryError(
-                "Not a valid BCD time/duration register: "
-                + reg_bytes.hex()
+                "Not a valid BCD time/duration register: " + reg_bytes.hex()
             )
         return int("".join(str(n) for n in nibbles))
 
@@ -265,7 +263,7 @@ class Alarms(MemoryRegion):
 
     @classmethod
     def _decode_time(cls, reg_bytes: bytes) -> Tuple[datetime.datetime, bool]:
-        '''Decodes a time register into `(trigger_time, repeats)`
+        """Decodes a time register into `(trigger_time, repeats)`
         (docs/alarms.md sec 12).
 
         The last BCD digit (the hundredths-of-a-second units place) is the
@@ -273,7 +271,7 @@ class Alarms(MemoryRegion):
         repeat register follows. It is dropped from `trigger_time`. The
         digit before it is real tenths-of-a-second precision and is kept;
         a keypad-set alarm always has 0 there, but one set to tenths of a
-        second does not (tests/data/tenthsofasecond.dm41).'''
+        second does not (tests/data/tenthsofasecond.dm41)."""
         cs = cls._decode_bcd_centiseconds(reg_bytes)
         repeats = (cs % 10) == 1
         cs_time = cs - (cs % 10)  # drop only the flag digit, keep tenths
@@ -282,12 +280,12 @@ class Alarms(MemoryRegion):
 
     @classmethod
     def _encode_time(cls, when: datetime.datetime, *, repeats: bool) -> bytes:
-        '''Encodes `when` (to a tenth of a second) plus the repeats digit in
+        """Encodes `when` (to a tenth of a second) plus the repeats digit in
         the last BCD position (see `_decode_time()`). `repeats` must match
         whether a repeat register really follows: if it doesn't, the
         calculator reads the repeat register as the start of the message,
         and every later alarm in the buffer is misaligned by one register
-        (docs/alarms.md sec 12).'''
+        (docs/alarms.md sec 12)."""
         delta = when - _EPOCH
         if delta.total_seconds() < 0:
             raise ValueError("Alarm trigger time can't be before 1900-01-01.")
@@ -309,7 +307,7 @@ class Alarms(MemoryRegion):
 
     @classmethod
     def _looks_like_repeat_register(cls, reg_bytes: bytes) -> bool:
-        '''True if `reg_bytes` looks like a repeat register: byte 6 is
+        """True if `reg_bytes` looks like a repeat register: byte 6 is
         0x00, bytes 0-5 are all BCD digits, and the interval is plausible
         (see _MAX_PLAUSIBLE_REPEAT).
 
@@ -317,7 +315,7 @@ class Alarms(MemoryRegion):
         register's repeats digit (see `_decode_time()`); this is only a
         sanity check in `_decode_one()`, so a buffer whose flag promises
         a repeat register that doesn't look like one is reported as
-        corrupt rather than trusted.'''
+        corrupt rather than trusted."""
         if len(reg_bytes) < REGISTER_SIZE_BYTES or reg_bytes[6] != 0x00:
             return False
         nibbles = cls._bcd_nibbles(reg_bytes[:6])
@@ -330,9 +328,9 @@ class Alarms(MemoryRegion):
 
     @classmethod
     def _classify(cls, raw: bytes):
-        '''Splits a decoded message field's raw bytes into
+        """Splits a decoded message field's raw bytes into
         `(alarm_type, label_or_message_bytes)` per the up-arrow convention
-        in the module docstring.'''
+        in the module docstring."""
         if raw[:2] == bytes([_UP_ARROW, _UP_ARROW]):
             return Alarm.TYPE_CONTROL, raw[2:]
         if raw[:1] == bytes([_UP_ARROW]):
@@ -352,9 +350,9 @@ class Alarms(MemoryRegion):
     # -- Decoding (docs/alarms.md sec 3/4/5) ------------------------------
 
     def _decode_one(self, addr: int, limit_addr: int):
-        '''Decodes one entry starting at `addr` (a time register).
+        """Decodes one entry starting at `addr` (a time register).
         `limit_addr` is the delimiter's address -- decoding never reads at
-        or past it. Returns `(Alarm, next_addr)`.'''
+        or past it. Returns `(Alarm, next_addr)`."""
         entry_start = addr
         time_bytes = self._memory.get_register(addr).get_bytes()
         trigger_time, repeats = self._decode_time(time_bytes)
@@ -406,9 +404,9 @@ class Alarms(MemoryRegion):
         return alarm, addr
 
     def list_alarms(self) -> List[Alarm]:
-        '''Every alarm currently in the buffer, in stored (trigger-time-
+        """Every alarm currently in the buffer, in stored (trigger-time-
         sorted, docs/alarms.md sec 5) order. Empty list if there's no
-        buffer at all.'''
+        buffer at all."""
         alarms = []
         addr = self.start + 1
         limit = self.end  # the delimiter's address
@@ -418,14 +416,12 @@ class Alarms(MemoryRegion):
         return alarms
 
     def get_alarm(self, start_addr: int) -> Optional[Alarm]:
-        '''The single alarm whose time register is at `start_addr`, or
+        """The single alarm whose time register is at `start_addr`, or
         None -- `start_addr` is an Alarm's own stable identity (its
         position can move as other alarms are added/removed), suited to a
         GUI re-fetching "the currently selected alarm" fresh rather than
-        trusting a cached object across an edit.'''
-        return next(
-            (a for a in self.list_alarms() if a.start_addr == start_addr), None
-        )
+        trusting a cached object across an edit."""
+        return next((a for a in self.list_alarms() if a.start_addr == start_addr), None)
 
     # -- Encoding one entry (docs/alarms.md sec 3/4, module docstring) ----
 
@@ -458,7 +454,8 @@ class Alarms(MemoryRegion):
         msg_regs = math.ceil(len(field) / REGISTER_SIZE_BYTES) if field else 0
 
         time_bytes = bytearray(
-            cls._encode_time(trigger_time, repeats=repeat_interval is not None) + b"\x00"
+            cls._encode_time(trigger_time, repeats=repeat_interval is not None)
+            + b"\x00"
         )
         time_bytes[6] = (0xF0 if past_due else 0x00) | (msg_regs & 0x0F)
         registers = [Register(data=bytes(time_bytes))]
@@ -477,29 +474,28 @@ class Alarms(MemoryRegion):
         return registers
 
     def _room_ceiling(self) -> int:
-        '''Highest address the buffer may grow into -- bounded by
+        """Highest address the buffer may grow into -- bounded by
         `.END.` when the state has a real program partition (matching
         FreeSpace's own reasoning), falling back to PRIMARY_DATA_END
         otherwise. A tighter, more correct check than relocate()'s own
         PRIMARY_DATA_END-only backstop above, usable here because this is
-        new code rather than a pre-existing check being preserved as-is.'''
+        new code rather than a pre-existing check being preserved as-is."""
         return self._memory.free_space.end
 
     def _insert_registers(self, insert_addr: int, entry_registers: List[Register]):
-        '''Splices `entry_registers` into the buffer starting at
+        """Splices `entry_registers` into the buffer starting at
         `insert_addr`, creating the buffer fresh if none exists yet.
-        Shared by `add_alarm()`.'''
+        Shared by `add_alarm()`."""
         n = len(entry_registers)
         ceiling = self._room_ceiling()
 
         if self.is_empty:
             total = n + 2  # header + entries + delimiter
             if self.start + total - 1 > ceiling:
-                raise DM41MemoryError(
-                    "Insufficient memory: no room for a new alarm."
-                )
+                raise DM41MemoryError("Insufficient memory: no room for a new alarm.")
             self._memory.set_register(
-                self.start, Register(data=bytes([self.HEADER_MARKER, total, 0, 0, 0, 0, 0]))
+                self.start,
+                Register(data=bytes([self.HEADER_MARKER, total, 0, 0, 0, 0, 0])),
             )
             addr = self.start + 1
             for reg in entry_registers:
@@ -514,9 +510,7 @@ class Alarms(MemoryRegion):
         old_count = old_header[1]
         old_delim_addr = self.end
         if old_delim_addr + n > ceiling:
-            raise DM41MemoryError(
-                "Insufficient memory: no room for a new alarm."
-            )
+            raise DM41MemoryError("Insufficient memory: no room for a new alarm.")
 
         tail_len = old_delim_addr - insert_addr + 1
         for i in range(tail_len - 1, -1, -1):
@@ -545,7 +539,7 @@ class Alarms(MemoryRegion):
         repeat_interval: Optional[datetime.timedelta] = None,
         past_due: Optional[bool] = None,
     ) -> Alarm:
-        '''Adds a new alarm, inserted wherever `trigger_time` belongs to
+        """Adds a new alarm, inserted wherever `trigger_time` belongs to
         keep the buffer in sorted order (docs/alarms.md sec 5) -- after any
         existing alarm(s) at the same trigger time. `text` is trigraph-
         escaped display text (see Alarm's docstring); for a control/
@@ -561,7 +555,7 @@ class Alarms(MemoryRegion):
         False to override.
 
         Raises `ValueError` for an out-of-range text length, and
-        `DM41MemoryError` if there isn't room to grow the buffer.'''
+        `DM41MemoryError` if there isn't room to grow the buffer."""
         if past_due is None:
             past_due = trigger_time < datetime.datetime.now()
 
@@ -596,11 +590,11 @@ class Alarms(MemoryRegion):
         return self.get_alarm(entry_addr)
 
     def delete_alarm(self, start_addr: int):
-        '''Removes the alarm whose time register is at `start_addr`,
+        """Removes the alarm whose time register is at `start_addr`,
         closing the gap (docs/alarms.md sec 7's confirmed one-time-alarm-
         fires behavior, applied here to an explicit user delete instead).
         Clears the whole buffer back to empty (class docstring) if this
-        was the last alarm. Raises `ValueError` if no alarm is there.'''
+        was the last alarm. Raises `ValueError` if no alarm is there."""
         target = self.get_alarm(start_addr)
         if target is None:
             raise ValueError(f"No alarm at 0x{start_addr:03X}.")

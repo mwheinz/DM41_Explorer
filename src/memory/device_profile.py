@@ -1,4 +1,4 @@
-'''
+"""
 DeviceProfile: the per-model facts a Memory needs that differ between DM41
 models.
 
@@ -18,7 +18,7 @@ DeviceMode, at the end of this module, is the user-facing choice of which
 profile the application works in (docs/dm41x_explorer_plan.md phase 6). The
 mode is the single source of truth for the active profile: not the file's
 extension, and not what is plugged in.
-'''
+"""
 
 import enum
 from dataclasses import dataclass
@@ -29,7 +29,7 @@ from .functions import CX_XROM_FUNCTIONS, XROM_FUNCTIONS
 
 @dataclass(frozen=True)
 class DeviceProfile:
-    '''An immutable description of one DM41 model's memory map and the XROM
+    """An immutable description of one DM41 model's memory map and the XROM
     functions built into it.
 
     `builtin_xroms` is only about what the *calculator* has. The name
@@ -44,7 +44,7 @@ class DeviceProfile:
     its mode. It is a property of the model, deliberately not a test against
     `name`: the DM41XN has both a FAT disk and a serial interface, so adding
     its profile later must not require revisiting every gating decision.
-    Defaults to False, so a new profile has to opt in.'''
+    Defaults to False, so a new profile has to opt in."""
 
     name: str
     xm_regions: Tuple[Tuple[int, int], ...]
@@ -66,21 +66,21 @@ class DeviceProfile:
 
     @property
     def xm_address_range(self) -> Tuple[int, int]:
-        '''Outermost extent XM can occupy: the first region's pointer
+        """Outermost extent XM can occupy: the first region's pointer
         register through the last region's ceiling. The gaps between
-        regions are inside this range but are not XM.'''
+        regions are inside this range but are not XM."""
         return (self.xm_regions[0][0], self.xm_regions[-1][1])
 
     @property
     def display_end(self) -> int:
-        '''Highest address of the model's addressable memory map (the last
-        XM region's ceiling) -- the end of the Hex View's range.'''
+        """Highest address of the model's addressable memory map (the last
+        XM region's ceiling) -- the end of the Hex View's range."""
         return self.xm_regions[-1][1]
 
     @property
     def xm_raw_registers(self) -> int:
-        '''Structural XM capacity in registers, excluding each region's
-        reserved pointer register.'''
+        """Structural XM capacity in registers, excluding each region's
+        reserved pointer register."""
         return sum(hi - lo for lo, hi in self.xm_regions)
 
 
@@ -121,7 +121,7 @@ PROFILES = {profile.name: profile for profile in (DM41L, DM41X)}
 
 
 class DeviceMode(enum.Enum):
-    '''Which calculator the application is working as, chosen by the user
+    """Which calculator the application is working as, chosen by the user
     and persisted in the preferences file (config.py's "mode").
 
     One mode per profile, and the mode picks the profile for everything:
@@ -132,28 +132,28 @@ class DeviceMode(enum.Enum):
 
     A real enumerated type rather than bare strings, because this is a
     closed set of named modes; `value` is the stored/display name, which is
-    also the profile's own `name`.'''
+    also the profile's own `name`."""
 
     DM41L = "DM41L"
     DM41X = "DM41X"
 
     @property
     def profile(self) -> DeviceProfile:
-        '''The DeviceProfile this mode works in.'''
+        """The DeviceProfile this mode works in."""
         return PROFILES[self.value]
 
     @property
     def supports_serial(self) -> bool:
-        '''Whether the serial actions mean anything in this mode. Asks the
-        profile; never tests the mode's name.'''
+        """Whether the serial actions mean anything in this mode. Asks the
+        profile; never tests the mode's name."""
         return self.profile.supports_serial
 
     @classmethod
     def from_value(cls, value, default: "DeviceMode" = None) -> "DeviceMode":
-        '''The mode named `value`, or `default` (DEFAULT_MODE when that is
+        """The mode named `value`, or `default` (DEFAULT_MODE when that is
         omitted too) for anything unrecognised -- a hand-edited preferences
         file, or a key written by a newer version. Never raises: a bad
-        setting must not stop the application starting.'''
+        setting must not stop the application starting."""
         if isinstance(value, cls):
             return value
         try:

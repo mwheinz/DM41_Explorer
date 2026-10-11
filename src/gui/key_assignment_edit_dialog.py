@@ -291,9 +291,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         # Only worth saying in a mode that actually has the function: in
         # DM41L mode it is refused on Save instead, with a reason.
         dm41x_only = (
-            op is not None
-            and is_dm41x_only(op)
-            and is_available_on(op, self._profile)
+            op is not None and is_dm41x_only(op) and is_available_on(op, self._profile)
         )
         self._dm41x_hint.configure(text=_DM41X_ONLY_HINT if dm41x_only else "")
 

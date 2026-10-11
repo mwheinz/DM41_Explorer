@@ -127,9 +127,8 @@ def test_build_region_pointer_keeps_both_ww_digits():
     # tests/data/manyfiles.dm41 (a DM41L state) has WW=0x1f in region 0.
     memory = Memory.from_file(DATA_DIR / "manyfiles.dm41")
     build = memory.extended_memory._build_region_pointer
-    assert (
-        build(0, next_region_active=True, ww=0x1F, pp=0x1F).get_hex()
-        == _hex(memory, 0x40)
+    assert build(0, next_region_active=True, ww=0x1F, pp=0x1F).get_hex() == _hex(
+        memory, 0x40
     )
 
 
@@ -177,7 +176,9 @@ def test_add_file_uses_the_free_space_at_the_bottom_of_region_two():
         for f in before
     ]
     assert (_hex(memory, 0x40), _hex(memory, 0x201), _hex(memory, 0x301)) == (
-        R40, R201, R301,
+        R40,
+        R201,
+        R301,
     )
     # And the new directory still ends in an EOM marker.
     assert _hex(memory, files[-1].data_start - 1) == EOM_REGISTER_HEX

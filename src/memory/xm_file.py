@@ -24,10 +24,10 @@ NAME_MAX_CHAR = 0x65
 
 
 class XMHeader(NamedTuple):
-    '''A decoded XM file header register (ExtendedMemory._parse_header()).
+    """A decoded XM file header register (ExtendedMemory._parse_header()).
     `register_length` is SSS, the register count the header declares;
     `byte_length` is BBB, the instruction-byte count, for Program files
-    only (None otherwise).'''
+    only (None otherwise)."""
 
     file_type: int
     register_length: int
@@ -73,8 +73,10 @@ class XMFile:
         # The exact 7 raw bytes the name register holds, independent of `name`
         # (which is get_ascii()'s lossy '.'-for-unprintable display form --
         # see ExtendedMemory.list_files().
-        self.name_bytes = name_bytes if name_bytes is not None else name.encode(
-            "ascii", errors="replace"
+        self.name_bytes = (
+            name_bytes
+            if name_bytes is not None
+            else name.encode("ascii", errors="replace")
         )
         # segments is a list of inclusive (start, end) address ranges, in
         # record order: the first segment is in the header's own region and
@@ -115,7 +117,7 @@ class XMFile:
 
     @property
     def type_label(self) -> str:
-        """"Program", "Data" or "ASCII"; "@ (type N)" for types 4-15, the
+        """ "Program", "Data" or "ASCII"; "@ (type N)" for types 4-15, the
         calculator's own "@" plus the number it hides."""
         if self.is_other_type:
             return f"@ (type {self.file_type})"
@@ -146,9 +148,7 @@ class XMFile:
         return sum(1 for start, end in self.segments if end >= start) > 1
 
     def __repr__(self):
-        span = ", ".join(
-            f"0x{s:03x}-0x{e:03x}" for s, e in self.segments if e >= s
-        )
+        span = ", ".join(f"0x{s:03x}-0x{e:03x}" for s, e in self.segments if e >= s)
         return f"XMFile({self.name!r}, {self.type_label}, {span})"
 
     def data_registers(self) -> list:
@@ -472,7 +472,7 @@ class ExtendedMemory(MemoryRegion):
         addr = (region_header[1] & 0x0F) * 256 + region_header[0]
         if addr != regions[current_region][1]:
             raise DM41MemoryError(
-                f"Invalid XM header: {addr:x} != 0x" f"{regions[current_region][1]}"
+                f"Invalid XM header: {addr:x} != 0x{regions[current_region][1]}"
             )
 
         while self.get_register(addr) != eom_register():
@@ -533,7 +533,9 @@ class ExtendedMemory(MemoryRegion):
         for i, (lo, hi) in enumerate(self._xm_regions):
             if lo < addr <= hi:
                 return i
-        raise DM41MemoryError(f"Address 0x{addr:x} is not within any writable XM region")
+        raise DM41MemoryError(
+            f"Address 0x{addr:x} is not within any writable XM region"
+        )
 
     def _next_slot(self) -> tuple:
         """
@@ -830,7 +832,9 @@ class ExtendedMemory(MemoryRegion):
 
         byte_length = None
         given = [
-            x for x in (numbers, data_lines, records, instruction_bytes) if x is not None
+            x
+            for x in (numbers, data_lines, records, instruction_bytes)
+            if x is not None
         ]
         if len(given) != 1:
             raise ValueError(
@@ -913,7 +917,9 @@ class ExtendedMemory(MemoryRegion):
                 "register-length field (max 4095 registers)."
             )
 
-        return self._place_file(padded_name_bytes, file_type, data_registers, byte_length)
+        return self._place_file(
+            padded_name_bytes, file_type, data_registers, byte_length
+        )
 
     def _place_file(
         self,
@@ -1021,7 +1027,9 @@ class ExtendedMemory(MemoryRegion):
         for f in files:
             if f.header_addr == header_addr:
                 continue
-            rebuild.append((f.name_bytes, f.file_type, f.data_registers(), f.byte_length))
+            rebuild.append(
+                (f.name_bytes, f.file_type, f.data_registers(), f.byte_length)
+            )
 
         for lo, hi in self._xm_regions:
             for addr in range(lo, hi + 1):

@@ -111,6 +111,7 @@ def layout_for_profile(profile):
         return FALLBACK_LAYOUT
     return LAYOUT_BY_PROFILE.get(profile.name, FALLBACK_LAYOUT)
 
+
 UNASSIGNED_TEXT = SECONDARY_TEXT
 UNASSIGNED_FG = ("gray85", "gray24")
 
@@ -252,7 +253,9 @@ def layout_placements(layout) -> list:
                 above.rowspan += 1
                 placement = above
             else:
-                placement = CellPlacement(cell, row_index, position * unit, width * unit)
+                placement = CellPlacement(
+                    cell, row_index, position * unit, width * unit
+                )
                 placements.append(placement)
             for covered in range(position, position + width):
                 owners[(row_index, covered)] = placement
@@ -273,7 +276,9 @@ def key_button_min_width(font) -> int:
     is in the same unscaled units as a widget's width."""
     digits = font.measure("0" * KEY_MIN_CHARS)
     widest_name = max(font.measure(name) for name in _function_names())
-    return max(digits, widest_name) + font.measure(KEY_TEXT_PREFIXES) + BUTTON_TEXT_PADDING
+    return (
+        max(digits, widest_name) + font.measure(KEY_TEXT_PREFIXES) + BUTTON_TEXT_PADDING
+    )
 
 
 def _program_names(memory: Memory) -> list:
@@ -292,7 +297,9 @@ def _count_all_assignments(memory: Memory) -> int:
     assignment -- the header count used to just be the first of these,
     silently omitting any global-label assignments."""
     program_count = sum(
-        1 for p in memory.programs.list_global_chain() if p.is_named and p.key_assignment
+        1
+        for p in memory.programs.list_global_chain()
+        if p.is_named and p.key_assignment
     )
     return len(memory.key_assignments.list_assignments()) + program_count
 
@@ -391,7 +398,7 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         self._refresh_buttons()
 
     def _header_text(self, count: int) -> str:
-        """"Key assignments: N", plus how many of them have their key flag
+        """ "Key assignments: N", plus how many of them have their key flag
         clear (see KeyAssignments.flag_clear_assignments()) when any do."""
         text = f"Key assignments: {count}"
         clear = len(self._memory.key_assignments.flag_clear_assignments())
@@ -571,7 +578,9 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         def save(kind, value):
             try:
                 if kind == "function":
-                    self._memory.key_assignments.set_assignment(key_number, shifted, value)
+                    self._memory.key_assignments.set_assignment(
+                        key_number, shifted, value
+                    )
                     logger.info(
                         "Key %02d (%s) assigned function: %s",
                         key_number,
@@ -579,7 +588,9 @@ class KeyAssignmentsTab(ctk.CTkFrame):
                         value,
                     )
                 else:  # "program"
-                    self._memory.programs.set_program_key_assignment(value, key_number, shifted)
+                    self._memory.programs.set_program_key_assignment(
+                        value, key_number, shifted
+                    )
                     logger.info(
                         "Key %02d (%s) assigned program: %s",
                         key_number,
@@ -591,7 +602,6 @@ class KeyAssignmentsTab(ctk.CTkFrame):
                 update_header()
             except Exception as e:
                 logger.error("Failed to save key assignment: %s", str(e))
-
 
         def delete():
             # Clear both storage mechanisms -- normally only one is ever

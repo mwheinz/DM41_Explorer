@@ -1,4 +1,4 @@
-'''
+"""
 Hex View tab: a read-only, color-coded hex dump of the entire addressable
 memory space (0x000-0x2ff), one row per register.
 
@@ -16,7 +16,7 @@ numbers). Unlike Data Registers, this is a single table rather than a
 left/right split: a hex dump reads more naturally as one continuous
 top-to-bottom listing, and the whole point here is seeing color bands
 transition as you scroll through it.
-'''
+"""
 
 import customtkinter as ctk
 
@@ -66,11 +66,11 @@ _TREE_COLUMNS = [
 
 
 def _region_span_for(regions: list, addr: int):
-    '''The RegionSpan in `regions` (a Memory.regions() list) containing
+    """The RegionSpan in `regions` (a Memory.regions() list) containing
     `addr`, or None. `regions` covers the display range except a DM41X's
     0x2F0-0x2FF gap (see Memory.regions()'s docstring); render() below
     shows an address that matches nothing as "Inaccessible" rather than
-    crashing.'''
+    crashing."""
     for span in regions:
         if addr in span:
             return span
@@ -78,9 +78,9 @@ def _region_span_for(regions: list, addr: int):
 
 
 class HexViewTab(ctk.CTkFrame):
-    '''Renders a read-only, region-colored hex dump of the full address
+    """Renders a read-only, region-colored hex dump of the full address
     space for a Memory object. Call `render(memory)` whenever the buffer
-    changes.'''
+    changes."""
 
     def __init__(self, master, **kwargs):
         super().__init__(master, **kwargs)
@@ -106,8 +106,8 @@ class HexViewTab(ctk.CTkFrame):
         self._apply_region_tags()
 
     def _build_legend(self):
-        '''A row of small color swatches + labels so the row colors below
-        are self-explanatory without a separate reference doc.'''
+        """A row of small color swatches + labels so the row colors below
+        are self-explanatory without a separate reference doc."""
         legend = ctk.CTkFrame(self, fg_color="transparent")
         legend.pack(fill="x", padx=8, pady=(0, 6))
         dark = ctk.get_appearance_mode() == "Dark"
@@ -132,14 +132,14 @@ class HexViewTab(ctk.CTkFrame):
             self._tree.tag_configure(key, background=self._region_bg[key])
 
     def _style_treeview(self):
-        '''Applies the shared ttk.Treeview theming (gui/tab_common.py's
+        """Applies the shared ttk.Treeview theming (gui/tab_common.py's
         `style_treeview()`) with `selectable=False`, since this tab's
         `selectmode="none"` table has no selection to highlight -- it
         colors rows by memory region (`_apply_region_tags()`) instead of
         the plain zebra striping the other Treeview-based tabs use, so the
         shared stripe-background return value is discarded here. Also
         recomputes `self._region_bg`, the per-region row colors (dark vs.
-        light mode) `_apply_region_tags()`/render() read from.'''
+        light mode) `_apply_region_tags()`/render() read from."""
         style_treeview(selectable=False)
         dark = ctk.get_appearance_mode() == "Dark"
         self._region_bg = {
@@ -148,7 +148,7 @@ class HexViewTab(ctk.CTkFrame):
         }
 
     def refresh_theme(self):
-        '''Re-applies every theme-dependent color after
+        """Re-applies every theme-dependent color after
         ctk.set_appearance_mode() changes elsewhere (e.g. Preferences --
         see gui/app.py's _on_preferences_saved()).
 
@@ -161,7 +161,7 @@ class HexViewTab(ctk.CTkFrame):
         dark/light switch. This recomputes and re-applies both, in place,
         without touching the legend's layout or the tree's already-
         rendered rows (tag_configure updates propagate to existing rows
-        automatically).'''
+        automatically)."""
         self._style_treeview()
         self._apply_region_tags()
         dark = ctk.get_appearance_mode() == "Dark"

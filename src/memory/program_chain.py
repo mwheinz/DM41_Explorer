@@ -1,4 +1,4 @@
-'''
+"""
 Byte-level parsing/encoding of the HP-41 "global chain" marker format
 (docs/program.md sec 5.1/5.2), operating directly on a plain `bytes` buffer
 rather than register-addressed `Memory` state.
@@ -26,7 +26,7 @@ here) means something different depending on whether this marker is a
 label or not, and is never touched by import_program()'s own splicing
 logic except to flip a `.END.`-turned-real-`END`'s high nibble -- see
 ProgramMemory.import_program().
-'''
+"""
 
 from dataclasses import dataclass, replace
 from typing import Optional
@@ -36,13 +36,13 @@ from .registers import REGISTER_SIZE_BYTES
 
 @dataclass(frozen=True)
 class ChainMarker:
-    '''One decoded 3-byte global-chain marker (see the module docstring).
+    """One decoded 3-byte global-chain marker (see the module docstring).
 
     `end_type` is set only for an END (0 = normal END, 2 = the permanent
     `.END.`), `label_length` only for a global label. `index`, `name` and
     `key_assignment` are filled in by walk_chain() and
     opcode_scan.scan_global_markers_forward(), which know where in their
-    buffer the marker sits; `name`/`key_assignment` only for a label.'''
+    buffer the marker sits; `name`/`key_assignment` only for a label."""
 
     bbb: int
     distance_registers: int
@@ -56,12 +56,12 @@ class ChainMarker:
 
     @property
     def distance_bytes(self) -> int:
-        '''The link back to the previous marker, in bytes (0 = none).'''
+        """The link back to the previous marker, in bytes (0 = none)."""
         return self.distance_registers * REGISTER_SIZE_BYTES + self.bbb
 
 
 def decode_chain_marker(data: bytes, index: int) -> Optional[ChainMarker]:
-    '''
+    """
     Decodes the 3-byte marker at `data[index:index+3]`. Returns None if
     `index` is out of bounds or the byte there doesn't start with the
     0xC0-0xCD marker range (docs/program.md sec 5.1) -- `bbb`, the 3-bit
@@ -71,7 +71,7 @@ def decode_chain_marker(data: bytes, index: int) -> Optional[ChainMarker]:
     use as ordinary 2-byte opcodes elsewhere in FOCAL code (`X<>` on a
     synthetic status register, `LBL nn` in its general/non-compact form
     -- see src/tests/test_program_text.py).
-    '''
+    """
     if index < 0 or index + 3 > len(data):
         return None
     raw = data[index : index + 3]
@@ -90,10 +90,10 @@ def decode_chain_marker(data: bytes, index: int) -> Optional[ChainMarker]:
 
 
 def decode_label_name(data: bytes, index: int, length: int) -> tuple:
-    '''Decodes a global label's name and key-assignment byte given where
+    """Decodes a global label's name and key-assignment byte given where
     its 4-byte header starts in `data` (docs/program.md sec 5.2).
     Non-printable name bytes come back as "?". Returns
-    (name, key_assignment).'''
+    (name, key_assignment)."""
     end = index + 4 + max(length, 0)
     combined = data[index:end]
     key_assignment = combined[3]
@@ -102,11 +102,11 @@ def decode_label_name(data: bytes, index: int, length: int) -> tuple:
 
 
 def located_marker(data: bytes, index: int) -> Optional[ChainMarker]:
-    '''decode_chain_marker() plus where it sits: the marker at `index`
+    """decode_chain_marker() plus where it sits: the marker at `index`
     with `index` set and, for a global label, its `name` and
     `key_assignment` too. None if there is no marker at `index`, or if a
     label's header/name would run past the end of `data` (truncated or
-    corrupt input, not a real label).'''
+    corrupt input, not a real label)."""
     marker = decode_chain_marker(data, index)
     if marker is None:
         return None
@@ -119,7 +119,7 @@ def located_marker(data: bytes, index: int) -> Optional[ChainMarker]:
 
 
 def encode_chain_marker(bbb: int, distance_registers: int, third_byte: int) -> bytes:
-    '''
+    """
     The counterpart to `decode_chain_marker()`: packs
     `bbb`/`distance_registers` (docs/program.md sec 5.1's `bbb`/`rrrrrrrrr`
     fields) plus a caller-supplied `third_byte` (passed through completely
@@ -128,7 +128,7 @@ def encode_chain_marker(bbb: int, distance_registers: int, third_byte: int) -> b
 
     Raises ValueError if `bbb` or `distance_registers` don't fit their
     field widths (3 and 9 bits respectively).
-    '''
+    """
     if not 0 <= bbb <= 0x7:
         raise ValueError(f"bbb must fit in 3 bits (0-7), got {bbb}")
     if not 0 <= distance_registers <= 0x1FF:
@@ -143,7 +143,7 @@ def encode_chain_marker(bbb: int, distance_registers: int, third_byte: int) -> b
 
 
 def walk_chain(data: bytes) -> list:
-    '''
+    """
     Walks `data`'s own internal global chain backward, starting from its
     trailing 3-byte marker (`data[-3:]` -- every well-formed single-program
     byte blob, per `ProgramMemory.get_program_bytes()`/`decode_program_raw()`/
@@ -178,7 +178,7 @@ def walk_chain(data: bytes) -> list:
     of a slightly-off fixture or a truncated/corrupt buffer), or after a
     generous iteration cap as a backstop against a corrupt circular
     chain.
-    '''
+    """
     if len(data) < 3:
         return []
 

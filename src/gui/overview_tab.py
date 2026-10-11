@@ -186,10 +186,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
             text=repr(str(sr.alpha)),
             font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
             anchor="w",
-        ).grid(
-            row=next_row, column=1, columnspan=4, sticky="w", padx=10,
-            pady=(8,0)
-        )
+        ).grid(row=next_row, column=1, columnspan=4, sticky="w", padx=10, pady=(8, 0))
 
         mnop_rows = [
             ("M", repr(sr.M().get_ascii())),
@@ -432,7 +429,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
             rows.append(
                 (
                     "User memory locations",
-                    f"00-{reserved-1} (R00-0x{PRIMARY_DATA_END:03x})",
+                    f"00-{reserved - 1} (R00-0x{PRIMARY_DATA_END:03x})",
                 )
             )
             rows.append(("Program storage consumed", f"{consumed} registers"))

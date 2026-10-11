@@ -147,9 +147,10 @@ def test_the_dm41l_keyboard_is_drawn_for_a_dm41l_state(tab):
             if not cell.grid_info():
                 continue
             for label in cell.winfo_children():
-                if isinstance(label, ctk.CTkLabel) and label.cget(
-                    "text"
-                ) == f"{key_number:02d}":
+                if (
+                    isinstance(label, ctk.CTkLabel)
+                    and label.cget("text") == f"{key_number:02d}"
+                ):
                     return int(cell.grid_info()["row"])
         return None
 

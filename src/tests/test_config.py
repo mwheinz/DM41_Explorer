@@ -12,6 +12,7 @@ skip_if_permission_bits_unenforced = pytest.mark.skipif(
     "(root, or Windows os.chmod semantics)",
 )
 
+
 @pytest.fixture
 def prefs_file(tmp_path, monkeypatch):
     """Points ProjectConfig.PREFS_FILE at a throwaway path
@@ -19,6 +20,7 @@ def prefs_file(tmp_path, monkeypatch):
     fake_prefs_path = tmp_path / ".dm41_test_prefs.json"
     monkeypatch.setattr(ProjectConfig, "PREFS_FILE", fake_prefs_path)
     return fake_prefs_path
+
 
 def test_defaults_when_no_prefs_file(prefs_file):
     """ProjectConfig() no longer touches disk at all -- __init__ just
@@ -30,6 +32,7 @@ def test_defaults_when_no_prefs_file(prefs_file):
     assert config.logging_level == ProjectConfig.DEFAULT_PREFS["logging_level"]
     assert config.appearance_mode == ProjectConfig.DEFAULT_PREFS["appearance_mode"]
     assert config.color_theme == ProjectConfig.DEFAULT_PREFS["color_theme"]
+
 
 def test_load_merges_saved_values_over_defaults(prefs_file):
     """Only the keys present on disk should override the defaults.
@@ -44,6 +47,7 @@ def test_load_merges_saved_values_over_defaults(prefs_file):
         == ProjectConfig.DEFAULT_PREFS["console_timeout_minutes"]
     )
 
+
 def test_load_raises_exception_on_corrupt_json(prefs_file):
     """Corrupt JSON raises an exception. Construction itself can't raise
     any more (it no longer touches disk) -- the raise happens on the
@@ -54,12 +58,14 @@ def test_load_raises_exception_on_corrupt_json(prefs_file):
         config.load()
     assert "Could not load preferences from" in str(excinfo.value)
 
+
 def test_save_writes_current_prefs_to_disk(prefs_file):
     config = ProjectConfig()
     config.baudrate = 57600
     config.save()
     on_disk = json.loads(prefs_file.read_text())
     assert on_disk["baudrate"] == 57600
+
 
 def test_property_setters_update_internal_state(prefs_file):
     config = ProjectConfig()
@@ -72,6 +78,7 @@ def test_property_setters_update_internal_state(prefs_file):
     assert config.appearance_mode == "Dark"
     assert config.color_theme == "green"
     assert config.get_all()["serial_port"] == "/dev/tty.fake"
+
 
 def test_save_persists_appearance_and_theme(prefs_file):
     """appearance_mode/color_theme round-trip through the same single file
@@ -88,6 +95,7 @@ def test_save_persists_appearance_and_theme(prefs_file):
     assert reloaded.appearance_mode == "Dark"
     assert reloaded.color_theme == "green"
 
+
 def test_round_trip_persists_across_instances(prefs_file):
     """Saving with one instance and loading with a fresh one should agree."""
     first = ProjectConfig()
@@ -96,6 +104,7 @@ def test_round_trip_persists_across_instances(prefs_file):
     second = ProjectConfig()
     second.load()
     assert second.baudrate == 4800
+
 
 @skip_if_permission_bits_unenforced
 def test_save_raises_exception_on_permission_error(tmp_path, monkeypatch):
@@ -138,6 +147,7 @@ def test_a_hand_edited_high_contrast_value_reads_as_the_default(prefs_file, junk
     config = ProjectConfig()
     config.load()
     assert config.high_contrast is True
+
 
 # -- The DM41L/DM41X mode (docs/dm41x_explorer_plan.md phase 6) -----------
 

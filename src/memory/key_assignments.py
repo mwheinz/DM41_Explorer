@@ -1,4 +1,4 @@
-'''
+"""
 KeyAssignments: the Key Assignment Registers region (docs/key_assignments.md
 sec 4), starting at KEY_ASSIGNMENTS_RANGE[0] (0xC0) and growing upward two
 assignments at a time.
@@ -17,7 +17,7 @@ for the full derivation.
 The Alarms buffer (alarms.py) starts exactly where this region ends, with
 no gap, so every edit here that changes the register count moves it as
 well -- see `_encode_entries()`.
-'''
+"""
 
 from dataclasses import dataclass
 from typing import List, Optional, TYPE_CHECKING
@@ -38,14 +38,14 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class KeyAssignment:
-    '''One built-in/peripheral function assignment from the Key
+    """One built-in/peripheral function assignment from the Key
     Assignment Registers (docs/key_assignments.md sec 4.2).
 
     `fn_byte2` is None for a single-byte built-in function. `name` is the
     function's HP-41 display name (memory/mnemonics.py), or a "0xNN"-style
     fallback if the byte(s) match no known function. `key_number` and
     `shifted` are None when `raw_key_byte` doesn't decode to one of the 34
-    real assignable keys (a corrupt or hand-crafted state).'''
+    real assignable keys (a corrupt or hand-crafted state)."""
 
     key_number: Optional[int]
     shifted: Optional[bool]
@@ -56,7 +56,7 @@ class KeyAssignment:
 
 
 class KeyAssignments(MemoryRegion):
-    '''The Key Assignment Registers (docs/key_assignments.md sec 4.2).'''
+    """The Key Assignment Registers (docs/key_assignments.md sec 4.2)."""
 
     key = "key"
     label = "Key Assignments"
@@ -115,7 +115,7 @@ class KeyAssignments(MemoryRegion):
 
     @property
     def end(self) -> int:
-        '''Highest address currently holding a Key Assignment Register, or
+        """Highest address currently holding a Key Assignment Register, or
         `start - 1` when there are no assignments at all.
 
         The underlying exclusive bound is cached rather than rescanned on
@@ -124,17 +124,17 @@ class KeyAssignments(MemoryRegion):
         every edit made through this class. A raw `Memory.set_register()`
         into this span -- e.g. from the hex editor -- will NOT update it
         until `rescan()` is called or the state is reloaded.
-        '''
+        """
         return self._end - 1
 
     def rescan(self):
-        '''Re-derives this region's extent from the registers themselves.
+        """Re-derives this region's extent from the registers themselves.
         Called after a state is loaded, and available to any caller that
-        has written into this span behind the region's back.'''
+        has written into this span behind the region's back."""
         self._end = self._scan_end()
 
     def _scan_end(self) -> int:
-        '''
+        """
         Scans upward from `start` (0xC0) for as long as each register's
         leading byte is the 0xF0 key-assignment marker, and returns the
         address one past the last such register -- an exclusive upper
@@ -147,7 +147,7 @@ class KeyAssignments(MemoryRegion):
         `.END.`/R00 -- both of those are themselves derived values that
         can be nonsense in a fresh or corrupt Memory, so this scan
         deliberately doesn't depend on either.
-        '''
+        """
         addr = KEY_ASSIGNMENTS_RANGE[0]
         while addr <= PRIMARY_DATA_END and (
             self._memory.get_register(addr).get_bytes()[0] == self.MARKER
@@ -159,14 +159,14 @@ class KeyAssignments(MemoryRegion):
 
     @classmethod
     def _key_row_col(cls, key_number: int) -> tuple:
-        '''Splits a two-digit key number `MN` (docs sec 2 -- row M, column
+        """Splits a two-digit key number `MN` (docs sec 2 -- row M, column
         N) into (M, N). Raises ValueError unless `key_number` is one of the
         34 real assignable keyboard positions (see _VALID_KEY_POSITIONS
         above) -- notably rejecting `31` (the physical SHIFT key) and
         anything with M or N outside the real keyboard's layout. `N` here
         is the key-NUMBER column (as printed on the key, e.g. the `2` in
         `42`) -- see _physical_column() for the column actually used by the
-        byte/bit formulas, which differs from this for row 4.'''
+        byte/bit formulas, which differs from this for row 4."""
         m, n = divmod(key_number, 10)
         if (m, n) not in cls._VALID_KEY_POSITIONS:
             raise ValueError(f"Invalid key number: {key_number!r}")
@@ -174,21 +174,21 @@ class KeyAssignments(MemoryRegion):
 
     @classmethod
     def _physical_column(cls, m: int, n: int) -> int:
-        '''Maps a key number's (M, N) -- N being the key-NUMBER column,
+        """Maps a key number's (M, N) -- N being the key-NUMBER column,
         e.g. the `2` in key `42` -- to the physical column actually used
         by the key-byte (sec 4.3) and KEYFLAGS bit (sec 4.5) formulas.
         Identical to N for every row except row 4, whose double-width
         ENTER^ key shifts the three keys after it over by one physical
-        column -- see _ROW4_PHYSICAL_COLUMN above.'''
+        column -- see _ROW4_PHYSICAL_COLUMN above."""
         if m == 4:
             return cls._ROW4_PHYSICAL_COLUMN[n]
         return n
 
     @classmethod
     def key_byte_for(cls, key_number: int, shifted: bool) -> int:
-        '''The internal key-byte encoding for `key_number` (docs sec 4.3):
+        """The internal key-byte encoding for `key_number` (docs sec 4.3):
         `16*(N-1) + M` unshifted, `16*(N-1) + (M+8)` shifted, where `N` is
-        the *physical* column (see _physical_column()).'''
+        the *physical* column (see _physical_column())."""
         m, n = cls._key_row_col(key_number)
         n_phys = cls._physical_column(m, n)
         row = m + 8 if shifted else m
@@ -196,7 +196,7 @@ class KeyAssignments(MemoryRegion):
 
     @classmethod
     def key_number_for_byte(cls, key_byte: int) -> tuple:
-        '''Inverts key_byte_for(): given a stored key byte, returns
+        """Inverts key_byte_for(): given a stored key byte, returns
         (key_number, shifted). Tries every real assignable keyboard
         position (_VALID_KEY_NUMBERS) rather than algebraically inverting
         the formula, since the carry behavior for M=8 rows (sec 4.3) makes
@@ -204,7 +204,7 @@ class KeyAssignments(MemoryRegion):
         called on the small number of decoded entries in a state, so the
         brute-force cost is immaterial. Raises ValueError if `key_byte`
         doesn't match any real key (e.g. a corrupt state, or a hand-crafted
-        test fixture targeting a non-assignable position).'''
+        test fixture targeting a non-assignable position)."""
         for key_number in cls._VALID_KEY_NUMBERS:
             if cls.key_byte_for(key_number, False) == key_byte:
                 return key_number, False
@@ -214,11 +214,11 @@ class KeyAssignments(MemoryRegion):
 
     @classmethod
     def _keyflags_bit(cls, key_number: int) -> int:
-        '''Bit position within the KEYFLAGS bitmap (register R or e) for
+        """Bit position within the KEYFLAGS bitmap (register R or e) for
         `key_number` (docs sec 4.5): `36 - M - 8*(N-1)`, where `N` is the
         *physical* column (see _physical_column()). The same bit number
         is used in both registers -- which register (R vs. e)
-        distinguishes unshifted from shifted, not the bit position.'''
+        distinguishes unshifted from shifted, not the bit position."""
         m, n = cls._key_row_col(key_number)
         n_phys = cls._physical_column(m, n)
         return 36 - m - 8 * (n_phys - 1)
@@ -230,16 +230,16 @@ class KeyAssignments(MemoryRegion):
     # which key is this region's business, so the mapping lives here.
 
     def get_key_flag(self, key_number: int, shifted: bool) -> bool:
-        '''Reads the KEYFLAGS existence bit for `key_number` -- True means
+        """Reads the KEYFLAGS existence bit for `key_number` -- True means
         *some* assignment exists for this key/shift-state, in either the
         Key Assignment Registers (sec 4.2) or a global label (sec 4.6);
-        it says nothing about which kind. See docs sec 4.5.'''
+        it says nothing about which kind. See docs sec 4.5."""
         return self._memory.status_registers.get_keyflag_bit(
             self._keyflags_bit(key_number), shifted
         )
 
     def flag_clear_assignments(self) -> list:
-        '''`(key_number, shifted)` for every key that has an assignment of
+        """`(key_number, shifted)` for every key that has an assignment of
         either kind (a Key Assignment Register entry, or a global label's
         key byte) while its KEYFLAGS bit is clear, in key-number order.
 
@@ -249,7 +249,7 @@ class KeyAssignments(MemoryRegion):
         leaves the assignments alone (docs/key_assignments.md, "LKAOFF (DM41X)").
         Nothing here changes the flags, and the app never recomputes them
         from the assignments; the one-key set/clear in set_assignment() and
-        the global-label paths is all that ever touches them.'''
+        the global-label paths is all that ever touches them."""
         assigned = set()
         for entry in self.list_assignments():
             if entry.key_number is not None:
@@ -267,22 +267,22 @@ class KeyAssignments(MemoryRegion):
         )
 
     def is_lkaoff_like(self) -> bool:
-        '''True if any assigned key in the top two rows (keys 11-15 and
+        """True if any assigned key in the top two rows (keys 11-15 and
         21-25, the ones local-label auto assignment and LKAOFF act on) has
         its KEYFLAGS bit clear -- what a state saved after LKAOFF looks
-        like.'''
+        like."""
         return any(
             key_number // 10 in (1, 2)
             for key_number, _shifted in self.flag_clear_assignments()
         )
 
     def set_key_flag(self, key_number: int, shifted: bool, value: bool):
-        '''Sets or clears the KEYFLAGS existence bit for `key_number`
+        """Sets or clears the KEYFLAGS existence bit for `key_number`
         (docs sec 4.5). Callers writing an actual assignment should use
         set_assignment()/delete_assignment() below instead of calling this
         directly -- those keep the Key Assignment Registers and KEYFLAGS
         in sync; this is the low-level primitive they (and ProgramMemory's
-        global-label assignment/deletion) share.'''
+        global-label assignment/deletion) share."""
         self._memory.status_registers.set_keyflag_bit(
             self._keyflags_bit(key_number), shifted, value
         )
@@ -290,12 +290,12 @@ class KeyAssignments(MemoryRegion):
     # -- Entry storage (sec 4.2/4.4) -------------------------------------
 
     def decode_entries(self) -> list:
-        '''Returns every entry currently in the Key Assignment Registers,
+        """Returns every entry currently in the Key Assignment Registers,
         in stored (newest-first, sec 4.4) order, as
         `(fn_byte1, fn_byte2_or_None, key_byte)` tuples -- `fn_byte2` is
         None for a single-byte built-in function entry (the register's
         real filler-first storage, sec 4.2, is normalized away here so
-        every other method only deals with "1 byte" vs. "2 bytes").'''
+        every other method only deals with "1 byte" vs. "2 bytes")."""
         entries = []
         for addr in range(self.start, self._end):
             raw = self._memory.get_register(addr).get_bytes()
@@ -310,7 +310,7 @@ class KeyAssignments(MemoryRegion):
         return entries
 
     def _encode_entries(self, entries: list):
-        '''Repacks `entries` (same shape decode_entries() returns)
+        """Repacks `entries` (same shape decode_entries() returns)
         canonically into the Key Assignment Registers, starting at `start`
         with no gaps, two entries per register, re-adding the filler byte
         for a single-byte entry (sec 4.2). Clears every register between
@@ -322,7 +322,7 @@ class KeyAssignments(MemoryRegion):
         Also updates this region's own extent. See Alarms.relocate() for
         the move itself. Entries are written in list order -- callers
         control LIFO placement (sec 4.4) by ordering `entries` themselves
-        before calling this.'''
+        before calling this."""
         alarms = self._memory.alarms
         base = self.start
         old_end = self._end
@@ -368,17 +368,17 @@ class KeyAssignments(MemoryRegion):
         self._end = new_end
 
     def repack(self):
-        '''Rewrites the region in canonical, gapless form without changing
+        """Rewrites the region in canonical, gapless form without changing
         which assignments it holds. A no-op for a state this class has only
         ever edited itself (every edit already leaves it packed); this
         self-heals one loaded from disk with a pre-existing gap. See
-        Memory.pack().'''
+        Memory.pack()."""
         self._encode_entries(self.decode_entries())
 
     # -- Assignments (sec 4.2/4.4/4.7) -----------------------------------
 
     def set_assignment(self, key_number: int, shifted: bool, function_bytes):
-        '''Assigns `key_number` (unshifted or shifted, per `shifted`) to a
+        """Assigns `key_number` (unshifted or shifted, per `shifted`) to a
         built-in/peripheral function -- `function_bytes` is a single int
         (a one-byte HP-41 function, e.g. 0x40 for `+`; see the sec-5
         caveat in memory/functions.py for the low-code (<0x40) case) or a
@@ -395,7 +395,7 @@ class KeyAssignments(MemoryRegion):
         shadow that program's assignment rather than genuinely replacing
         it; see ProgramMemory.set_program_key_assignment() for the same
         precedent in the other direction.
-        '''
+        """
         key_byte = self.key_byte_for(key_number, shifted)
 
         if isinstance(function_bytes, int):
@@ -416,11 +416,11 @@ class KeyAssignments(MemoryRegion):
         self.set_key_flag(key_number, shifted, True)
 
     def delete_assignment(self, key_number: int, shifted: bool):
-        '''Removes any Key Assignment Register entry for `key_number`/
+        """Removes any Key Assignment Register entry for `key_number`/
         `shifted` and clears its KEYFLAGS bit. A no-op (still clears the
         flag) if the key currently has no entry there -- e.g. it's a
         global-label assignment (sec 4.6, untouched by this method) or
-        simply unassigned.'''
+        simply unassigned."""
         key_byte = self.key_byte_for(key_number, shifted)
         entries = self.decode_entries()
         filtered = [e for e in entries if e[2] != key_byte]
@@ -429,14 +429,14 @@ class KeyAssignments(MemoryRegion):
         self.set_key_flag(key_number, shifted, False)
 
     def get_assignment(self, key_number: int, shifted: bool) -> Optional[KeyAssignment]:
-        '''Looks up the single Key Assignment Register entry (if any) for
+        """Looks up the single Key Assignment Register entry (if any) for
         `key_number`/`shifted` -- a KeyAssignment, as list_assignments()
         returns, or None if that key/shift-state has no entry
         there (unassigned, or assigned via a global label instead, sec
         4.6). Intended for a GUI rendering one keypad cell at a time (docs
         sec 6 item 4), where scanning the full decoded list per cell would
         be wasteful for a whole grid at once -- callers rendering every key
-        at once should use list_assignments() instead.'''
+        at once should use list_assignments() instead."""
         key_byte = self.key_byte_for(key_number, shifted)
         for fn1, fn2, kb in self.decode_entries():
             if kb == key_byte:
@@ -451,13 +451,13 @@ class KeyAssignments(MemoryRegion):
         return None
 
     def list_assignments(self) -> List[KeyAssignment]:
-        '''Returns every built-in/peripheral key assignment currently in
+        """Returns every built-in/peripheral key assignment currently in
         the Key Assignment Registers, as KeyAssignments. Order
         matches the buffer's own newest-first order (sec 4.4); global
         label assignments (sec 4.6) are NOT included here -- see
         ProgramMemory.list_global_chain()'s `key_assignment` field for
         those, per docs/key_assignments.md sec 6 item 4's shared-data-model
-        note.'''
+        note."""
         results = []
         for fn1, fn2, key_byte in self.decode_entries():
             try:
@@ -470,12 +470,14 @@ class KeyAssignments(MemoryRegion):
                 # whole listing, with enough raw detail (the key byte
                 # itself) that a caller/GUI can flag it distinctly.
                 key_number, shifted = None, None
-            results.append(KeyAssignment(
-                key_number=key_number,
-                shifted=shifted,
-                fn_byte1=fn1,
-                fn_byte2=fn2,
-                name=display_for_key_bytes(fn1, fn2),
-                raw_key_byte=key_byte,
-            ))
+            results.append(
+                KeyAssignment(
+                    key_number=key_number,
+                    shifted=shifted,
+                    fn_byte1=fn1,
+                    fn_byte2=fn2,
+                    name=display_for_key_bytes(fn1, fn2),
+                    raw_key_byte=key_byte,
+                )
+            )
         return results

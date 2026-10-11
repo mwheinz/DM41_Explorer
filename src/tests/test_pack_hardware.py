@@ -139,7 +139,9 @@ def test_pack_only_leaves_a_null_between_two_numbers(fixture):
         if area[start] != 0x00 or start >= last_marker_end:
             continue
         before = instructions[position - 1][0] if position else None
-        after = instructions[position + 1][0] if position + 1 < len(instructions) else None
+        after = (
+            instructions[position + 1][0] if position + 1 < len(instructions) else None
+        )
         assert before is not None and area[before] in NUMBER_ENTRY_BYTES, (
             f"{fixture.name}: NULL at byte {start} doesn't follow a number"
         )
@@ -169,7 +171,9 @@ from memory.opcode_scan import compact_program_stream  # noqa: E402
 
 
 def test_compact_keeps_one_null_between_two_numbers_and_drops_the_rest():
-    assert compact_program_stream(bytes([0x15, 0x00, 0x16])) == bytes([0x15, 0x00, 0x16])
+    assert compact_program_stream(bytes([0x15, 0x00, 0x16])) == bytes(
+        [0x15, 0x00, 0x16]
+    )
     assert compact_program_stream(bytes([0x15, 0x00, 0x00, 0x00, 0x16])) == bytes(
         [0x15, 0x00, 0x16]
     )
@@ -182,7 +186,9 @@ def test_compact_keeps_one_null_between_two_numbers_and_drops_the_rest():
 def test_compact_never_touches_a_zero_that_is_part_of_an_instruction():
     fix_0 = bytes([0x9C, 0x00])  # FIX 0
     isg_00 = bytes([0x96, 0x00])  # ISG 00
-    text = bytes([0xF3, 0x41, 0x00, 0x42])  # a 3-character ALPHA string containing a 00 byte
+    text = bytes(
+        [0xF3, 0x41, 0x00, 0x42]
+    )  # a 3-character ALPHA string containing a 00 byte
     assert compact_program_stream(fix_0 + isg_00 + text) == fix_0 + isg_00 + text
 
 
@@ -194,15 +200,24 @@ def test_compact_clears_jump_caches_but_keeps_the_label_being_jumped_to():
     # General 3-byte GTO/XEQ: the first byte's low nibble, all of the
     # second byte, and the direction bit of the third are the cache; the
     # third byte's low 7 bits are the label.
-    assert compact_program_stream(bytes([0xE4, 0x22, 0x04])) == bytes([0xE0, 0x00, 0x04])
-    assert compact_program_stream(bytes([0xE0, 0x00, 0x9E])) == bytes([0xE0, 0x00, 0x1E])
-    assert compact_program_stream(bytes([0xD3, 0x45, 0x89])) == bytes([0xD0, 0x00, 0x09])
+    assert compact_program_stream(bytes([0xE4, 0x22, 0x04])) == bytes(
+        [0xE0, 0x00, 0x04]
+    )
+    assert compact_program_stream(bytes([0xE0, 0x00, 0x9E])) == bytes(
+        [0xE0, 0x00, 0x1E]
+    )
+    assert compact_program_stream(bytes([0xD3, 0x45, 0x89])) == bytes(
+        [0xD0, 0x00, 0x09]
+    )
 
 
 def test_compact_copies_markers_verbatim():
     label = bytes([0xC0, 0x00, 0xF6, 0x01, 0x58, 0x4D, 0x42, 0x43, 0x44])  # LBL "XMBCD"
     end = bytes([0xC4, 0x0E, 0x09])
-    assert compact_program_stream(label + bytes([0x00, 0x83]) + end) == label + bytes([0x83]) + end
+    assert (
+        compact_program_stream(label + bytes([0x00, 0x83]) + end)
+        == label + bytes([0x83]) + end
+    )
 
 
 # -- More real-hardware evidence -----------------------------------------------
@@ -231,7 +246,23 @@ def test_pack_keeps_every_null_that_separates_two_numbers():
     # each pair separated by a NULL: 15 00 17 00 11 12 13 00 14 15 16 00 17 18 19.
     memory = load_fixture(path("nulltest.dm41"))
     separated = bytes(
-        [0x15, 0x00, 0x17, 0x00, 0x11, 0x12, 0x13, 0x00, 0x14, 0x15, 0x16, 0x00, 0x17, 0x18, 0x19]
+        [
+            0x15,
+            0x00,
+            0x17,
+            0x00,
+            0x11,
+            0x12,
+            0x13,
+            0x00,
+            0x14,
+            0x15,
+            0x16,
+            0x00,
+            0x17,
+            0x18,
+            0x19,
+        ]
     )
     assert separated in program_area(memory)
     memory.pack()

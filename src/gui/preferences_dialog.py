@@ -204,7 +204,10 @@ class PreferencesDialog(ctk.CTkToplevel):
             side="left", fill="x", expand=True
         )
         ctk.CTkButton(
-            dir_row, text="Browse...", width=scaled(90), command=self._pick_log_directory
+            dir_row,
+            text="Browse...",
+            width=scaled(90),
+            command=self._pick_log_directory,
         ).pack(side="left", padx=(8, 0))
 
     def _on_mode_chosen(self, value):
@@ -238,9 +241,9 @@ class PreferencesDialog(ctk.CTkToplevel):
             # e.g. the path of a theme file typed into the preferences file
             themes.append(current_theme)
         self._color_theme_var = ctk.StringVar(value=current_theme)
-        ctk.CTkOptionMenu(
-            tab, values=themes, variable=self._color_theme_var
-        ).pack(anchor="w", padx=8, fill="x")
+        ctk.CTkOptionMenu(tab, values=themes, variable=self._color_theme_var).pack(
+            anchor="w", padx=8, fill="x"
+        )
 
         self._high_contrast_var = ctk.BooleanVar(value=self._config.high_contrast)
         ctk.CTkCheckBox(
@@ -354,8 +357,7 @@ class PreferencesDialog(ctk.CTkToplevel):
             self._config.save()
             logger.info("Preferences saved.")
         except Exception as e:
-            messagebox.showerror("Preferences",
-                f"Unable to save preferences {e}")
+            messagebox.showerror("Preferences", f"Unable to save preferences {e}")
             logger.warning("Unable to save preferences %s", str(e))
 
         if self._on_saved:

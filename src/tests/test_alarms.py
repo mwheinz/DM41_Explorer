@@ -209,7 +209,9 @@ def test_add_alarm_past_due_can_be_overridden():
 def test_add_alarm_rejects_text_the_calculator_cannot_hold(alarm_type, text, message):
     memory = Memory()
     with pytest.raises(ValueError, match=message or None):
-        memory.alarms.add_alarm(trigger_time=_dt(2026, 9, 5), alarm_type=alarm_type, text=text)
+        memory.alarms.add_alarm(
+            trigger_time=_dt(2026, 9, 5), alarm_type=alarm_type, text=text
+        )
     assert memory.alarms.list_alarms() == []  # rejected before any write
 
 
@@ -318,8 +320,16 @@ def test_delete_all_alarms_one_at_a_time_from_real_fixture():
 
 def test_alarms_survive_a_to_string_from_string_round_trip():
     memory = Memory()
-    memory.alarms.add_alarm(trigger_time=_dt(2026, 9, 5, 8, 0), text="MORNING", repeat_interval=datetime.timedelta(days=1))
-    memory.alarms.add_alarm(trigger_time=_dt(2026, 9, 5, 20, 0), alarm_type=Alarm.TYPE_CONTROL, text="RUNPROG")
+    memory.alarms.add_alarm(
+        trigger_time=_dt(2026, 9, 5, 8, 0),
+        text="MORNING",
+        repeat_interval=datetime.timedelta(days=1),
+    )
+    memory.alarms.add_alarm(
+        trigger_time=_dt(2026, 9, 5, 20, 0),
+        alarm_type=Alarm.TYPE_CONTROL,
+        text="RUNPROG",
+    )
 
     reloaded = Memory.from_string(memory.to_string())
     alarms = reloaded.alarms.list_alarms()

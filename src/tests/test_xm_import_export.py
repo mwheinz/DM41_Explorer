@@ -49,7 +49,9 @@ def root():
 
 def test_dialog_save_parses_all_three_data_line_kinds(root):
     captured = {}
-    dlg = XMFileDialog(root, lambda *a: captured.update(name=a[0], file_type=a[1], kwargs=a[2]))
+    dlg = XMFileDialog(
+        root, lambda *a: captured.update(name=a[0], file_type=a[1], kwargs=a[2])
+    )
     dlg._name_var.set("TEST")
     dlg._data_box.delete("1.0", "end")
     dlg._data_box.insert("1.0", "1.5\nHI\n0x50000000000000\n-3\n")
@@ -109,7 +111,9 @@ def test_dialog_save_ascii_records_decode_trigraphs(root):
     ExtendedMemory.add_file() itself, so this just confirms the dialog
     doesn't reject or mangle trigraph syntax on the way through."""
     captured = {}
-    dlg = XMFileDialog(root, lambda *a: captured.update(name=a[0], file_type=a[1], kwargs=a[2]))
+    dlg = XMFileDialog(
+        root, lambda *a: captured.update(name=a[0], file_type=a[1], kwargs=a[2])
+    )
     dlg._name_var.set("NOTES")
     dlg._type_var.set("ASCII")
     dlg._on_type_changed("ASCII")
@@ -185,13 +189,17 @@ def test_xm_export_file_writes_data_lines(root, tmp_path, monkeypatch):
     tab.render(memory)
 
     out_path = tmp_path / "MIXED.txt"
-    monkeypatch.setattr("gui.xm_files_tab.filedialog.asksaveasfilename", lambda **k: str(out_path))
+    monkeypatch.setattr(
+        "gui.xm_files_tab.filedialog.asksaveasfilename", lambda **k: str(out_path)
+    )
     monkeypatch.setattr(messagebox, "showinfo", lambda *a, **k: None)
 
     tab._export_file(f)
 
     assert out_path.read_text(encoding="ascii").splitlines() == [
-        "1.5", "HI", "0x50000000000000",
+        "1.5",
+        "HI",
+        "0x50000000000000",
     ]
 
 
@@ -205,7 +213,9 @@ def test_xm_export_file_writes_ascii_records(root, tmp_path, monkeypatch):
     tab.render(memory)
 
     out_path = tmp_path / "NOTES.txt"
-    monkeypatch.setattr("gui.xm_files_tab.filedialog.asksaveasfilename", lambda **k: str(out_path))
+    monkeypatch.setattr(
+        "gui.xm_files_tab.filedialog.asksaveasfilename", lambda **k: str(out_path)
+    )
     monkeypatch.setattr(messagebox, "showinfo", lambda *a, **k: None)
 
     tab._export_file(f)
@@ -222,7 +232,9 @@ def test_xm_import_file_prefills_dialog_and_adds_on_save(root, tmp_path, monkeyp
 
     src_path = tmp_path / "myfile.txt"
     src_path.write_text("1.5\nHI\n0x50000000000000\n", encoding="ascii")
-    monkeypatch.setattr("gui.xm_files_tab.filedialog.askopenfilename", lambda **k: str(src_path))
+    monkeypatch.setattr(
+        "gui.xm_files_tab.filedialog.askopenfilename", lambda **k: str(src_path)
+    )
 
     created = {}
     monkeypatch.setattr(
@@ -242,7 +254,9 @@ def test_xm_import_file_prefills_dialog_and_adds_on_save(root, tmp_path, monkeyp
     # must be 1-7 characters -- see ExtendedMemory.add_file() -- an
     # 8-char name here would hit _save_new_or_edited_file()'s real,
     # unmocked messagebox.showerror() and hang the test under Xvfb.)
-    created["on_save"]("IMPORT", ExtendedMemory.TYPE_DATA, {"data_lines": ["1.5", "HI"]})
+    created["on_save"](
+        "IMPORT", ExtendedMemory.TYPE_DATA, {"data_lines": ["1.5", "HI"]}
+    )
     xm = ExtendedMemory(memory, address_range=[0x40, 0x2EF])
     files = xm.list_files()
     assert len(files) == 1
@@ -262,6 +276,7 @@ def test_xm_import_file_prefills_dialog_and_adds_on_save(root, tmp_path, monkeyp
 # above) so switching the type dropdown to correct a wrong guess doesn't
 # lose the imported text either.
 #
+
 
 def test_guess_file_type_prose_text_is_ascii():
     """The exact scenario reported: long, punctuated lines from a real XM
@@ -286,10 +301,14 @@ def test_guess_file_type_empty_defaults_to_data():
 
 
 def test_guess_file_type_one_bad_line_is_enough_for_ascii():
-    assert _guess_file_type(["1.5", "HI", "this line is way too long for data"]) == "ASCII"
+    assert (
+        _guess_file_type(["1.5", "HI", "this line is way too long for data"]) == "ASCII"
+    )
 
 
-def test_xm_import_prose_file_guesses_ascii_and_saves_correctly(root, tmp_path, monkeypatch):
+def test_xm_import_prose_file_guesses_ascii_and_saves_correctly(
+    root, tmp_path, monkeypatch
+):
     """End-to-end regression for the reported bug, using a real ASCII XM
     export (ALLCHRS.txt): Import File... must guess ASCII and actually let
     it save as an ASCII file without the user touching the type
@@ -299,12 +318,16 @@ def test_xm_import_prose_file_guesses_ascii_and_saves_correctly(root, tmp_path, 
     tab.render(memory)
 
     src_path = DATA_DIR / "ALLCHRS.txt"
-    monkeypatch.setattr("gui.xm_files_tab.filedialog.askopenfilename", lambda **k: str(src_path))
+    monkeypatch.setattr(
+        "gui.xm_files_tab.filedialog.askopenfilename", lambda **k: str(src_path)
+    )
 
     created = {}
     monkeypatch.setattr(
         "gui.xm_files_tab.XMFileDialog",
-        lambda master, on_save, **kwargs: created.update(on_save=on_save, kwargs=kwargs),
+        lambda master, on_save, **kwargs: created.update(
+            on_save=on_save, kwargs=kwargs
+        ),
     )
 
     tab._import_file()
@@ -346,7 +369,9 @@ def test_dialog_switching_type_after_import_does_not_lose_content(root):
 # ---- Duplicate-name rejection (GitHub issue #11 follow-up) ----
 
 
-def test_xm_import_duplicate_name_shows_error_not_silent_success(root, tmp_path, monkeypatch):
+def test_xm_import_duplicate_name_shows_error_not_silent_success(
+    root, tmp_path, monkeypatch
+):
     """User-reported bug: re-importing an exported file whose name
     matches one already present used to silently add a duplicate
     directory entry (something a real DM41L would reject). The model-
@@ -364,7 +389,9 @@ def test_xm_import_duplicate_name_shows_error_not_silent_success(root, tmp_path,
         messagebox, "showerror", lambda title, msg: errors.append((title, msg))
     )
 
-    tab._save_new_or_edited_file("XM1.000", ExtendedMemory.TYPE_DATA, {"numbers": [1, 2, 3]})
+    tab._save_new_or_edited_file(
+        "XM1.000", ExtendedMemory.TYPE_DATA, {"numbers": [1, 2, 3]}
+    )
 
     assert errors and "already exists" in errors[0][1]
     xm_after = ExtendedMemory(memory, address_range=[0x40, 0x2EF])
@@ -407,7 +434,9 @@ def test_data_registers_export_default_range_writes_every_register(
 
     lines = out_path.read_text(encoding="ascii").splitlines()
     assert len(lines) == count
-    expected = [format_data_line(memory.get_register(a)) for a in range(r00, r00 + count)]
+    expected = [
+        format_data_line(memory.get_register(a)) for a in range(r00, r00 + count)
+    ]
     assert lines == expected
 
 
@@ -433,7 +462,9 @@ def test_data_registers_export_partial_range_writes_only_that_range(
     tab._export_registers()
 
     lines = out_path.read_text(encoding="ascii").splitlines()
-    expected = [format_data_line(memory.get_register(a)) for a in range(r00 + 2, r00 + 5)]
+    expected = [
+        format_data_line(memory.get_register(a)) for a in range(r00 + 2, r00 + 5)
+    ]
     assert lines == expected
 
 
@@ -602,7 +633,9 @@ def test_data_registers_import_rejects_invalid_line_with_line_number(
     assert "TOOLONGTEXTVALUE" in caplog.records[0].message
 
 
-def test_data_registers_import_dialog_receives_actual_import_count(root, tmp_path, monkeypatch):
+def test_data_registers_import_dialog_receives_actual_import_count(
+    root, tmp_path, monkeypatch
+):
     """RegisterImportLocationDialog needs the file's real register count
     (not the displayed range's count) to validate/report where an offset
     import would land -- see GitHub issue #14's example (a 30-register

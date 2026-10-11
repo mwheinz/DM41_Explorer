@@ -103,7 +103,9 @@ def test_remove_clears_the_removed_programs_own_key_assignment_flag():
         aaa.labels[0].key_assignment
     )
     bbb_key_byte = bbb.labels[0].key_assignment
-    bbb_key_number, bbb_shifted = memory.key_assignments.key_number_for_byte(bbb_key_byte)
+    bbb_key_number, bbb_shifted = memory.key_assignments.key_number_for_byte(
+        bbb_key_byte
+    )
     assert memory.key_assignments.get_key_flag(aaa_key_number, aaa_shifted) is True
 
     memory.programs.remove_program(aaa)
@@ -174,7 +176,8 @@ def test_remove_every_program_in_every_sample_state_one_at_a_time():
             # Match target by position, same convention get_program_bytes()
             # itself uses.
             match = next(
-                p for p in fresh_programs
+                p
+                for p in fresh_programs
                 if p.start_addr == target.start_addr
                 and p.start_offset == target.start_offset
             )

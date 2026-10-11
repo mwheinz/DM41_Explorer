@@ -23,7 +23,6 @@ def mock_serial():
 
 
 class TestSerialManager:
-
     def test_initialization(self, manager):
         """Verifies initial state of SerialManager."""
         assert manager.is_connected is False

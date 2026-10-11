@@ -100,9 +100,7 @@ def test_the_dialog_shows_the_current_contrast_choice(root, config):
     dialog.destroy()
 
 
-def test_save_stores_the_theme_and_contrast_in_the_prefs_file(
-    root, config, prefs_file
-):
+def test_save_stores_the_theme_and_contrast_in_the_prefs_file(root, config, prefs_file):
     saved = mock.Mock()
     dialog = _dialog(root, config, on_saved=saved)
     dialog._color_theme_var.set("dark-blue")
@@ -137,9 +135,10 @@ def test_a_theme_file_that_is_not_json_falls_back_to_the_default(tmp_path):
     bad = tmp_path / "bad.json"
     bad.write_text("not json")
     _apply_color_theme(str(bad))  # must not raise
-    assert ctk.ThemeManager._currently_loaded_theme == ProjectConfig.DEFAULT_PREFS[
-        "color_theme"
-    ]
+    assert (
+        ctk.ThemeManager._currently_loaded_theme
+        == ProjectConfig.DEFAULT_PREFS["color_theme"]
+    )
 
 
 @pytest.mark.parametrize("theme", COLOR_THEMES)
@@ -198,6 +197,7 @@ def test_high_contrast_on_changes_the_blue_themes_button_colors(make_app):
 
 def test_the_app_starts_with_a_theme_that_cannot_be_loaded(make_app, tmp_path):
     make_app(color_theme=str(tmp_path / "missing.json"))
-    assert ctk.ThemeManager._currently_loaded_theme == ProjectConfig.DEFAULT_PREFS[
-        "color_theme"
-    ]
+    assert (
+        ctk.ThemeManager._currently_loaded_theme
+        == ProjectConfig.DEFAULT_PREFS["color_theme"]
+    )

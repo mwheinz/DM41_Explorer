@@ -29,9 +29,7 @@ GOLDEN_PATH = DATA_DIR / "golden.json"
 
 def capture_paths():
     """Every state capture in tests/data, in name order."""
-    return sorted(
-        p for p in DATA_DIR.iterdir() if p.suffix in (".dm41", ".d41")
-    )
+    return sorted(p for p in DATA_DIR.iterdir() if p.suffix in (".dm41", ".d41"))
 
 
 def profile_for(path):
@@ -84,9 +82,7 @@ def _programs(memory):
             "at": f"0x{p.start_addr:03X}.{p.start_offset}",
             "length": p.length,
             "terminator": p.terminator,
-            "labels": [
-                [label.name, label.key_assignment] for label in p.labels
-            ],
+            "labels": [[label.name, label.key_assignment] for label in p.labels],
             # The decompiled listing (memory/program_text.py).
             "listing": _attempt(
                 lambda p=p: encode_program_txt(

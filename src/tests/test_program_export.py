@@ -53,16 +53,12 @@ DATA_DIR = Path(__file__).parent / "data"
 # "TEST" spanning two registers, docs/program.md sec 5.2) through its own
 # packed END marker ("c40309", the same plain-END chain link
 # list_programs() finds -- docs/program.md's worked example).
-APPTEST_BYTES = bytes.fromhex(
-    "c000f8004150505445535410021140111010468475b200c40309"
-)
+APPTEST_BYTES = bytes.fromhex("c000f8004150505445535410021140111010468475b200c40309")
 
 # hp41uc's own DAT output for exactly these bytes -- verified against an
 # hp41uc binary built from source (`hp41uc /r=apptest.raw /d`), byte for
 # byte.
-APPTEST_DAT_REFERENCE = (
-    b"001AC000F8004150505445535410021140111010468475B200C4030948"
-)
+APPTEST_DAT_REFERENCE = b"001AC000F8004150505445535410021140111010468475B200C4030948"
 
 
 def test_find_program_end_apptest():
@@ -173,12 +169,16 @@ def test_decode_program_dat_reads_towers_declared_length_header():
 
 def test_encode_program_raw_round_trips_tower():
     instruction_bytes = decode_program_dat((DATA_DIR / "tower.dat").read_bytes())
-    assert encode_program_raw(instruction_bytes) == (DATA_DIR / "tower.raw").read_bytes()
+    assert (
+        encode_program_raw(instruction_bytes) == (DATA_DIR / "tower.raw").read_bytes()
+    )
 
 
 def test_encode_program_dat_round_trips_tower():
     instruction_bytes = decode_program_raw((DATA_DIR / "tower.raw").read_bytes())
-    assert encode_program_dat(instruction_bytes) == (DATA_DIR / "tower.dat").read_bytes()
+    assert (
+        encode_program_dat(instruction_bytes) == (DATA_DIR / "tower.dat").read_bytes()
+    )
 
 
 def test_decode_program_raw_rejects_corrupt_checksum():

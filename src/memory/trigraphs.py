@@ -219,7 +219,7 @@ def decode_trigraphs(text: str, *, restrict_literals: bool = False) -> bytes:
             continue
 
         raise ValueError(
-            f"Unrecognized trigraph at position {i}: {text[i:i + 4]!r} "
+            f"Unrecognized trigraph at position {i}: {text[i : i + 4]!r} "
             "isn't a known shorthand (see docs/trigraphs.md) or "
             "\\ + exactly 3 decimal digits."
         )

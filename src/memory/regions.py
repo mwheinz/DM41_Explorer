@@ -1,4 +1,4 @@
-'''
+"""
 MemoryRegion and RegionSpan -- two different answers to "what named span
 of registers is this."
 
@@ -30,7 +30,7 @@ snapshots rather than hand-rolling the arithmetic.
 Extended memory (`XMFile`/`ExtendedMemory`) lives in `xm_file.py` instead
 of getting its own module here, since it has a whole file-system-like
 structure built on top of its region.
-'''
+"""
 
 from dataclasses import dataclass
 from typing import Dict, Optional, Sequence, TYPE_CHECKING
@@ -44,7 +44,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class RegionSpan:
-    '''
+    """
     A plain, immutable descriptor for one region's boundaries at one
     moment -- what `MemoryRegion.span()` and `Memory.regions()` hand back.
     Deliberately NOT a `MemoryRegion`: it carries no reference to a
@@ -53,7 +53,7 @@ class RegionSpan:
 
     `start`/`end` are both inclusive, matching `MemoryRegion`'s own
     convention (`start <= addr <= end`).
-    '''
+    """
 
     key: str
     label: str
@@ -62,8 +62,8 @@ class RegionSpan:
 
     @property
     def count(self) -> int:
-        '''Number of registers this span covers -- 0 (not negative) for an
-        empty span, e.g. "key" in a state with no key assignments at all.'''
+        """Number of registers this span covers -- 0 (not negative) for an
+        empty span, e.g. "key" in a state with no key assignments at all."""
         return max(0, self.end - self.start + 1)
 
     def __contains__(self, addr: int) -> bool:
@@ -74,7 +74,7 @@ class RegionSpan:
 
 
 class MemoryRegion:
-    '''
+    """
     Base class for a named, contiguous span of registers within a
     `Memory`.
 
@@ -89,7 +89,7 @@ class MemoryRegion:
     empty, in which case `end == start - 1`, `count == 0`, iteration
     yields nothing and `addr in region` is never true -- so callers
     classifying addresses don't need to special-case an empty region.
-    '''
+    """
 
     key: str = "region"
     label: str = "Region"
@@ -102,7 +102,7 @@ class MemoryRegion:
 
     @property
     def start(self) -> int:
-        '''Lowest address in this region (inclusive).'''
+        """Lowest address in this region (inclusive)."""
         if self._fixed_range is None:
             raise NotImplementedError(
                 f"{type(self).__name__} must override start (or be "
@@ -112,8 +112,8 @@ class MemoryRegion:
 
     @property
     def end(self) -> int:
-        '''Highest address in this region (inclusive), or `start - 1` when
-        the region is currently empty.'''
+        """Highest address in this region (inclusive), or `start - 1` when
+        the region is currently empty."""
         if self._fixed_range is None:
             raise NotImplementedError(
                 f"{type(self).__name__} must override end (or be "
@@ -123,21 +123,21 @@ class MemoryRegion:
 
     @property
     def end_exclusive(self) -> int:
-        '''One past `end` -- the half-open upper bound, handy for
+        """One past `end` -- the half-open upper bound, handy for
         `range()` and for regions that stack directly on top of each
-        other (`Alarms` starts exactly at `KeyAssignments.end_exclusive`).'''
+        other (`Alarms` starts exactly at `KeyAssignments.end_exclusive`)."""
         return self.end + 1
 
     @property
     def address_range(self) -> tuple:
-        '''`(start, end)`, both inclusive -- a live read, not a stored
-        value.'''
+        """`(start, end)`, both inclusive -- a live read, not a stored
+        value."""
         return (self.start, self.end)
 
     @property
     def count(self) -> int:
-        '''Number of registers currently in this region; 0 (never
-        negative) when it's empty.'''
+        """Number of registers currently in this region; 0 (never
+        negative) when it's empty."""
         return max(0, self.end - self.start + 1)
 
     @property
@@ -145,9 +145,9 @@ class MemoryRegion:
         return self.count == 0
 
     def span(self) -> RegionSpan:
-        '''An immutable snapshot of this region's current boundaries --
+        """An immutable snapshot of this region's current boundaries --
         what `Memory.regions()` collects. Safe to keep; unlike the region
-        itself it will NOT follow subsequent edits.'''
+        itself it will NOT follow subsequent edits."""
         return RegionSpan(self.key, self.label, self.start, self.end)
 
     def __contains__(self, addr: int) -> bool:
@@ -174,33 +174,33 @@ class MemoryRegion:
             )
 
     def get_register(self, addr: int) -> Register:
-        '''Reads a register at an absolute address within this region.'''
+        """Reads a register at an absolute address within this region."""
         self._check_addr(addr)
         return self._memory.get_register(addr)
 
     def set_register(self, addr: int, register: Register):
-        '''Writes a register at an absolute address within this region.'''
+        """Writes a register at an absolute address within this region."""
         self._check_addr(addr)
         self._memory.set_register(addr, register)
 
     def registers(self) -> Dict[int, Register]:
-        '''All registers in this region, keyed by absolute address.'''
+        """All registers in this region, keyed by absolute address."""
         return {addr: self.get_register(addr) for addr in self}
 
     def clear(self):
-        '''Zeroes every register currently in this region. Does not move
+        """Zeroes every register currently in this region. Does not move
         any boundary -- a region whose extent is derived from its own
         contents (`KeyAssignments`, `Alarms`) will report itself empty
-        afterward as a consequence, not because this said so.'''
+        afterward as a consequence, not because this said so."""
         for addr in self:
             self._memory.set_register(addr, zero_register())
 
 
 class VoidRegion(MemoryRegion):
-    '''The addressable-but-nonexistent hole between the status registers
+    """The addressable-but-nonexistent hole between the status registers
     and the first extended-memory region. Nothing lives here; it exists as
     a region only so that every address in the displayed range belongs to
-    exactly one of them.'''
+    exactly one of them."""
 
     key = "nonexistent"
     label = "Inaccessible"
@@ -210,7 +210,7 @@ class VoidRegion(MemoryRegion):
 
 
 class FreeSpace(MemoryRegion):
-    '''
+    """
     Whatever is left over between the top of the Alarms buffer and the
     bottom of program memory -- genuinely unallocated registers, available
     for a program import or for more key assignments/alarms to grow into.
@@ -221,7 +221,7 @@ class FreeSpace(MemoryRegion):
     see `Memory.has_program_partition()` -- it runs all the way up to
     `PRIMARY_DATA_END`, since there is no meaningful program/data split to
     stop at.
-    '''
+    """
 
     key = "unused"
     label = "Unused / Free"

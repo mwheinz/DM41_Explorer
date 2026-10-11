@@ -54,10 +54,13 @@ def test_there_is_one_mode_per_profile():
 PROFILE_NAMES = ("DM41L", "DM41X")
 
 
-@pytest.mark.parametrize("mode,expected", [
-    (DeviceMode.DM41L, DM41L),
-    (DeviceMode.DM41X, DM41X),
-])
+@pytest.mark.parametrize(
+    "mode,expected",
+    [
+        (DeviceMode.DM41L, DM41L),
+        (DeviceMode.DM41X, DM41X),
+    ],
+)
 def test_a_mode_resolves_to_its_profile(mode, expected):
     assert mode.profile is expected
 
@@ -68,12 +71,15 @@ def test_the_default_mode_is_dm41x():
     assert DEFAULT_MODE is DeviceMode.DM41X
 
 
-@pytest.mark.parametrize("value,expected", [
-    ("DM41L", DeviceMode.DM41L),
-    ("DM41X", DeviceMode.DM41X),
-    (DeviceMode.DM41L, DeviceMode.DM41L),
-    (DeviceMode.DM41X, DeviceMode.DM41X),
-])
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        ("DM41L", DeviceMode.DM41L),
+        ("DM41X", DeviceMode.DM41X),
+        (DeviceMode.DM41L, DeviceMode.DM41L),
+        (DeviceMode.DM41X, DeviceMode.DM41X),
+    ],
+)
 def test_from_value_accepts_names_and_modes(value, expected):
     assert DeviceMode.from_value(value) is expected
 

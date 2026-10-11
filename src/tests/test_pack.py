@@ -103,7 +103,9 @@ def test_pack_round_trips_through_to_string_and_from_string(path):
     expected = [(p.names_label, p.length) for p in memory.programs.list_programs()]
 
     reloaded = Memory.from_string(memory.to_string(), profile=memory.profile)
-    assert [(p.names_label, p.length) for p in reloaded.programs.list_programs()] == expected
+    assert [
+        (p.names_label, p.length) for p in reloaded.programs.list_programs()
+    ] == expected
 
 
 # -- twolabels.dm41: the specific alignment regression ------------------------
@@ -134,17 +136,21 @@ def test_pack_leaves_key_assignments_end_and_alarms_end_unchanged_when_canonical
 def test_pack_preserves_global_label_key_assignments():
     memory = Memory.from_file(DATA_DIR / "global-key-assignments.dm41")
     before = {
-        p.names_label: p.labels[0].key_assignment for p in memory.programs.list_programs()
+        p.names_label: p.labels[0].key_assignment
+        for p in memory.programs.list_programs()
     }
     memory.pack()
     after = {
-        p.names_label: p.labels[0].key_assignment for p in memory.programs.list_programs()
+        p.names_label: p.labels[0].key_assignment
+        for p in memory.programs.list_programs()
     }
     assert after == before
 
     # And the KEYFLAGS bits themselves are untouched too.
     for p in memory.programs.list_programs():
-        key_number, shifted = memory.key_assignments.key_number_for_byte(p.labels[0].key_assignment)
+        key_number, shifted = memory.key_assignments.key_number_for_byte(
+            p.labels[0].key_assignment
+        )
         assert memory.key_assignments.get_key_flag(key_number, shifted) is True
 
 
@@ -173,7 +179,9 @@ def test_pack_on_a_freshly_constructed_memory_does_not_raise():
 # -- Rebuilding a missing backward chain ---------------------------------------
 
 
-@pytest.mark.parametrize("unpacked_name,label", [("lander.dm41", "LANDER"), ("targ.dm41", "TARG")])
+@pytest.mark.parametrize(
+    "unpacked_name,label", [("lander.dm41", "LANDER"), ("targ.dm41", "TARG")]
+)
 def test_pack_repaired_label_can_be_assigned_to_a_key(unpacked_name, label):
     # The actual point of the fix: a repaired label isn't just visible in
     # list_programs(), it can be assigned to a key like any other.

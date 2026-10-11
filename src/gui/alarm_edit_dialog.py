@@ -59,7 +59,9 @@ class AlarmEditDialog(ctk.CTkToplevel):
         )
 
         ctk.CTkLabel(self, text="Type:").pack(anchor="w", padx=16, pady=(12, 4))
-        type_default = _TYPE_LABELS[existing.alarm_type if existing else Alarm.TYPE_MESSAGE]
+        type_default = _TYPE_LABELS[
+            existing.alarm_type if existing else Alarm.TYPE_MESSAGE
+        ]
         self._type_var = ctk.StringVar(value=type_default)
         ctk.CTkOptionMenu(
             self,

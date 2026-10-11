@@ -1,4 +1,4 @@
-'''
+"""
 Converting between raw HP-41 program instruction bytes and a plain-text
 keystroke listing: `encode_program_txt()` (bytes -> text, decompile) and
 `decode_program_txt()` (text -> bytes, compile).
@@ -63,7 +63,7 @@ contradicts them.
      synthetic-only status-register postfixes (M/N/O/P/Q/R/a/b/c/d/e);
      see the module-level comment above _STACK_REGISTER_NAMES for
      exactly what's confirmed and what's merely named-but-undescribed.
-'''
+"""
 
 import re
 from typing import List, Optional, Tuple
@@ -95,9 +95,19 @@ from .program_chain import decode_chain_marker, encode_chain_marker
 # "3 E3" for 3000, vs. bare "E2" when there's no mantissa before it at
 # all) -- see _render_number_run() below.
 _DIGIT_CHARS = {
-    0x10: "0", 0x11: "1", 0x12: "2", 0x13: "3", 0x14: "4",
-    0x15: "5", 0x16: "6", 0x17: "7", 0x18: "8", 0x19: "9",
-    0x1A: ".", 0x1B: "E", 0x1C: "-",
+    0x10: "0",
+    0x11: "1",
+    0x12: "2",
+    0x13: "3",
+    0x14: "4",
+    0x15: "5",
+    0x16: "6",
+    0x17: "7",
+    0x18: "8",
+    0x19: "9",
+    0x1A: ".",
+    0x1B: "E",
+    0x1C: "-",
 }
 
 # -- Compact single-byte RCL/STO forms (registers 00-15 only) ----------
@@ -250,31 +260,31 @@ _XEQ_IND_FLAG = 0x80
 # Anything else doesn't decode to a known operand -- callers should treat
 # that as an unrecognized/spare instruction (see _format_unknown()).
 _STACK_REGISTER_NAMES = {
-    0x70: "T",   # inferred -- not directly observed in tower.txt
-    0x71: "Z",   # inferred -- not directly observed in tower.txt
-    0x72: "Y",   # confirmed: "STO IND Y" -> STO 0xF2 (0x80 | 0x72)
-    0x73: "X",   # confirmed: "GTO IND X" -> GTO IND 0x73; "ARCL X" -> ARCL 0x73
-    0x74: "L",   # inferred -- not directly observed in tower.txt
-    0x75: "M",   # Wickes sec 4A/4B -- one of the 4 ALPHA-register registers
-    0x76: "N",   # Wickes sec 4A/4B -- one of the 4 ALPHA-register registers
-    0x77: "O",   # Wickes sec 4A/4B -- one of the 4 ALPHA-register registers
-    0x78: "P",   # Wickes sec 4A/4B -- one of the 4 ALPHA-register registers
-    0x79: "Q",   # Wickes sec 4A/4C -- general-purpose scratch register
-    0x7A: "R",   # hp41uc's name; Wickes/byte_table.html show its glyph (a sideways T)
-    0x7B: "a",   # Wickes sec 4A -- named, but not individually described
-    0x7C: "b",   # Wickes sec 4A -- named, but not individually described
-    0x7D: "c",   # Wickes sec 4A -- named, but not individually described
-    0x7E: "d",   # Wickes sec 4A/4D -- the 56-bit system/user flag register
-    0x7F: "e",   # Wickes sec 4A/4E -- the key-assignment flag register
+    0x70: "T",  # inferred -- not directly observed in tower.txt
+    0x71: "Z",  # inferred -- not directly observed in tower.txt
+    0x72: "Y",  # confirmed: "STO IND Y" -> STO 0xF2 (0x80 | 0x72)
+    0x73: "X",  # confirmed: "GTO IND X" -> GTO IND 0x73; "ARCL X" -> ARCL 0x73
+    0x74: "L",  # inferred -- not directly observed in tower.txt
+    0x75: "M",  # Wickes sec 4A/4B -- one of the 4 ALPHA-register registers
+    0x76: "N",  # Wickes sec 4A/4B -- one of the 4 ALPHA-register registers
+    0x77: "O",  # Wickes sec 4A/4B -- one of the 4 ALPHA-register registers
+    0x78: "P",  # Wickes sec 4A/4B -- one of the 4 ALPHA-register registers
+    0x79: "Q",  # Wickes sec 4A/4C -- general-purpose scratch register
+    0x7A: "R",  # hp41uc's name; Wickes/byte_table.html show its glyph (a sideways T)
+    0x7B: "a",  # Wickes sec 4A -- named, but not individually described
+    0x7C: "b",  # Wickes sec 4A -- named, but not individually described
+    0x7D: "c",  # Wickes sec 4A -- named, but not individually described
+    0x7E: "d",  # Wickes sec 4A/4D -- the 56-bit system/user flag register
+    0x7F: "e",  # Wickes sec 4A/4E -- the key-assignment flag register
 }
 
 
 def _decode_register_operand(byte: int) -> Optional[str]:
-    '''Decodes a "descriptor" operand byte (see the module-level comment
+    """Decodes a "descriptor" operand byte (see the module-level comment
     above) into its display text -- a 2-digit register/flag number, a
     local letter label, a stack register name, or an "IND "-prefixed
     version of any of those. Returns None if `byte` doesn't decode to
-    anything recognized.'''
+    anything recognized."""
     indirect = bool(byte & 0x80)
     base = byte & 0x7F
     if 0 <= base <= 0x63:
@@ -289,13 +299,13 @@ def _decode_register_operand(byte: int) -> Optional[str]:
 
 
 def _decode_small_digit_operand(byte: int) -> Optional[str]:
-    '''FIX/SCI/ENG/TONE's own operand style: a bare 0-9 digit with no
+    """FIX/SCI/ENG/TONE's own operand style: a bare 0-9 digit with no
     zero-padding (confirmed: "FIX 0"/"FIX 2"/"TONE 0"/"TONE 2", never
     "FIX 00"/"TONE 02" -- contrast with _decode_register_operand()'s
     2-digit style used by every other operand-taking instruction). Falls
     back to the general register-descriptor decode for anything outside
     0-9 (e.g. an IND form), which isn't exercised by tower.txt but is a
-    reasonable, safe fallback rather than silently misrendering it.'''
+    reasonable, safe fallback rather than silently misrendering it."""
     if 0 <= byte <= 9:
         return str(byte)
     return _decode_register_operand(byte)
@@ -306,9 +316,24 @@ def _decode_small_digit_operand(byte: int) -> Optional[str]:
 # memory/mnemonics.py (canonical() on export, resolve() on import).
 _REGISTER_OPERAND_PREFIX_CODES = frozenset(
     {
-        0x90, 0x91, 0x92, 0x93, 0x94, 0x95,  # RCL STO ST+ ST- ST* ST/
-        0x96, 0x97, 0x98, 0x99, 0x9A, 0x9B,  # ISG DSE VIEW SREG ASTO ARCL
-        0xA8, 0xA9, 0xAA, 0xAB, 0xAC, 0xAD,  # SF CF FS?C FC?C FS? FC?
+        0x90,
+        0x91,
+        0x92,
+        0x93,
+        0x94,
+        0x95,  # RCL STO ST+ ST- ST* ST/
+        0x96,
+        0x97,
+        0x98,
+        0x99,
+        0x9A,
+        0x9B,  # ISG DSE VIEW SREG ASTO ARCL
+        0xA8,
+        0xA9,
+        0xAA,
+        0xAB,
+        0xAC,
+        0xAD,  # SF CF FS?C FC?C FS? FC?
         0xCE,  # X<>
     }
 )
@@ -324,11 +349,11 @@ def _name_for_byte(byte: int) -> str:
 
 
 def _append_mnemonic(lines, mnemonic, operand_text, data, start, length):
-    '''Appends "<mnemonic> <operand_text>", or an unknown-opcode fallback
+    """Appends "<mnemonic> <operand_text>", or an unknown-opcode fallback
     comment if `operand_text` is None (an unrecognized operand byte) --
     a small shared helper for the several 2-/3-byte instruction forms
     below that all follow this same "mnemonic + decoded operand, or give
-    up" shape.'''
+    up" shape."""
     if operand_text is None:
         lines.append(_format_unknown(data, start, length))
     else:
@@ -336,23 +361,23 @@ def _append_mnemonic(lines, mnemonic, operand_text, data, start, length):
 
 
 def _format_unknown(data: bytes, start: int, length: int) -> str:
-    '''hp41uc's own decompiler emits an informational, non-recompilable
+    """hp41uc's own decompiler emits an informational, non-recompilable
     comment line for a synthetic/unassigned opcode byte rather than
     silently dropping it -- e.g.
     the two confirmed-spare bytes 0xAF/0xB0. This module follows the same
     policy for anything else it doesn't recognize (an unexpected operand
-    byte, an unassigned prefix range, etc.), rather than guessing.'''
+    byte, an unassigned prefix range, etc.), rather than guessing."""
     hex_bytes = " ".join(f"{b:02X}" for b in data[start : start + length])
     return f"; UNKNOWN OPCODE: {hex_bytes}"
 
 
 def _render_number_run(chars: List[str]) -> str:
-    '''Renders a run of digit-literal characters (see _DIGIT_CHARS)
+    """Renders a run of digit-literal characters (see _DIGIT_CHARS)
     exactly as hp41uc's own decompiler does: the characters in order,
     except a single space is inserted immediately before an 'E' that
     isn't the very first character -- confirmed by tower.txt's "3 E3"
     (mantissa "3" then a space then the exponent marker) vs. bare "E2"
-    (no mantissa, no leading space).'''
+    (no mantissa, no leading space)."""
     out = []
     for i, ch in enumerate(chars):
         if ch == "E" and i > 0:
@@ -362,7 +387,7 @@ def _render_number_run(chars: List[str]) -> str:
 
 
 def _encode_alpha_content(data: bytes) -> str:
-    '''Renders raw ALPHA-text character bytes as a quoted string body
+    """Renders raw ALPHA-text character bytes as a quoted string body
     (the text between the double quotes, not including them).
 
     Deliberately does NOT reuse trigraphs.py's own escape scheme here --
@@ -382,7 +407,7 @@ def _encode_alpha_content(data: bytes) -> str:
     the \\nnn numeric fallback, the canonical escape spelling this
     project's other file formats use, since there's no fixture evidence
     favoring any other spelling. Anything outside the printable range at all (control
-    bytes, DEL, high bytes) also falls back to \\nnn for the same reason.'''
+    bytes, DEL, high bytes) also falls back to \\nnn for the same reason."""
     out = []
     for b in data:
         if b in (0x22, 0x5C):
@@ -397,14 +422,14 @@ def _encode_alpha_content(data: bytes) -> str:
 def _decode_alpha_instruction(
     data: bytes, start: int, prefix_len: int, count: int
 ) -> str:
-    '''Renders a direct ALPHA-text-load instruction (the 0xF0-0xFF class,
+    """Renders a direct ALPHA-text-load instruction (the 0xF0-0xFF class,
     prefix_len=1) or a GTO"/XEQ"-style global-name reference (the
     0x1D-0x1F class, prefix_len=2) as quoted text. A leading "Append"
     control byte (0x7F, trigraphs.py's own "\\+" shorthand) is rendered
     as hp41uc's own leading ">" notation instead, with the rest of the
     string quoted normally -- confirmed by tower.txt's `>":" ` (append a
     colon) and `>" " ` (append a space), both of which have 0x7F as
-    their very first content byte.'''
+    their very first content byte."""
     content = data[start + prefix_len : start + prefix_len + count]
     if content and content[0] == 0x7F:
         return ">" + '"' + _encode_alpha_content(content[1:]) + '"'
@@ -412,7 +437,7 @@ def _decode_alpha_instruction(
 
 
 def _decode_xrom(byte1: int, byte2: int) -> str:
-    '''Renders an XROM instruction the way hp41uc's own decompiler does:
+    """Renders an XROM instruction the way hp41uc's own decompiler does:
     always as "XROM mm,ff" (never the friendly function name as the
     mnemonic itself), with the function's name as a trailing comment when
     it's a known Extended Functions/Time function -- confirmed against
@@ -421,7 +446,7 @@ def _decode_xrom(byte1: int, byte2: int) -> str:
     (byte2 >> 6), ff = byte2 & 0x3F -- a formula confirmed by cross-
     checking multiple known (byte1, byte2) pairs from functions.py's own
     XROM_FUNCTIONS table against tower.txt's "mm,ff" comments (SEEKPT,
-    ARCLREC, GETKEY, X<>F all check out exactly).'''
+    ARCLREC, GETKEY, X<>F all check out exactly)."""
     mm = ((byte1 & 0x07) << 2) | (byte2 >> 6)
     ff = byte2 & 0x3F
     text = f"{canonical(XROM)} {mm:02d},{ff:02d}"  # hp41uc: "%02d" (decomp.c)
@@ -432,7 +457,7 @@ def _decode_xrom(byte1: int, byte2: int) -> str:
 
 
 def encode_program_txt(data: bytes) -> str:
-    '''
+    """
     Decompiles one program's raw instruction bytes (as returned by
     ProgramMemory.get_program_bytes(), decode_program_raw(), or
     decode_program_dat() -- a single program's bytes, ending in its own
@@ -451,7 +476,7 @@ def encode_program_txt(data: bytes) -> str:
     unassigned/spare opcode, or a malformed operand) renders as an
     informational "; UNKNOWN OPCODE: ..." comment line rather than
     raising or guessing -- see _format_unknown().
-    '''
+    """
     lines: List[str] = []
     i = 0
     n = len(data)
@@ -706,7 +731,7 @@ _XROM_RE = re.compile(r"^(\d{1,2})\s*,\s*(\d{1,2})$")
 
 
 def _tokenize_line(line: str) -> List[str]:
-    '''Quote-and-escape-aware tokenizer for one line of program-text
+    """Quote-and-escape-aware tokenizer for one line of program-text
     source: splits on whitespace outside a quoted ALPHA string, and
     treats a backslash inside quotes as escaping the very next character
     (so `\\"` inside a string doesn't end it early -- necessary for the
@@ -726,7 +751,7 @@ def _tokenize_line(line: str) -> List[str]:
     reasoning on the decode side.
 
     Raises ValueError if the line ends with an unterminated quoted
-    string (an unmatched `"`).'''
+    string (an unmatched `"`)."""
     tokens: List[str] = []
     cur: List[str] = []
     in_quotes = False
@@ -762,7 +787,7 @@ def _tokenize_line(line: str) -> List[str]:
 
 
 def _is_number_literal_tokens(tokens: List[str]) -> bool:
-    '''True if `tokens`, concatenated back together with no separator,
+    """True if `tokens`, concatenated back together with no separator,
     forms nothing but digit-literal characters (see _DIGIT_CHARS) -- the
     compile-side mirror of _render_number_run()'s own single-space-
     before-a-non-initial-'E' rule: decompiling "3 E3" splits it into two
@@ -776,7 +801,7 @@ def _is_number_literal_tokens(tokens: List[str]) -> bool:
     *not* treated as a number literal -- is what tells a real number
     literal like "-1" apart from a bare "-" that's actually the
     unrelated SUBTRACT function; see _AMBIGUOUS_NUMBER_LITERAL_TEXT's
-    own comment above.'''
+    own comment above."""
     joined = "".join(tokens)
     if joined == _AMBIGUOUS_NUMBER_LITERAL_TEXT:
         return False
@@ -784,7 +809,7 @@ def _is_number_literal_tokens(tokens: List[str]) -> bool:
 
 
 def _decode_alpha_text_literal(text: str) -> bytes:
-    '''Reverses _encode_alpha_content() -- turns the text between a pair
+    """Reverses _encode_alpha_content() -- turns the text between a pair
     of quotes back into raw content bytes. A literal printable-ASCII
     character (0x20-0x7E) maps to its own byte value, matching hp41uc's
     "FOCAL's reassigned punctuation prints literally" behavior confirmed
@@ -796,7 +821,7 @@ def _decode_alpha_text_literal(text: str) -> bytes:
     single-letter escapes in _C_STYLE_ESCAPES (accepted per the plan's
     sec 5 decision, for smoother acceptance of hp41uc/community source --
     never emitted by the encoder). Raises ValueError on a trailing
-    backslash or an escape sequence that matches none of those forms.'''
+    backslash or an escape sequence that matches none of those forms."""
     out = bytearray()
     i = 0
     n = len(text)
@@ -839,12 +864,12 @@ def _decode_alpha_text_literal(text: str) -> bytes:
 
 
 def _parse_quoted_token(token: str) -> bytes:
-    '''Parses a single tokenized quoted-string token -- e.g. `'"SCORE: "'`
+    """Parses a single tokenized quoted-string token -- e.g. `'"SCORE: "'`
     or `'>":"'` (a leading `>`, hp41uc's own "append to ALPHA" notation,
     see _decode_alpha_instruction()'s own docstring) -- into raw content
     bytes, with the 0x7F "Append" control byte prepended when `>` was
     present. Raises ValueError if `token` isn't a well-formed quoted
-    string (missing/mismatched quotes).'''
+    string (missing/mismatched quotes)."""
     append = token.startswith(">")
     body = token[1:] if append else token
     if len(body) < 2 or body[0] != '"' or body[-1] != '"':
@@ -854,7 +879,7 @@ def _parse_quoted_token(token: str) -> bytes:
 
 
 def _parse_register_base(token: str) -> int:
-    '''Parses a bare (non-indirect) register/label/flag descriptor
+    """Parses a bare (non-indirect) register/label/flag descriptor
     token -- a decimal register/flag number 0-99, a local letter label
     A-J, a stack register name T/Z/Y/X/L, or one of the synthetic-only
     status-register names M/N/O/P/Q/R/a/b/c/d/e (see the module-level
@@ -874,7 +899,7 @@ def _parse_register_base(token: str) -> int:
     would silently fold "a" into "A" and never reach register a at all.
     The case-insensitive fallback below preserves the previous lenient
     behavior for the genuinely case-insensitive names (T/Z/Y/X/L and the
-    new M/N/O/P/Q), e.g. "t" still resolves to stack register T.'''
+    new M/N/O/P/Q), e.g. "t" still resolves to stack register T."""
     if token in _STACK_REGISTER_CODES:
         return _STACK_REGISTER_CODES[token]
     upper = token.upper()
@@ -890,11 +915,11 @@ def _parse_register_base(token: str) -> int:
 
 
 def _parse_register_operand(tokens: List[str]) -> int:
-    '''Parses an operand token list that may lead with a literal "IND"
+    """Parses an operand token list that may lead with a literal "IND"
     token (e.g. `["IND", "16"]` or just `["16"]`) into a full descriptor
     byte, indirect bit included -- the reverse of
     _decode_register_operand(). Raises ValueError if `tokens` isn't
-    exactly an optional "IND" followed by one base-operand token.'''
+    exactly an optional "IND" followed by one base-operand token."""
     indirect = bool(tokens) and tokens[0].upper() == "IND"
     rest = tokens[1:] if indirect else tokens
     if len(rest) != 1:
@@ -904,7 +929,7 @@ def _parse_register_operand(tokens: List[str]) -> int:
 
 
 def _encode_register_operand_instruction(prefix: int, tokens: List[str]) -> bytes:
-    '''RCL/STO/ST+/ST-/ST*/ST//ISG/DSE/VIEW/SREG/ASTO/ARCL/SF/CF/
+    """RCL/STO/ST+/ST-/ST*/ST//ISG/DSE/VIEW/SREG/ASTO/ARCL/SF/CF/
     FS?C/FC?C/FS?/FC?/X<> -- every mnemonic sharing the register/flag
     "descriptor" operand byte scheme. RCL/STO additionally prefer the
     compact single-byte form for a direct (non-IND) register 00-15,
@@ -913,7 +938,7 @@ def _encode_register_operand_instruction(prefix: int, tokens: List[str]) -> byte
     comment) -- every other mnemonic in this group always uses the
     general 2-byte form, since it has no compact form to begin with.
     `prefix` is the instruction's prefix byte; `tokens[0]` is its name
-    as written, used only in error messages.'''
+    as written, used only in error messages."""
     mnemonic = tokens[0]
     operand_tokens = tokens[1:]
     if not operand_tokens:
@@ -940,11 +965,11 @@ def _encode_register_operand_instruction(prefix: int, tokens: List[str]) -> byte
 
 
 def _encode_small_digit_operand_instruction(prefix: int, tokens: List[str]) -> bytes:
-    '''FIX/SCI/ENG/TONE -- the bare-0-9-digit operand style (see
+    """FIX/SCI/ENG/TONE -- the bare-0-9-digit operand style (see
     _decode_small_digit_operand()). Falls back to the general
     register-descriptor encode (supporting an "IND" operand) for anything
     that isn't a single bare digit 0-9, mirroring
-    _decode_small_digit_operand()'s own fallback.'''
+    _decode_small_digit_operand()'s own fallback."""
     operand_tokens = tokens[1:]
     if not operand_tokens:
         raise ValueError(f"{tokens[0]} needs an operand: {' '.join(tokens)!r}")
@@ -960,7 +985,7 @@ def _encode_small_digit_operand_instruction(prefix: int, tokens: List[str]) -> b
 
 
 def _encode_xrom(tokens: List[str]) -> bytes:
-    '''"XROM mm,ff" -- reverses _decode_xrom()'s mm/ff-recovery formula
+    """ "XROM mm,ff" -- reverses _decode_xrom()'s mm/ff-recovery formula
     (byte1 = 0xA0 | ((mm>>2)&7), byte2 = ((mm&3)<<6) | (ff&0x3F)).
 
     Accepts any module 00-31 and function 00-63, whether or not the
@@ -972,7 +997,7 @@ def _encode_xrom(tokens: List[str]) -> bytes:
 
     This is only reached for the numeric "XROM mm,ff" spelling -- a
     function spelled by its own name (e.g. "SEEKPT") resolves directly
-    to its XROM op in _encode_instruction() and never gets here.'''
+    to its XROM op in _encode_instruction() and never gets here."""
     if len(tokens) != 2:
         raise ValueError(
             f"XROM needs exactly one 'mm,ff' operand: {' '.join(tokens)!r}"
@@ -992,7 +1017,7 @@ def _encode_xrom(tokens: List[str]) -> bytes:
 
 
 def _encode_gto_xeq(is_xeq: bool, tokens: List[str]) -> bytes:
-    '''GTO/XEQ -- three forms, matching encode_program_txt()'s own three
+    """GTO/XEQ -- three forms, matching encode_program_txt()'s own three
     GTO/XEQ decode branches exactly: a quoted global name reference
     (`GTO "NAME"`/`XEQ "NAME"`, the 0x1D/0x1E-prefixed form), `GTO IND
     <reg>`/`XEQ IND <reg>` (the shared 0xAE opcode, with the operand's
@@ -1001,7 +1026,7 @@ def _encode_gto_xeq(is_xeq: bool, tokens: List[str]) -> bytes:
     form for a local number 00-14, matching _GTO_COMPACT_BASE's own
     module-level comment; XEQ has no compact form at all and always uses
     the general 3-byte form). `tokens[0]` is the name as written (GTO,
-    GOTO, XEQ, ...), used only in error messages.'''
+    GOTO, XEQ, ...), used only in error messages."""
     mnemonic = tokens[0]
     operand_tokens = tokens[1:]
     if not operand_tokens:
@@ -1045,7 +1070,7 @@ def _encode_gto_xeq(is_xeq: bool, tokens: List[str]) -> bytes:
 
 
 def _encode_instruction(tokens: List[str]) -> Tuple[bytes, bool]:
-    '''Encodes one non-numeric-literal instruction's tokens (as produced
+    """Encodes one non-numeric-literal instruction's tokens (as produced
     by _tokenize_line()) into its raw bytes. Returns (bytes, is_end) --
     `is_end` is True only for the program's own terminating END, so
     decode_program_txt() knows to stop there. Raises ValueError, with a
@@ -1053,7 +1078,7 @@ def _encode_instruction(tokens: List[str]) -> Tuple[bytes, bool]:
     recognize -- the same "give up and be informative" posture
     _format_unknown() takes on the decode side, just as an exception
     instead of a comment line, since a program that doesn't compile has
-    no bytes to fall back to.'''
+    no bytes to fall back to."""
     first = tokens[0]
 
     # A bare quoted string (optionally `>`-prefixed) with no leading
@@ -1147,14 +1172,12 @@ def _encode_instruction(tokens: List[str]) -> Tuple[bytes, bool]:
         # rule for -- a gap in this module's tables, not bad input.
         raise ValueError(f"no encoding rule for instruction {mnemonic!r}")
     if len(tokens) != 1:
-        raise ValueError(
-            f"unexpected operand(s) for {mnemonic}: {' '.join(tokens)!r}"
-        )
+        raise ValueError(f"unexpected operand(s) for {mnemonic}: {' '.join(tokens)!r}")
     return bytes([byte]), False
 
 
 def decode_program_txt(text: str) -> bytes:
-    '''
+    """
     Compiles a plain-text keystroke listing (as produced by
     `encode_program_txt()`, or an hp41uc/community-authored `.txt` file
     such as `src/tests/data/tower.txt` itself) back into one program's
@@ -1206,7 +1229,7 @@ def decode_program_txt(text: str) -> bytes:
     instruction, an operand that doesn't fit its field width, an XROM
     module/function number out of range, or a missing/misplaced terminating
     END. Never silently drops or guesses at malformed input.
-    '''
+    """
     out = bytearray()
     last_was_number = False
     end_seen = False

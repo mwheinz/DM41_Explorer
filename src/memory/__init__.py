@@ -1,4 +1,4 @@
-'''
+"""
 A representation of the memory of a DM41-series emulator (DM41L, DM41X).
 
 A state has three parts: the "DM41" header, the main memory registers, and
@@ -45,7 +45,7 @@ Modules, by area (each module's docstring has the details):
     mnemonic_dialects.py alternate spellings folded into the registry
     mnemonic_doc.py      the generated mnemonic reference
     trigraphs.py         the FOCAL character set's non-ASCII symbols
-'''
+"""
 
 from .registers import (
     DM41MemoryError,

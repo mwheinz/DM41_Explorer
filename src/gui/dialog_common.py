@@ -48,7 +48,9 @@ def fit_dialog(dialog, base_width=0, base_height=0, *, minimum=None, content=Tru
         else (0, 0)
     )
     size = dialog_size(_font_size(), (base_width, base_height), needed, screen)
-    smallest = dialog_size(_font_size(), minimum or (base_width, base_height), needed, screen)
+    smallest = dialog_size(
+        _font_size(), minimum or (base_width, base_height), needed, screen
+    )
     dialog.geometry(f"{size[0]}x{size[1]}")
     dialog.minsize(*smallest)
 
@@ -145,9 +147,9 @@ def build_dialog_button_row(
         center = ctk.CTkFrame(row, fg_color="transparent")
         center.pack(side="left", expand=True)
         for text, command in extra_buttons:
-            ctk.CTkButton(center, text=text, width=scaled(BUTTON_WIDTH), command=command).pack(
-                side="left", padx=4
-            )
+            ctk.CTkButton(
+                center, text=text, width=scaled(BUTTON_WIDTH), command=command
+            ).pack(side="left", padx=4)
 
     def _on_return(event):
         if _is_multiline_text_widget(event.widget):

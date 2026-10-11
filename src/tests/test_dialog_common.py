@@ -86,7 +86,9 @@ def dialog(root):
 
 def test_cancel_is_left_of_primary(dialog):
     row, primary = build_dialog_button_row(
-        dialog, primary_text="Save", on_primary=lambda: None,
+        dialog,
+        primary_text="Save",
+        on_primary=lambda: None,
     )
     dialog.update_idletasks()
     cancel = _buttons_by_text(row)["Cancel"]
@@ -127,13 +129,17 @@ def test_custom_cancel_text_and_multiple_extra_buttons(dialog):
 
 def test_primary_button_invokes_on_primary(dialog):
     on_primary = mock.Mock()
-    row, primary = build_dialog_button_row(dialog, primary_text="Save", on_primary=on_primary)
+    row, primary = build_dialog_button_row(
+        dialog, primary_text="Save", on_primary=on_primary
+    )
     primary.invoke()
     on_primary.assert_called_once()
 
 
 def test_cancel_defaults_to_dialog_destroy(dialog):
-    row, primary = build_dialog_button_row(dialog, primary_text="Save", on_primary=lambda: None)
+    row, primary = build_dialog_button_row(
+        dialog, primary_text="Save", on_primary=lambda: None
+    )
     cancel = row.winfo_children()[0]
     assert dialog.winfo_exists()
     cancel.invoke()
@@ -143,7 +149,10 @@ def test_cancel_defaults_to_dialog_destroy(dialog):
 def test_cancel_uses_explicit_on_cancel_instead_of_destroy(dialog):
     on_cancel = mock.Mock()
     row, primary = build_dialog_button_row(
-        dialog, primary_text="Connect", on_primary=lambda: None, on_cancel=on_cancel,
+        dialog,
+        primary_text="Connect",
+        on_primary=lambda: None,
+        on_cancel=on_cancel,
     )
     cancel = row.winfo_children()[0]
     cancel.invoke()

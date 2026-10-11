@@ -135,9 +135,7 @@ class MnemonicsReferenceDialog(ctk.CTkToplevel):
         # Opens at the size for the application font (never larger than the
         # screen) and re-wraps the explanatory notes as the window is resized.
         # The tables scroll, so the content doesn't set the size.
-        fit_dialog(
-            self, *_BASE_SIZE, minimum=_BASE_MINIMUM_SIZE, content=False
-        )
+        fit_dialog(self, *_BASE_SIZE, minimum=_BASE_MINIMUM_SIZE, content=False)
         wrap_labels_to_width(self, self._notes, _NOTE_MARGIN)
 
         self._apply_filter()
@@ -147,7 +145,10 @@ class MnemonicsReferenceDialog(ctk.CTkToplevel):
         """An explanatory paragraph at the top of a tab, wrapped to the
         window width (see wrap_labels_to_width)."""
         label = ctk.CTkLabel(
-            page, text=text, wraplength=scaled(_BASE_SIZE[0] - _NOTE_MARGIN), justify="left"
+            page,
+            text=text,
+            wraplength=scaled(_BASE_SIZE[0] - _NOTE_MARGIN),
+            justify="left",
         )
         label.pack(anchor="w", padx=4, pady=(4, 6))
         self._notes.append(label)

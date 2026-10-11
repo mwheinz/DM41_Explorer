@@ -7,6 +7,7 @@ The layout tables are tested directly. The two widget tests build a real
 KeyAssignmentsTab but only inspect its structure, never its on-screen
 geometry, so they don't depend on the platform's fonts or window system.
 """
+
 import pytest
 
 pytest.importorskip("customtkinter")
@@ -75,11 +76,19 @@ def test_only_adjacent_repeats_merge():
     """The same number in two places that don't touch stays two cells, and
     labels (including blanks) are never merged."""
     layout = [[11, 12, 11], ["", "", 21], [11, 12, 21]]
-    cells = [(p.cell, p.row, p.column, p.columnspan, p.rowspan) for p in layout_placements(layout)]
+    cells = [
+        (p.cell, p.row, p.column, p.columnspan, p.rowspan)
+        for p in layout_placements(layout)
+    ]
     assert cells == [
-        (11, 0, 0, 10, 1), (12, 0, 10, 10, 1), (11, 0, 20, 10, 1),
-        ("", 1, 0, 10, 1), ("", 1, 10, 10, 1), (21, 1, 20, 10, 2),
-        (11, 2, 0, 10, 1), (12, 2, 10, 10, 1),
+        (11, 0, 0, 10, 1),
+        (12, 0, 10, 10, 1),
+        (11, 0, 20, 10, 1),
+        ("", 1, 0, 10, 1),
+        ("", 1, 10, 10, 1),
+        (21, 1, 20, 10, 2),
+        (11, 2, 0, 10, 1),
+        (12, 2, 10, 10, 1),
     ]
 
 
@@ -120,6 +129,8 @@ def test_equalizing_the_columns_does_not_flush_pending_drawing(make_tab, monkeyp
 
     tab = make_tab()
     flushes = []
-    monkeypatch.setattr(tkinter.Misc, "update_idletasks", lambda self: flushes.append(self))
+    monkeypatch.setattr(
+        tkinter.Misc, "update_idletasks", lambda self: flushes.append(self)
+    )
     tab._equalize_columns(tab._grid_frame)
     assert not flushes

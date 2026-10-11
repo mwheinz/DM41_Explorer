@@ -126,7 +126,7 @@ class ProgramTab(ctk.CTkFrame):
         self._caption = build_caption_label(
             self,
             "Each row indicates a separate HP41 program, separated by "
-            "explicit END markers. The \"Label\" column lists the "
+            'explicit END markers. The "Label" column lists the '
             "global labels contained in the program and each program may "
             "have zero or more global labels as identifiers.",
         )
@@ -199,9 +199,7 @@ class ProgramTab(ctk.CTkFrame):
             return ""
         if len(program.labels) == 1:
             return program.labels[0].key_assignment_text
-        return ", ".join(
-            f"{label.key_assignment_text}" for label in program.labels
-        )
+        return ", ".join(f"{label.key_assignment_text}" for label in program.labels)
 
     def _selected_program(self):
         """The Program for the currently-selected row, or None if
@@ -361,7 +359,9 @@ class ProgramTab(ctk.CTkFrame):
             file_bytes = Path(path).read_bytes()
             instruction_bytes = decoder(file_bytes)
         except (OSError, DM41MemoryError) as e:
-            logger.warning("Could not read %s program file %s: %s", format_label, path, e)
+            logger.warning(
+                "Could not read %s program file %s: %s", format_label, path, e
+            )
             messagebox.showerror("Could Not Import", str(e))
             return
 
@@ -449,9 +449,7 @@ class ProgramTab(ctk.CTkFrame):
         try:
             self._memory.programs.remove_program(program)
         except (ValueError, DM41MemoryError) as e:
-            logger.warning(
-                "Could not remove program %r: %s", program.names_label, e
-            )
+            logger.warning("Could not remove program %r: %s", program.names_label, e)
             messagebox.showerror("Could Not Remove Program", str(e))
             return
 

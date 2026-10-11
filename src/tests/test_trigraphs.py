@@ -167,9 +167,7 @@ def test_restrict_literals_allows_lowercase_a_through_e(ch):
 
 
 def test_restrict_literals_allows_uppercase_and_digits_and_space():
-    assert decode_trigraphs(
-        "ALL UPPER 123", restrict_literals=True
-    ) == b"ALL UPPER 123"
+    assert decode_trigraphs("ALL UPPER 123", restrict_literals=True) == b"ALL UPPER 123"
 
 
 def test_restrict_literals_still_allows_an_explicit_trigraph_for_the_same_byte():

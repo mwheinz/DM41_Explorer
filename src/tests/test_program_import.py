@@ -40,7 +40,9 @@ def test_import_apptest_into_empty_memory_matches_simple_dm41_exactly():
     # into empty.dm41 should reproduce that fixture's own DotEnd/chain
     # layout byte for byte (docs/program.md's own worked example).
     source = Memory.from_file(DATA_DIR / "simple.dm41")
-    apptest_bytes = source.programs.get_program_bytes(source.programs.list_programs()[0])
+    apptest_bytes = source.programs.get_program_bytes(
+        source.programs.list_programs()[0]
+    )
 
     dest = Memory.from_file(DATA_DIR / "empty.dm41")
     imported = dest.programs.import_program(apptest_bytes)
@@ -85,7 +87,9 @@ def test_import_into_simple_dm41_case_b_preserves_apptest_and_stacks_new_program
     # importing a second program shouldn't touch APPTEST at all, and the
     # new program should land as a second, newer entry.
     source = Memory.from_file(DATA_DIR / "unlabelled.dm41")
-    prog_bytes = source.programs.get_program_bytes(source.programs.list_programs()[0])  # 16 bytes, unlabelled
+    prog_bytes = source.programs.get_program_bytes(
+        source.programs.list_programs()[0]
+    )  # 16 bytes, unlabelled
 
     dest = Memory.from_file(DATA_DIR / "simple.dm41")
     apptest_before = _programs_by_name(dest)["APPTEST"]
@@ -98,7 +102,9 @@ def test_import_into_simple_dm41_case_b_preserves_apptest_and_stacks_new_program
     assert apptest_after.length == apptest_before.length == 26
     assert apptest_after.start_addr == apptest_before.start_addr
     assert apptest_after.start_offset == apptest_before.start_offset
-    assert dest.programs.get_program_bytes(apptest_after) == dest.programs.get_program_bytes(apptest_before)
+    assert dest.programs.get_program_bytes(
+        apptest_after
+    ) == dest.programs.get_program_bytes(apptest_before)
 
     assert imported.length == 16
     newest = programs[-1]
@@ -123,7 +129,11 @@ def test_import_stacks_multiple_programs_in_order():
     dest.programs.import_program(prog2_bytes)
 
     programs = dest.programs.list_programs()
-    assert [p.names_label for p in programs] == ["APPTEST", "(unlabelled)", "(unlabelled)"]
+    assert [p.names_label for p in programs] == [
+        "APPTEST",
+        "(unlabelled)",
+        "(unlabelled)",
+    ]
     assert [p.length for p in programs] == [26, 16, 20]
     for program in programs:
         instruction_bytes = dest.programs.get_program_bytes(program)

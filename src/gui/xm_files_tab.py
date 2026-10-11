@@ -211,7 +211,7 @@ class XMFilesTab(ctk.CTkFrame):
         self._header_label.configure(text=f"Extended-memory files: {len(files)}")
 
         for pos, f in enumerate(files):
-            #span_note = " (spans regions)" if f.spans_regions else ""
+            # span_note = " (spans regions)" if f.spans_regions else ""
             self._tree.insert(
                 "",
                 "end",
@@ -220,7 +220,7 @@ class XMFilesTab(ctk.CTkFrame):
                     f.name.rstrip(),
                     f.type_label,
                     f"0x{f.header_addr:03x}",
-                    #f"{f.num_registers}{span_note}",
+                    # f"{f.num_registers}{span_note}",
                     f"{f.num_registers}",
                     self._preview_for(f),
                 ),
@@ -249,7 +249,9 @@ class XMFilesTab(ctk.CTkFrame):
                 status = (
                     "valid"
                     if checksum
-                    else "INVALID" if checksum is False else "unknown"
+                    else "INVALID"
+                    if checksum is False
+                    else "unknown"
                 )
                 return f"{f.byte_length} instruction bytes, checksum {status}"
             if f.is_other_type:

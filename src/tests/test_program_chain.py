@@ -10,16 +10,20 @@ from pathlib import Path
 
 import pytest
 
-from memory import Memory, decode_chain_marker, decode_label_name, encode_chain_marker, walk_chain
+from memory import (
+    Memory,
+    decode_chain_marker,
+    decode_label_name,
+    encode_chain_marker,
+    walk_chain,
+)
 from memory.program_files import decode_program_dat
 
 DATA_DIR = Path(__file__).parent / "data"
 
 # APPTEST's own instruction bytes (simple.dm41, see test_program_export.py):
 # a global label header ("APPTEST") through its own packed END marker.
-APPTEST_BYTES = bytes.fromhex(
-    "c000f8004150505445535410021140111010468475b200c40309"
-)
+APPTEST_BYTES = bytes.fromhex("c000f8004150505445535410021140111010468475b200c40309")
 
 # unlabelled.dm41's own first program (see test_program_export.py): starts
 # with an ALPHA-string opcode ("f8..."), no global label at all, ends in a

@@ -1,7 +1,7 @@
-'''
+"""
 Shared address-range and sentinel-register constants used across the
 memory package.
-'''
+"""
 
 from .registers import Register, REGISTER_SIZE_BYTES  # re-exported
 
@@ -35,19 +35,31 @@ EOM_REGISTER_HEX = "ffffffffffffff"
 # stored into a Memory (set_register(addr, EOM_REGISTER)) could be changed
 # in place later, silently altering the "constant" for every other user.
 def zero_register() -> Register:
-    '''A new all-zero 7-byte register (what a missing address reads as).'''
+    """A new all-zero 7-byte register (what a missing address reads as)."""
     return Register(size=REGISTER_SIZE_BYTES)
 
 
 def eom_register() -> Register:
-    '''A new end-of-XM-directory sentinel register (all 0xFF).'''
+    """A new end-of-XM-directory sentinel register (all 0xFF)."""
     return Register.from_hex(EOM_REGISTER_HEX)
 
 
 # Labels for the 16 status registers, in address order.
 STATUS_REGISTER_LABELS = [
-    "T", "Z", "Y", "X",
-    "LastX", "M", "N", "O",
-    "P", "Q", "R", "a",
-    "b", "c", "d / Flags", "e",
+    "T",
+    "Z",
+    "Y",
+    "X",
+    "LastX",
+    "M",
+    "N",
+    "O",
+    "P",
+    "Q",
+    "R",
+    "a",
+    "b",
+    "c",
+    "d / Flags",
+    "e",
 ]

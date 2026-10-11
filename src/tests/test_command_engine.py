@@ -56,13 +56,21 @@ def _run(engine, serial, command, messages):
     "command, sent, reply, result",
     [
         (BatteryCheckCommand(), "b", "BAT: 3600mV\n", 3600),
-        (ConsoleTimeoutCommand([15]), "ct 15",
-         "Console timeout set to 15 minutes\n", "Console timeout set to 15 minutes"),
+        (
+            ConsoleTimeoutCommand([15]),
+            "ct 15",
+            "Console timeout set to 15 minutes\n",
+            "Console timeout set to 15 minutes",
+        ),
         (GetTimeCommand(), "t", "2026-07-19 15:30:45 SUN\n", "2026-07-19 15:30:45 SUN"),
         (SetTimeCommand(["20240719", "153530"]), "ts 20240719 153530", "", ""),
         # A malformed time gets the calculator's help text back, not an error.
-        (SetTimeCommand(["20240719"]), "ts 20240719",
-         "Set time\n\n<YYYYMMDD> <HHMMSS>\n", "Set time\n\n<YYYYMMDD> <HHMMSS>"),
+        (
+            SetTimeCommand(["20240719"]),
+            "ts 20240719",
+            "Set time\n\n<YYYYMMDD> <HHMMSS>\n",
+            "Set time\n\n<YYYYMMDD> <HHMMSS>",
+        ),
         (MemoryStringCommand(), "s", STATE + "\n", STATE.strip()),
         (LoadMemoryStringCommand([STATE]), "l", "Read OK\n", "Read OK"),
     ],
@@ -94,7 +102,9 @@ def test_the_echo_and_reply_can_arrive_together_with_padding(engine, serial):
     ],
     ids=["battery", "time", "load"],
 )
-def test_an_unparseable_reply_goes_to_the_error_callback(engine, serial, caplog, command, reply):
+def test_an_unparseable_reply_goes_to_the_error_callback(
+    engine, serial, caplog, command, reply
+):
     sent = command.get_request()
     on_success, on_error = _run(engine, serial, command, [sent + "\n", reply + PROMPT])
     assert engine.state == EngineState.IDLE

@@ -8,6 +8,7 @@ and the resize debounce is driven directly rather than with real timing,
 so they behave the same on every platform. The size rules themselves are
 in test_window_geometry.py.
 """
+
 import json
 import types
 
@@ -59,7 +60,9 @@ def test_closing_saves_the_size_for_the_next_launch(app, prefs_file, monkeypatch
     assert config.window_size == (930, 640)
 
 
-def test_closing_a_maximized_window_keeps_the_previous_size(app, prefs_file, monkeypatch):
+def test_closing_a_maximized_window_keeps_the_previous_size(
+    app, prefs_file, monkeypatch
+):
     _report_size(app, monkeypatch, 1200, 800)
     monkeypatch.setattr(app, "_window_is_maximized", lambda: True)
     app.on_close()

@@ -126,7 +126,10 @@ class XMFileDialog(ctk.CTkToplevel):
         elif initial:
             data_default = initial.get("content", "")
         self._data_box = ctk.CTkTextbox(
-            self, width=scaled(320), height=scaled(140), font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY)
+            self,
+            width=scaled(320),
+            height=scaled(140),
+            font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
         )
         if data_default:
             self._data_box.insert("1.0", data_default)
@@ -137,7 +140,10 @@ class XMFileDialog(ctk.CTkToplevel):
         elif initial:
             ascii_default = initial.get("content", "")
         self._ascii_box = ctk.CTkTextbox(
-            self, width=scaled(320), height=scaled(140), font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY)
+            self,
+            width=scaled(320),
+            height=scaled(140),
+            font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
         )
         if ascii_default:
             self._ascii_box.insert("1.0", ascii_default)

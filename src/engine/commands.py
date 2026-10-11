@@ -1,6 +1,6 @@
-'''
+"""
 The individual commands for controlling the emulator console.
-'''
+"""
 
 import re
 import logging
@@ -11,10 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 class PingCommand(BaseCommand):
-    '''
+    """
     Dummy command. Used to verify that the calculator's serial console
     is running.
-    '''
+    """
 
     def __init__(self, timeout: float):
         super().__init__(timeout=timeout)
@@ -28,10 +28,10 @@ class PingCommand(BaseCommand):
 
 
 class MemoryStringCommand(BaseCommand):
-    '''
+    """
     "s" command - Causes the calculator to send its memory state to the console
     as ASCII encoded text data. This data is returned as a string.
-    '''
+    """
 
     def __init__(self, timeout: float = 1.0, serial=None):
         super().__init__(timeout=timeout, serial=serial)
@@ -46,7 +46,7 @@ class MemoryStringCommand(BaseCommand):
 
 
 class LoadMemoryStringCommand(BaseCommand):
-    ''''l' command - Streams a string to hardware as a memory state.'''
+    """'l' command - Streams a string to hardware as a memory state."""
 
     def __init__(self, args: list, timeout: float = 5.0, serial=None):
         super().__init__(args=args, timeout=timeout, serial=serial)
@@ -59,7 +59,7 @@ class LoadMemoryStringCommand(BaseCommand):
         return "l"  # send_command will handle adding the newline
 
     def trigger_transfer(self):
-        '''Queues the string to the serial buffer immediately after 'l'.'''
+        """Queues the string to the serial buffer immediately after 'l'."""
         logger.info("Beginning file transfer.")
         if not self.serial:
             logger.error("No serial manager available for LoadMemoryStringCommand.")
@@ -83,7 +83,7 @@ class LoadMemoryStringCommand(BaseCommand):
 
 
 class GetTimeCommand(BaseCommand):
-    ''''t' command - Requests system time.'''
+    """'t' command - Requests system time."""
 
     @property
     def command_string(self) -> str:
@@ -101,13 +101,13 @@ class GetTimeCommand(BaseCommand):
 
 
 class SetTimeCommand(BaseCommand):
-    ''''ts' command - Sets device clock.'''
+    """'ts' command - Sets device clock."""
 
     def __init__(self, args: list):
-        '''
+        """
         Sets the calculator's clock. arguments are in the form
         [ "YYYYMMDD", "HHMMSS"]
-        '''
+        """
         super().__init__(args=args)
 
         try:
@@ -125,7 +125,7 @@ class SetTimeCommand(BaseCommand):
 
 
 class BatteryCheckCommand(BaseCommand):
-    ''''b' command - Returns battery voltage in mV.'''
+    """'b' command - Returns battery voltage in mV."""
 
     @property
     def command_string(self) -> str:
@@ -140,13 +140,11 @@ class BatteryCheckCommand(BaseCommand):
         if match:
             return int(match.group(1))
 
-        raise ValueError(
-            f"Could not parse battery voltage from " f"response: '{raw_data}'"
-        )
+        raise ValueError(f"Could not parse battery voltage from response: '{raw_data}'")
 
 
 class ConsoleTimeoutCommand(BaseCommand):
-    ''''ct' command - Configures console timeout in minutes.'''
+    """'ct' command - Configures console timeout in minutes."""
 
     def __init__(self, args: list):
         super().__init__(args=args)

@@ -1,4 +1,4 @@
-'''
+"""
 Encoders for exporting a single HP41 program file.
 
 Supports RAW, DAT, "PPC" (a DAT that's been broken into multiple lines, as
@@ -13,7 +13,7 @@ RAW/DAT/TXT file's own bytes, and recover a program's instruction bytes.
 (There's no `decode_program_ppc()` of its own: PPC is just word-wrapped
 DAT, and `decode_program_dat()` already strips whitespace before decoding,
 so it reads a PPC file directly -- see that function's own docstring.)
-'''
+"""
 
 from .opcode_scan import find_program_end
 from .program_text import encode_program_txt as _encode_program_txt
@@ -22,20 +22,20 @@ from .registers import DM41MemoryError
 
 
 def _checksum(data: bytes) -> int:
-    '''Plain byte-sum checksum, mod 256 -- hp41uc's copy_raw_blocks()/
-    copy_dat_blocks() checksum loop (`*pchksum += buf[j]`).'''
+    """Plain byte-sum checksum, mod 256 -- hp41uc's copy_raw_blocks()/
+    copy_dat_blocks() checksum loop (`*pchksum += buf[j]`)."""
     return sum(data) % 256
 
 
 def encode_program_raw(data: bytes) -> bytes:
-    '''
+    """
     RAW format: (Source/hp41uc.c's `/r` help text):
     `[compiled code] + [1-byte checksum] + [trailer]`, where the trailer
     is zero-padding so the total file length is a multiple of 256 bytes
     (hp41uc's write_raw_checksum(), bufsize=256) -- if `data` is already
     an exact multiple of 256 bytes, a full extra 256-byte block is
     appended (checksum byte + 255 zero bytes), matching hp41uc exactly.
-    '''
+    """
     checksum = _checksum(data)
     pad_len = 256 - (len(data) % 256)
     trailer = bytes([checksum]) + bytes(pad_len - 1)
@@ -43,7 +43,7 @@ def encode_program_raw(data: bytes) -> bytes:
 
 
 def encode_program_dat(data: bytes) -> bytes:
-    '''
+    """
     DAT format: (Source/hp41uc.c's `/d` help text):
     `[4-byte header] + [compiled code] + [2-byte checksum]`, all as
     upper-case ASCII hex digits. The header is `data`'s length as a
@@ -54,7 +54,7 @@ def encode_program_dat(data: bytes) -> bytes:
 
     Raises ValueError if `data` is longer than 65535 bytes (the format's
     4-hex-digit header can't represent a larger size).
-    '''
+    """
     length = len(data)
     if length > 0xFFFF:
         raise ValueError(
@@ -71,7 +71,7 @@ def encode_program_dat(data: bytes) -> bytes:
 
 
 def decode_program_raw(data: bytes) -> bytes:
-    '''
+    """
     Recovers a program's instruction bytes from an HP41 RAW file
     (`encode_program_raw()`'s own format). RAW carries no length header
     of its own, so this uses `find_program_end()` -- the same forward
@@ -81,16 +81,14 @@ def decode_program_raw(data: bytes) -> bytes:
 
     Raises DM41MemoryError if no terminating END is found, if there's no
     checksum byte after it, or if the checksum doesn't match.
-    '''
+    """
     length = find_program_end(data)
     if length is None:
         raise DM41MemoryError(
             "Could not find a terminating END in this RAW file's compiled code."
         )
     if length >= len(data):
-        raise DM41MemoryError(
-            "RAW file has no checksum byte after its compiled code."
-        )
+        raise DM41MemoryError("RAW file has no checksum byte after its compiled code.")
     instruction_bytes = data[:length]
     checksum = data[length]
     expected = _checksum(instruction_bytes)
@@ -112,7 +110,7 @@ _ASCII_HEX_DIGITS = frozenset(b"0123456789ABCDEFabcdef")
 
 
 def _parse_strict_hex(data: bytes) -> int:
-    '''A strict ASCII-hex-digits-ONLY parse. Unlike plain `int(data, 16)`,
+    """A strict ASCII-hex-digits-ONLY parse. Unlike plain `int(data, 16)`,
     which also accepts a leading sign, an `0x`/`0X` prefix, and PEP 515
     underscores, this rejects anything that isn't one of the 16 hex-digit
     characters -- see `decode_program_dat()`'s own docstring for why that
@@ -120,14 +118,14 @@ def _parse_strict_hex(data: bytes) -> int:
     stricter parser already exists elsewhere in this codebase for base
     addresses, but that one's own leniency is deliberate there, so this
     is a separate, narrower helper rather than a shared one.) Raises
-    ValueError if `data` is empty or contains any non-hex-digit byte.'''
+    ValueError if `data` is empty or contains any non-hex-digit byte."""
     if not data or any(b not in _ASCII_HEX_DIGITS for b in data):
         raise ValueError(f"not all ASCII hex digits: {data!r}")
     return int(data, 16)
 
 
 def decode_program_dat(data: bytes) -> bytes:
-    '''
+    """
     Recovers a program's instruction bytes from an HP41 DAT (or a "PPC" file
     (DAT that has newlines in it...) Reads the header, decodes that many
     ASCII-hex-encoded bytes, and verifies the trailing 2-hex-digit checksum.
@@ -141,7 +139,7 @@ def decode_program_dat(data: bytes) -> bytes:
     otherwise silently parse as -1 instead of being rejected here, and
     only fail much later with a confusing "DAT file is shorter than its
     own declared length (-1 bytes)" error from the length check below.
-    '''
+    """
     stripped = bytes(b for b in data if b not in _DAT_WHITESPACE)
 
     if len(stripped) < 6:
@@ -181,15 +179,16 @@ def decode_program_dat(data: bytes) -> bytes:
 
 _PPC_LINE_WIDTH = 50
 
+
 def encode_program_ppc(data: bytes) -> bytes:
-    '''
+    """
     PPC format: DAT format that's word-wrapped to `_PPC_LINE_WIDTH` (50)
     characters per line, with a trailing newline after the last line. Based on
     the formatting of HP41 programs in the PPC Calculator Journal program
     listings.
 
     This is entirely to make the output file easier for a human to read.
-    '''
+    """
     dat_text = encode_program_dat(data)
     lines = [
         dat_text[i : i + _PPC_LINE_WIDTH]
@@ -199,7 +198,7 @@ def encode_program_ppc(data: bytes) -> bytes:
 
 
 def encode_program_txt(data: bytes) -> bytes:
-    '''
+    """
     TXT format: a plain-text HP-41 keystroke listing, UTF-8 encoded --
     the actual decompiling is memory/program_text.py's own
     `encode_program_txt()` (bytes -> str); this is only the "-> UTF-8
@@ -209,12 +208,12 @@ def encode_program_txt(data: bytes) -> bytes:
     expects -- see that module's docstring). Not an hp41uc file format of
     its own the way RAW/DAT are, but hp41uc-style text either way -- see
     memory/program_text.py.
-    '''
+    """
     return _encode_program_txt(data).encode("utf-8")
 
 
 def _decode_txt_bytes(data: bytes) -> str:
-    '''
+    """
     Turns a TXT file's raw bytes into text: UTF-8 (a leading byte-order
     mark is dropped), falling back to CP437 if the file isn't valid
     UTF-8. hp41uc-era listings are 8-bit DOS text, and hp41uc's own
@@ -222,7 +221,7 @@ def _decode_txt_bytes(data: bytes) -> str:
     maps every byte to a character, so this never fails; a file that
     was really some other encoding shows up as a compile error instead
     (docs/mnemonic_dialects_plan.md sec 3.7).
-    '''
+    """
     try:
         return data.decode("utf-8-sig")
     except UnicodeDecodeError:
@@ -230,7 +229,7 @@ def _decode_txt_bytes(data: bytes) -> str:
 
 
 def decode_program_txt(data: bytes) -> bytes:
-    '''
+    """
     Recovers a program's instruction bytes from a TXT file's own raw
     bytes -- the reverse of `encode_program_txt()` above. Decodes `data`
     to text (see `_decode_txt_bytes()` below), then compiles it via
@@ -243,7 +242,7 @@ def decode_program_txt(data: bytes) -> bytes:
     compile, so this matches decode_program_raw()/decode_program_dat()'s
     own error type (and what gui/program_tab.py's `_IMPORT_FORMATS`
     dispatch already catches).
-    '''
+    """
     text = _decode_txt_bytes(data)
     try:
         return _decode_program_txt(text)
