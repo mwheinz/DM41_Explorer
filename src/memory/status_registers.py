@@ -69,7 +69,7 @@ class StatusRegisters(MemoryRegion):
     def N(self) -> Register:
         return self.get_register(6)
 
-    def O(self) -> Register:
+    def O(self) -> Register:  # noqa: E743 -- O is the register's documented name
         return self.get_register(7)
 
     def P(self) -> Register:

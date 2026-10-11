@@ -432,7 +432,7 @@ class Memory:
         try:
             r00 = self.status_registers.R00
             dot_end = self.status_registers.DotEnd
-        except Exception:  # pylint: disable=broad-except
+        except Exception:
             return False
         return r00 >= MIN_SANE_R00 and dot_end <= r00
 

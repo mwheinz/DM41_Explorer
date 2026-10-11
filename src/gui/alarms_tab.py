@@ -110,7 +110,7 @@ class AlarmsTab(ctk.CTkFrame):
         if self._on_change:
             self._on_change()
 
-    def _on_tree_selected(self, event=None):  # pylint: disable=unused-argument
+    def _on_tree_selected(self, event=None):
         highlight_selected_row(self._tree)
         self._update_action_buttons(self._selected_alarm())
 

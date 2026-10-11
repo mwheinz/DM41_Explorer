@@ -117,7 +117,7 @@ def test_dm41x_state_loaded_as_a_dm41l_is_a_clean_error_not_an_indexerror():
 
 def test_build_region_pointer_reproduces_the_real_registers():
     xm = _x_memory().extended_memory
-    build = xm._build_region_pointer  # pylint: disable=protected-access
+    build = xm._build_region_pointer
     assert build(0, next_region_active=True, ww=0x3C, pp=0x3C).get_hex() == R40
     assert build(1, next_region_active=True, ww=0, pp=0x40).get_hex() == R201
     assert build(2, next_region_active=False, ww=0, pp=0x201).get_hex() == R301
@@ -126,7 +126,7 @@ def test_build_region_pointer_reproduces_the_real_registers():
 def test_build_region_pointer_keeps_both_ww_digits():
     # tests/data/manyfiles.dm41 (a DM41L state) has WW=0x1f in region 0.
     memory = Memory.from_file(DATA_DIR / "manyfiles.dm41")
-    build = memory.extended_memory._build_region_pointer  # pylint: disable=protected-access
+    build = memory.extended_memory._build_region_pointer
     assert (
         build(0, next_region_active=True, ww=0x1F, pp=0x1F).get_hex()
         == _hex(memory, 0x40)

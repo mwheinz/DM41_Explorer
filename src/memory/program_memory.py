@@ -908,7 +908,9 @@ class ProgramMemory(MemoryRegion):
                 continue
             raw = self.get_program_bytes(p)
             key_assignments = {
-                l.name: l.key_assignment for l in p.labels if l.key_assignment
+                label.name: label.key_assignment
+                for label in p.labels
+                if label.key_assignment
             }
             keep.append((raw, key_assignments))
 

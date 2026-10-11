@@ -37,3 +37,19 @@ py-modules = ["config"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 testpaths = ["src/tests"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+src = ["src"]
+extend-exclude = ["dm41-venv", "src/build", "src/dist"]
+
+[tool.ruff.lint]
+# Ruff's defaults: pyflakes (F) plus the pycodestyle errors that aren't
+# about layout (E4, E7, E9). Layout itself is `ruff format`'s job.
+select = ["E4", "E7", "E9", "F"]
+
+[tool.ruff.lint.per-file-ignores]
+# GUI tests skip themselves with pytest.importorskip() before importing
+# CustomTkinter, so those imports can't be at the top of the file.
+"src/tests/*.py" = ["E402"]

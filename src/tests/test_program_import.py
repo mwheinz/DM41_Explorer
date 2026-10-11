@@ -155,7 +155,7 @@ def test_import_into_twolabels_case_a_converts_dot_end_to_real_end():
     converted = programs[0]
     assert converted.terminator == "END"  # no longer ".END." -- converted
     assert converted.length == original.length == 28
-    assert [l.name for l in converted.labels] == ["FIRST", "SECOND"]
+    assert [label.name for label in converted.labels] == ["FIRST", "SECOND"]
     # Only the converted marker's own end-type nibble should have changed
     # (0x2_ -- permanent .END. -- to 0x0_ -- a normal closing END); its
     # low nibble (packed status) and everything else about the program's

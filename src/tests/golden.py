@@ -50,7 +50,7 @@ def _attempt(fn):
     checked."""
     try:
         return fn()
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:
         return {"error": f"{type(e).__name__}: {e}"}
 
 

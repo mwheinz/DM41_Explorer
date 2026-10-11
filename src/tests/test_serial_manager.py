@@ -1,6 +1,4 @@
 import pytest
-import threading
-import time
 from unittest.mock import MagicMock, patch
 from engine.serial_manager import SerialManager
 from memory import DM41L
@@ -118,7 +116,6 @@ class TestSerialManager:
 
         # Run exactly one iteration by setting the stop event immediately
         # after the first pass would have happened.
-        real_is_set = manager._stop_event.is_set
         call_count = {"n": 0}
 
         def is_set_once():

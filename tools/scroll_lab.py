@@ -36,7 +36,6 @@ from tkinter import ttk
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-# pylint: disable=wrong-import-position
 from gui.scroll_support import (  # noqa: E402
     TREE_SCROLL_TUNING,
     SmoothTreeview,

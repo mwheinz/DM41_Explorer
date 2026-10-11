@@ -32,7 +32,7 @@ class State(Enum):
     BYTE_ALPHA = 9     # remaining ALPHA-text character bytes
 
 
-def find_program_end(data: bytes) -> Optional[int]:  # pylint: disable=too-many-branches
+def find_program_end(data: bytes) -> Optional[int]:
     '''
     Scans `data` (raw program bytes, starting at a global label's own
     header -- see ProgramMemory.get_program_bytes()) forward, opcode by opcode,

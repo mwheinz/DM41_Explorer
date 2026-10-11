@@ -28,7 +28,7 @@ pytest.importorskip("customtkinter")
 from tkinter import messagebox
 import customtkinter as ctk
 
-from memory import Memory, ExtendedMemory, format_data_line, parse_data_line
+from memory import Memory, ExtendedMemory, format_data_line
 from gui.xm_file_dialog import XMFileDialog
 from gui.xm_files_tab import XMFilesTab, _guess_file_type
 from gui.data_registers_tab import DataRegistersTab

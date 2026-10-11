@@ -39,15 +39,25 @@ check there is expected before a PR gets merged.
 
 ## Code style
 
-The project uses [`black`](https://black.readthedocs.io/) for
-formatting (already in `requirements-dev.txt`):
+The project uses [`ruff`](https://docs.astral.sh/ruff/) for formatting
+and linting (already in `requirements-dev.txt`; its settings are in
+`pyproject.toml`). From the repository root:
 
 ```sh
-black src
+ruff format .
+ruff check .
 ```
 
-There's no CI enforcement of this yet, but please run it before
-submitting so diffs stay clean and reviewable.
+CI runs both (as `ruff format --check .` and `ruff check .`) and fails a
+pull request that needs either.
+
+The one-time reformat that introduced `ruff format` is listed in
+`.git-blame-ignore-revs`, so `git blame` skips it. GitHub does this
+automatically; locally, run once:
+
+```sh
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
 
 ## Logging
 

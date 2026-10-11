@@ -144,7 +144,7 @@ class ProgramTab(ctk.CTkFrame):
         self._stripe_bg = style_treeview(_TREE_STYLE)
         apply_row_tags(self._tree, self._stripe_bg)
 
-    def _on_tree_selected(self, event=None):  # pylint: disable=unused-argument
+    def _on_tree_selected(self, event=None):
         """Gives the selected row a visible highlight, the same way (and
         for the same reason) as gui/tab_common.py's
         `highlight_selected_row()` docstring (GitHub issue #22) explains.

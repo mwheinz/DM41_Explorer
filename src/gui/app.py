@@ -556,7 +556,7 @@ class DM41ExplorerApp(ctk.CTk):
             if after_id is not None:
                 try:
                     self.after_cancel(after_id)
-                except Exception:  # pylint: disable=broad-except
+                except Exception:
                     pass
                 setattr(self, name, None)
         super().destroy()
@@ -568,11 +568,11 @@ class DM41ExplorerApp(ctk.CTk):
         try:
             if self.state() == "zoomed":
                 return True
-        except Exception:  # pylint: disable=broad-except
+        except Exception:
             pass
         try:
             return bool(self.attributes("-zoomed"))  # X11
-        except Exception:  # pylint: disable=broad-except
+        except Exception:
             return False
 
     def _remember_window_size(self):
@@ -588,7 +588,7 @@ class DM41ExplorerApp(ctk.CTk):
             self.config_store.window_size = size
             self.config_store.save()
             self._applied_size = size
-        except Exception as e:  # pylint: disable=broad-except
+        except Exception as e:
             logger.warning("Could not save the window size: %s", e)
 
     # -- Layout ---------------------------------------------------------
