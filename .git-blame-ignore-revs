@@ -1,0 +1,6 @@
+# Commits `git blame` should skip: mechanical, repository-wide changes with
+# no change in behaviour. GitHub reads this file automatically; locally,
+# run `git config blame.ignoreRevsFile .git-blame-ignore-revs` once.
+
+# Reformat the whole repository with ruff format
+0f948d1300511f576935df28ffafd2cd5114a563

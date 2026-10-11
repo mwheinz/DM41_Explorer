@@ -8,6 +8,27 @@ on:
   workflow_dispatch:
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      # Same version as requirements-dev.txt; settings are in pyproject.toml.
+      - name: Install ruff
+        run: pip install ruff==0.17.0
+
+      - name: Check formatting
+        run: ruff format --check .
+
+      - name: Lint
+        run: ruff check .
+
   test:
     strategy:
       fail-fast: false
