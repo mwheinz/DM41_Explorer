@@ -485,10 +485,11 @@ class DM41ExplorerApp(ctk.CTk):
             self.mode.value,
             "; ".join(str(finding) for finding in findings),
         )
+        # The findings are for the log, above: to decide whether to switch,
+        # the user only needs to know the state is too big (issue #60).
         reason = (
-            f"{Path(path).name} does not fit a {self.mode.value}:\n\n"
-            f"{format_findings(findings)}\n\n"
-            f"{target.value} mode can open it."
+            f"{Path(path).name} needs more memory than a {self.mode.value} has."
+            f"\n\n{target.value} mode can open it."
         )
         if not self.set_mode(target, persist=False, reason=reason):
             self._set_status(f"Did not load {Path(path).name}: needs DM41X mode.")

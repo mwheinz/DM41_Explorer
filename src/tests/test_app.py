@@ -756,8 +756,12 @@ def test_a_too_large_state_offers_dm41x_mode_and_loads_on_yes(dm41l_app):
         dm41l_app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
 
     message = ask.call_args.args[2]
-    assert "does not fit a DM41L" in message
-    assert "XM files use memory a DM41L does not have" in message
+    # Just the reason, not the findings (GitHub issue #60).
+    assert message.startswith(
+        "dm41x_manyfiles.dm41 needs more memory than a DM41L has.\n\n"
+        "DM41X mode can open it.\n\n"
+    )
+    assert "XM files" not in message
     assert dm41l_app.mode is DeviceMode.DM41X
     assert dm41l_app.memory.profile is DM41X
     assert len(dm41l_app.memory.extended_memory.list_files()) == 59
