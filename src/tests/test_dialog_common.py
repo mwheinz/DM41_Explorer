@@ -70,6 +70,27 @@ def _show(window, timeout: float = 5.0) -> bool:
     return False
 
 
+def _focus(widget, timeout: float = 5.0) -> bool:
+    """Gives `widget` keyboard focus and pumps the event loop until Tk
+    really reports it there.
+
+    A single focus_force() + update() is not enough on Windows: the focus
+    change arrives later as a WM_SETFOCUS message, and customtkinter's own
+    deferred titlebar callbacks (see _show()) can re-focus the toplevel in
+    the meantime. event_generate("<Return>") delivers key events to
+    whatever has focus *now*, so until this settles the key lands on the
+    toplevel instead of `widget`.
+    """
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        widget.focus_force()
+        widget.update()
+        if widget.focus_get() is widget:
+            return True
+        time.sleep(0.01)
+    return False
+
+
 @pytest.fixture
 def root():
     r = ctk.CTk()
@@ -207,8 +228,8 @@ def test_return_inside_textbox_does_not_trigger_primary_action(dialog):
     box.pack()
     build_dialog_button_row(dialog, primary_text="Save", on_primary=on_primary)
 
-    box._textbox.focus_force()
-    dialog.update()
+    if not _focus(box._textbox):
+        pytest.skip("the textbox never received keyboard focus on this display")
     box._textbox.event_generate("<Return>")
     dialog.update()
 
