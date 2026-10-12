@@ -17,7 +17,7 @@ The design and the tests on real calculators behind it are in GitHub issues [#44
 
 | Model | Library | Contents |
 | --- | --- | --- |
-| DM41L | `hp41cx` | The HP-41CX Extended Functions (XROM 25) and Time (XROM 26) ROMs. |
+| DM41L | `hp41cx` | The HP-41CX Extended Functions (XROM 25) and Time (XROM 26) ROMs, with their section headers (`-EXT FCN 2D`, `-CX EXT FCN`, `-TIME 2C`, `-CX TIME`). |
 | DM41X | `dm41x-cx` | The DM41X's patched versions of those ROMs: the HP-41CX set plus X<I>Y (25,63), TRNG (26,36), the 16 `-DM 41X-` functions (26,38–26,53) and the ROMs' section headers. |
 
 **Shipped with DM41_Explorer.** These are the 20 application pacs on the DM41X's disk, plus the Thermal Printer, which is preloaded in the DM41X's flash. The pac libraries were read from the `.mod` files themselves, and their numbers were checked against a real DM41X:
@@ -78,7 +78,7 @@ DM41_Explorer follows that order where you type a name **as you would on the cal
 
 Whichever way you name it, a key always stores the function's two bytes, as the calculator does. Exported listings write module functions as `XROM mm,ff ;NAME`, which means the same thing whatever libraries are active when the file is imported again.
 
-**Section headers** (the `-EXT FCN 2X`, `MATH 1C` lines in CAT 2) are shown by name, for example on a key that holds XROM 25,00 (the DM41X's hidden `CRT?`). They can't be typed or picked, so assign one by its numbers on the XROM tab.
+**Section headers** (the `-EXT FCN 2X`, `MATH 1C` lines in CAT 2) are shown by name, for example on a key that holds XROM 25,00 (the DM41X's hidden `CRT?`). The two models name their built-in headers differently, so XROM 25,00 shows as `-EXT FCN 2D` in DM41L mode and `-EXT FCN 2X` in DM41X mode. They can't be typed or picked, so assign one by its numbers on the XROM tab.
 
 ## Conflicts
 

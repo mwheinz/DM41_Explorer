@@ -3,12 +3,13 @@
   "format_version": 1,
   "id": "hp41cx",
   "title": "HP-41CX Extended Functions and Time (DM41L)",
-  "source": "HP-41CX owner's manual; hp41uc (-EXT FCN 2D, -CX EXT FCN, -TIME 2C, -CX TIME); checked against DM41L states",
+  "source": "HP-41CX owner's manual; hp41uc (-EXT FCN 2D, -CX EXT FCN, -TIME 2C, -CX TIME); checked against DM41L states; section headers from CAT 2 on a DM41L",
   "builtin_on": ["DM41L"],
   "modules": [
     {
       "xrom": 25,
       "functions": [
+        {"fn": 0, "name": "-EXT FCN 2D", "type": "mcode", "header": true},
         {"fn": 1, "name": "ALENG"},
         {"fn": 2, "name": "ANUM"},
         {"fn": 3, "name": "APPCHR"},
@@ -56,6 +57,7 @@
         {"fn": 45, "name": "STOFLAG"},
         {"fn": 46, "name": "X<>F"},
         {"fn": 47, "name": "XTOA"},
+        {"fn": 48, "name": "-CX EXT FCN", "type": "mcode", "header": true},
         {"fn": 49, "name": "ASROOM"},
         {"fn": 50, "name": "CLRGX"},
         {"fn": 51, "name": "ED"},
@@ -75,6 +77,7 @@
     {
       "xrom": 26,
       "functions": [
+        {"fn": 0, "name": "-TIME 2C", "type": "mcode", "header": true},
         {"fn": 1, "name": "ADATE"},
         {"fn": 2, "name": "ALMCAT"},
         {"fn": 3, "name": "ALMNOW"},
@@ -104,6 +107,7 @@
         {"fn": 27, "name": "T+X"},
         {"fn": 28, "name": "TIME"},
         {"fn": 29, "name": "XYZALM"},
+        {"fn": 30, "name": "-CX TIME", "type": "mcode", "header": true},
         {"fn": 31, "name": "CLALMA"},
         {"fn": 32, "name": "CLALMX"},
         {"fn": 33, "name": "CLRALMS"},

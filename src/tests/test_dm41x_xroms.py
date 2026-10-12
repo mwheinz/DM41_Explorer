@@ -123,15 +123,18 @@ def test_no_addition_reuses_a_cx_code_or_name():
 
 
 def test_dm41l_has_only_the_original_cx_xroms():
-    assert DM41L.builtin_xroms == frozenset(CX_XROMS)
-    assert len(DM41L.builtin_xroms) == 95
+    assert DM41L.builtin_xroms == frozenset(CX_XROMS) | frozenset(DM41L_HEADERS)
+    assert len(CX_XROMS) == 95
+    assert len(DM41L.builtin_xroms) == 99
 
 
 def test_dm41x_has_the_cx_xroms_its_additions_and_its_section_headers():
     assert DM41X.builtin_xroms == frozenset(ALL_XROMS) | frozenset(DM41X_HEADERS)
-    assert DM41X.builtin_xroms - DM41L.builtin_xroms == frozenset(
-        DM41X_ADDED
-    ) | frozenset(DM41X_HEADERS)
+    # Only -DM 41X- (26,37) is a header the DM41L lacks: the other four are
+    # at the same numbers on both models, under other names.
+    assert DM41X.builtin_xroms - DM41L.builtin_xroms == frozenset(DM41X_ADDED) | {
+        (0xA6, 0xA5)
+    }
     assert DM41L.builtin_xroms < DM41X.builtin_xroms
 
 
@@ -144,6 +147,24 @@ DM41X_HEADERS = {
     (0xA6, 0x9E): "-CXX TIME",  # 26,30
     (0xA6, 0xA5): "-DM 41X-",  # 26,37
 }
+
+
+# The DM41L's CAT 2 section headers, read off a real DM41L: the original
+# HP-41CX names, at the same numbers as the DM41X's renamed ones.
+DM41L_HEADERS = {
+    (0xA6, 0x40): "-EXT FCN 2D",  # XROM 25,00
+    (0xA6, 0x70): "-CX EXT FCN",  # 25,48
+    (0xA6, 0x80): "-TIME 2C",  # 26,00
+    (0xA6, 0x9E): "-CX TIME",  # 26,30
+}
+
+
+def test_the_dm41ls_section_headers_are_its_own():
+    with_headers = builtin_xrom_names("DM41L", headers=True)
+    assert {
+        pair: name for pair, name in with_headers.items() if pair not in CX_XROMS
+    } == DM41L_HEADERS
+    assert DM41L_HEADERS.keys() <= DM41L.builtin_xroms
 
 
 def test_the_section_headers_are_built_in_but_not_names():

@@ -227,6 +227,20 @@ def test_builtin_headers_display_but_never_resolve():
         resolve("-EXT FCN 2X")
 
 
+def test_each_mode_shows_its_own_header_names(shipped):
+    """XROM 25,00 is -EXT FCN 2D on a DM41L and -EXT FCN 2X on a DM41X:
+    the mode's built-in library, first in its active set, names it."""
+    try:
+        set_active_libraries(active_set(shipped, "DM41L").libraries)
+        assert display_for_key_bytes(*xrom_bytes(25, 0)) == "-EXT FCN 2D"
+        assert display_for_key_bytes(*xrom_bytes(26, 30)) == "-CX TIME"
+        set_active_libraries(active_set(shipped, "DM41X").libraries)
+        assert display_for_key_bytes(*xrom_bytes(25, 0)) == "-EXT FCN 2X"
+        assert display_for_key_bytes(*xrom_bytes(26, 30)) == "-CXX TIME"
+    finally:
+        set_active_libraries([])
+
+
 def test_a_pacs_header_displays_once_its_library_is_active(activate):
     assert display_for_key_bytes(*xrom_bytes(1, 0)) == "XROM 01,00"
     activate("math")

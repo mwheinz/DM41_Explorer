@@ -350,11 +350,25 @@ class Registry:
             for op, (canonical_name, display_name, programmable) in base.items()
         }
 
-        # Display-only names: the built-in libraries' section headers.
+        # Display-only names: the built-in libraries' section headers. The
+        # models name the same header numbers differently (XROM 25,00 is
+        # -EXT FCN 2D on a DM41L, -EXT FCN 2X on a DM41X), so the mode's own
+        # built-in library -- first in an active set -- names them; with
+        # none given, the DM41X's do, then the DM41L's.
         self._headers: Dict[Op, str] = {}
-        for code, name in builtin_xrom_names(headers=True).items():
-            if xrom_op(*code) not in self._entries:
-                self._headers[xrom_op(*code)] = name
+        sources = [
+            [(f.code, f.name) for f in library.functions() if f.header]
+            for library in libraries
+            if library.builtin_on
+        ]
+        for model in ("DM41X", "DM41L"):
+            names = builtin_xrom_names(model, headers=True)
+            plain = builtin_xrom_names(model)
+            sources.append([(c, n) for c, n in names.items() if c not in plain])
+        for source in sources:
+            for code, name in source:
+                if xrom_op(*code) not in self._entries:
+                    self._headers.setdefault(xrom_op(*code), name)
 
         self._library_exact: Dict[str, Op] = {}
         self._library_folded: Dict[str, Set[Op]] = {}
