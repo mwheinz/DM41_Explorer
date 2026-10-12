@@ -25,6 +25,7 @@ from memory.xrom_library import (
     find_conflicts,
     load_libraries,
     load_library,
+    name_search_order,
     parse_library,
     shipped_library_paths,
 )
@@ -372,38 +373,88 @@ def _notices(active):
     return [f for f in find_conflicts(active) if f.level == NOTICE]
 
 
-def test_size_is_hidden_by_the_builtin_in_four_pacs(everything):
-    hidden = [f for f in _notices(everything) if f.message.startswith("SIZE? in")]
-    assert sorted(f.library_ids[0] for f in hidden) == [
-        "games",
-        "real-estate",
-        "stress",
-        "structural",
-    ]
-    assert all(f.library_ids[1] == "dm41x-cx" for f in hidden)
-    real_estate = next(f for f in hidden if f.library_ids[0] == "real-estate")
-    assert real_estate.message == (
-        "SIZE? in Real Estate Pac (XROM 11,44) is hidden by the built-in "
-        "SIZE? (XROM 25,44); use XROM 11,44 to reach it."
+def test_a_plugins_size_hides_the_builtin_one(everything):
+    """On a real DM41X, ASN "SIZE?" with Real Estate plugged in took Real
+    Estate's: the calculator searches the plug-in pages before the
+    Extended Functions ROM (issue #52). With several pacs active, the
+    first in priority order (Games) hides the built-in one and the rest."""
+    notices = [f for f in _notices(everything) if "SIZE?" in f.message.split(" (")[0]]
+    builtin = [f for f in notices if f.message.startswith("The built-in SIZE?")]
+    assert [f.library_ids for f in builtin] == [("dm41x-cx", "games")]
+    assert builtin[0].message == (
+        "The built-in SIZE? (XROM 25,44) is hidden by SIZE? in Games Pac "
+        "(XROM 10,12), which the calculator finds first. In a program "
+        "listing, SIZE? still means the built-in one; elsewhere, use "
+        "XROM 25,44 to reach it."
     )
+    others = [f for f in notices if f not in builtin]
+    assert sorted(f.library_ids for f in others) == [
+        ("real-estate", "games"),
+        ("stress", "games"),
+        ("structural", "games"),
+    ]
 
 
-def test_mainframe_names_hide_pac_functions(everything):
-    hidden = {
+def test_with_one_pac_its_size_hides_the_builtin(shipped):
+    active = active_set(shipped, "DM41X", ["real-estate"]).libraries
+    (notice,) = [f for f in _notices(active) if "SIZE?" in f.message]
+    assert notice.library_ids == ("dm41x-cx", "real-estate")
+
+
+def test_names_shared_with_mainframe_functions(everything):
+    """A pac's function wins by name over the mainframe's (ASN "LOG" on a
+    real DM41X), but not in a program listing, so it is a notice of its
+    own rather than "hidden". Where two pacs share the name, the later
+    one is hidden by the earlier."""
+    shared = {
         (f.message.split(" in ")[0], f.library_ids)
         for f in _notices(everything)
         if "the HP-41's own" in f.message
     }
-    assert hidden == {
+    assert shared == {
         ("*", ("clinical",)),
-        ("*", ("home-mgt",)),
-        ("*", ("standard",)),
         ("+", ("standard",)),
         ("-", ("standard",)),
         ("/", ("standard",)),
         ("LOG", ("standard",)),
         ("PI", ("circuit",)),
     }
+    log = next(f for f in _notices(everything) if f.message.startswith("LOG in"))
+    assert log.message == (
+        "LOG in Standard Applications Pac (XROM 05,45) has the same name as "
+        "the HP-41's own LOG. By name, the calculator uses Standard "
+        "Applications Pac's; in a program listing, LOG still means the "
+        "HP-41's own, so write XROM 05,45 there."
+    )
+    stars = [
+        f.library_ids for f in _notices(everything) if f.message.startswith("* in")
+    ]
+    assert stars == [("clinical",), ("home-mgt", "clinical"), ("standard", "clinical")]
+
+
+def test_the_time_rom_is_searched_before_the_plugins(shipped):
+    """The built-in Time ROM (XROM 26, page 5) comes before the plug-in
+    pages, so a pac reusing one of its names is the one hidden."""
+    clash = parse_library(
+        _minimal(modules=[{"xrom": 11, "functions": [{"fn": 1, "name": "TIME"}]}])
+    )
+    (notice,) = _notices([builtin_library(shipped, "DM41X"), clash])
+    assert notice.message == (
+        "TIME in My ROM (XROM 11,01) is hidden by the built-in TIME "
+        "(XROM 26,28), which the calculator finds first; use XROM 11,01 to "
+        "reach it."
+    )
+
+
+def test_name_search_order(shipped):
+    active = active_set(shipped, "DM41X", ["math", "advantage"]).libraries
+    assert [(lib.id, module.xrom) for lib, module in name_search_order(active)] == [
+        ("dm41x-cx", 26),
+        ("math", 1),
+        ("advantage", 22),
+        ("advantage", 24),
+        ("dm41x-cx", 25),
+    ]
 
 
 def _solve(active):
@@ -414,12 +465,14 @@ def test_priority_decides_which_solve_is_hidden(shipped):
     math_first = active_set(shipped, "DM41X", ["math", "advantage"]).libraries
     assert _solve(math_first) == [
         "SOLVE in Advantage Pac (XROM 24,03) is hidden by SOLVE in Math Pac "
-        "(XROM 01,09); use XROM 24,03 to reach it."
+        "(XROM 01,09), which the calculator finds first; use XROM 24,03 to "
+        "reach it."
     ]
     advantage_first = active_set(shipped, "DM41X", ["advantage", "math"]).libraries
     assert _solve(advantage_first) == [
         "SOLVE in Math Pac (XROM 01,09) is hidden by SOLVE in Advantage Pac "
-        "(XROM 24,03); use XROM 01,09 to reach it."
+        "(XROM 24,03), which the calculator finds first; use XROM 01,09 to "
+        "reach it."
     ]
 
 
@@ -441,7 +494,8 @@ def test_a_name_twice_in_one_library_is_a_notice():
     (finding,) = find_conflicts([parse_library(data)])
     assert finding.message == (
         "FOO in My ROM (XROM 11,02) is hidden by XROM 11,01, earlier in the "
-        "same library; use XROM 11,02 to reach it."
+        "same library, which the calculator finds first; use XROM 11,02 to "
+        "reach it."
     )
     assert finding.library_ids == ("mine",)
 

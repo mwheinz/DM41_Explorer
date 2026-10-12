@@ -235,4 +235,15 @@ not a table here names it, and encodes them as in sec 4.2. Given by
 its numbers, an XROM the model does not have is allowed after a
 confirmation, unlike one picked by name. The Function tab also accepts
 a typed `XROM mm,ff`. An XROM that no table names displays as
-`XROM mm,ff` rather than as raw hex.
+`XROM mm,ff` rather than as raw hex, and a section header (such as
+XROM 25,00) displays as its name, `-EXT FCN 2X`.
+
+With plug-in XROM libraries active (GitHub issue #52), a name typed
+into the Function tab follows the calculator's own search order, as
+`ASN` does on a real DM41X: the built-in Time ROM, then the plug-in
+modules, then the Extended Functions ROM, then the mainframe functions.
+So with the Standard Applications Pac active, `LOG` assigns the pac's
+LOG. The list labels each name that two functions share with where it
+comes from (`LOG  (HP-41 function)`, `SOLVE  (Math Pac, XROM 01,09)`),
+and `XROM "NAME"` picks an XROM function by name. Whichever way a
+function is named, the key stores its bytes.

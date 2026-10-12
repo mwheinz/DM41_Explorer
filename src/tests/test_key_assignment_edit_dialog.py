@@ -27,7 +27,8 @@ import customtkinter as ctk
 
 from gui.key_assignment_edit_dialog import KeyAssignmentEditDialog
 from memory import DM41L, DM41X, KeyAssignment
-from memory.xrom_library import builtin_xrom_names
+from memory.mnemonics import set_active_libraries
+from memory.xrom_library import active_set, builtin_xrom_names, load_libraries
 from memory.mnemonics import key_bytes_for, resolve
 
 ALL_XROMS = builtin_xrom_names()
@@ -622,3 +623,102 @@ def test_function_tab_asks_before_a_typed_xrom_a_dm41l_lacks(root):
 
     assert ask.called
     on_save.assert_not_called()
+
+
+# ---- Plug-in libraries (GitHub issue #52) ----
+
+
+@pytest.fixture
+def activate():
+    """activate("math", ...) makes those XROM libraries active for one
+    test, then goes back to the built-in XROMs alone."""
+    libraries, _errors = load_libraries()
+
+    def _activate(*ids):
+        set_active_libraries(active_set(libraries, "DM41X", ids).libraries)
+
+    yield _activate
+    set_active_libraries([])
+
+
+def _save_function(dialog, text):
+    dialog._tabs.set("Function")
+    dialog._function_var.set(text)
+    dialog._on_save_clicked()
+
+
+@pytest.mark.parametrize(
+    "label, expected",
+    [
+        ("SOLVE  (Math Pac, XROM 01,09)", (0xA0, 0x49)),
+        ("SOLVE  (Advantage Pac, XROM 24,03)", (0xA6, 0x03)),
+    ],
+)
+def test_picking_a_labelled_function_assigns_exactly_it(
+    root, activate, label, expected
+):
+    activate("advantage", "math")
+    on_save = mock.Mock()
+    dialog = _make_dialog(root, on_save=on_save, profile=DM41X)
+    assert label in dialog._function_names
+
+    _save_function(dialog, label)
+
+    on_save.assert_called_once_with("function", expected)
+
+
+def test_a_typed_name_follows_the_calculators_order(root, activate):
+    """ASN "LOG" on a real DM41X with the Standard Pac plugged in stored
+    the pac's LOG; typing LOG here does the same. The key still stores
+    the XROM's bytes."""
+    activate("standard")
+    on_save = mock.Mock()
+    _save_function(_make_dialog(root, on_save=on_save, profile=DM41X), "LOG")
+    on_save.assert_called_once_with("function", (0xA1, 0x6D))  # XROM 05,45
+
+
+def test_the_mainframe_function_is_still_on_the_list(root, activate):
+    activate("standard")
+    on_save = mock.Mock()
+    _save_function(
+        _make_dialog(root, on_save=on_save, profile=DM41X), "LOG  (HP-41 function)"
+    )
+    on_save.assert_called_once_with("function", 0x56)
+
+
+def test_xrom_name_text_in_the_function_box(root, activate):
+    activate("standard")
+    on_save = mock.Mock()
+    _save_function(_make_dialog(root, on_save=on_save, profile=DM41X), 'XROM "LOG"')
+    on_save.assert_called_once_with("function", (0xA1, 0x6D))
+
+
+def test_an_unknown_xrom_name_is_refused(root):
+    on_save = mock.Mock()
+    with mock.patch.object(messagebox, "showerror") as error:
+        _save_function(_make_dialog(root, on_save=on_save), 'XROM "LOG"')
+    on_save.assert_not_called()
+    assert "XROM mm,ff" in error.call_args.args[1]
+
+
+def test_a_dm41l_refuses_a_pac_function_by_name(root, activate):
+    activate("math")
+    on_save = mock.Mock()
+    dialog = _make_dialog(root, on_save=on_save, profile=DM41L)
+    assert "SOLVE" not in dialog._function_names
+
+    with mock.patch.object(messagebox, "showerror") as error:
+        _save_function(dialog, "SOLVE")
+
+    on_save.assert_not_called()
+    message = error.call_args.args[1]
+    assert "comes from Math Pac, a plug-in module" in message
+    assert "XROM tab" in message
+
+
+def test_a_key_holding_a_pac_function_opens_on_its_label(root, activate):
+    activate("advantage", "math")
+    assignment = _xrom_assignment(0xA0, 0x49, "SOLVE")
+    dialog = _make_dialog(root, assignment=assignment, profile=DM41X)
+    assert dialog._tabs.get() == "Function"
+    assert dialog._function_var.get() == "SOLVE  (Math Pac, XROM 01,09)"

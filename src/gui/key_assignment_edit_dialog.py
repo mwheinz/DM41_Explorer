@@ -29,14 +29,18 @@ from gui.contrast import SECONDARY_TEXT
 from gui.tab_common import MONOSPACE_FONT_FAMILY
 from memory.mnemonics import (
     XROM_FIRST_BYTES,
-    assignable_display_names,
+    assignable_choices,
     display,
     is_available_on,
     is_dm41x_only,
     is_known,
     key_bytes_for,
+    library_of,
+    op_for_key_bytes,
+    parse_xrom_name_text,
     parse_xrom_text,
     resolve,
+    resolve_xrom_name,
     xrom_bytes,
     xrom_numbers,
     xrom_op,
@@ -61,17 +65,17 @@ _FLAG_CLEAR_NOTE = (
     "(as after LKAOFF). Saving an assignment sets the flag."
 )
 
-# Every assignable function's HP-41 display name, alphabetically --
-# single-byte and XROM/peripheral functions merged into one list, since
-# the picker doesn't need to distinguish them; memory/mnemonics.py
-# resolves whichever encoding a chosen name actually needs.
-# Every assignable name, whatever the model -- used only to tell a
-# genuinely unknown name from one this model happens not to have.
-_ALL_FUNCTION_NAMES = assignable_display_names()
 
-
-def _unavailable_message(name: str, profile) -> str:
+def _unavailable_message(name: str, op, profile) -> str:
     """Why a known function cannot be assigned in this mode."""
+    library = library_of(op)
+    if library is not None:
+        return (
+            f"{name} comes from {library}, a plug-in module, and a "
+            f"{profile.name} cannot load modules.\n\n"
+            "Switch to DM41X mode to use it, or assign it by its XROM "
+            "numbers on the XROM tab."
+        )
     return (
         f"{name} is a DM41X function, and this state is a "
         f"{profile.name}'s.\n\n"
@@ -185,7 +189,18 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         self._profile = profile
         # In DM41L mode the picker offers the HP-41CX set alone: a DM41L
         # cannot run a DM41X function, so offering it would be a trap.
-        self._function_names = assignable_display_names(profile)
+        # A name two functions share -- two pacs' SOLVE, or a pac's LOG and
+        # the mainframe's -- is listed once for each, labelled with where
+        # it comes from, and picking one assigns exactly that function
+        # (GitHub issue #52).
+        self._choices = dict(assignable_choices(profile))
+        self._function_names = sorted(self._choices)
+        self._label_for_op = {op: label for label, op in self._choices.items()}
+        current_op = (
+            op_for_key_bytes(assignment.fn_byte1, assignment.fn_byte2)
+            if assignment is not None
+            else None
+        )
 
         if assignment is not None:
             current_text = f"Currently assigned: {assignment.name}"
@@ -217,10 +232,8 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         tabs.add("Raw Hex")
 
         # -- Function tab: pick a named built-in/peripheral function -----
-        default_name = (
-            assignment.name
-            if assignment is not None and assignment.name in self._function_names
-            else (self._function_names[0] if self._function_names else "")
+        default_name = self._label_for_op.get(
+            current_op, self._function_names[0] if self._function_names else ""
         )
         self._function_var = ctk.StringVar(value=default_name)
         ctk.CTkLabel(tabs.tab("Function"), text="Function:").pack(
@@ -346,7 +359,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         # too, not just an unknown one: in DM41L mode a state that already
         # has LKAOFF on a key opens on the XROM tab, which is honest -- the
         # Function tab cannot offer that name.
-        if assignment is not None and assignment.name not in self._function_names:
+        if assignment is not None and current_op not in self._label_for_op:
             tabs.set("XROM" if module_text else "Raw Hex")
         elif assignment is None and program_assignment is not None:
             tabs.set("Program")
@@ -370,7 +383,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         """Says so under the Function box when the function in it is one
         only a DM41X has. Any spelling import accepts counts, as on Save."""
         try:
-            op = resolve(self._function_var.get().strip(), programmable_only=False)
+            op = self._op_for_function_text(self._function_var.get().strip())
         except ValueError:
             op = None  # empty, half-typed or unknown: Save reports it
         # Only worth saying in a mode that actually has the function: in
@@ -404,7 +417,27 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         """True if this model certainly cannot run the XROM `op`: it isn't
         built in, and the model can't plug in a module that might have
         it. On a model that loads modules, any XROM may be there."""
-        return not (is_available_on(op, self._profile) or self._profile.loads_modules)
+        return not is_available_on(op, self._profile)
+
+    def _op_for_function_text(self, text: str):
+        """The function the Function box's text means: a label picked from
+        the list means exactly that function; 'XROM "NAME"' an XROM
+        function by name; anything else is a typed name, which follows
+        the calculator's own search order, as ASN does -- with the
+        Standard Applications Pac active, "LOG" is the pac's (issue #52).
+        Raises ValueError for text that names nothing."""
+        if text in self._choices:
+            return self._choices[text]
+        name = parse_xrom_name_text(text)
+        if name is not None:
+            return resolve_xrom_name(name)
+        # Typed input doesn't have to match the display name's exact
+        # spelling or case: any spelling program-text import accepts works
+        # here too ("sigma+", "x^2", "p->r", "\\EREG";
+        # docs/mnemonic_dialects_plan.md). Keyboard-only functions (CAT,
+        # SST, ...) are assignable, so programmable_only is off. An unknown
+        # name raises with "did you mean" hints.
+        return resolve(text, programmable_only=False, prefer_modules=True)
 
     def _confirm_xrom(self, byte1: int, byte2: int) -> bool:
         """Whether to go ahead with an XROM given by its numbers. One this
@@ -439,18 +472,13 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
                     self._on_save("function", value)
                     self.destroy()
                     return
-                # Typed input doesn't have to match the display name's
-                # exact spelling or case: any spelling program-text import
-                # accepts works here too ("sigma+", "x^2", "p->r", "\\EREG";
-                # docs/mnemonic_dialects_plan.md). Keyboard-only functions
-                # (CAT, SST, ...) are assignable, so programmable_only is
-                # off. An unknown name raises with "did you mean" hints.
-                op = resolve(name, programmable_only=False)
+                op = self._op_for_function_text(name)
                 # A typed name bypasses the filtered dropdown, so the
                 # availability check has to be here as well, or the filter
-                # is only cosmetic.
+                # is only cosmetic. The key always stores the function's
+                # bytes, whichever way it was named.
                 if not is_available_on(op, self._profile):
-                    raise ValueError(_unavailable_message(name, self._profile))
+                    raise ValueError(_unavailable_message(name, op, self._profile))
                 kind, value = "function", key_bytes_for(op)
             elif which == "XROM":
                 value = _parse_xrom_fields(

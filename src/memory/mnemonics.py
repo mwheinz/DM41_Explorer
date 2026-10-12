@@ -22,7 +22,31 @@ it asks this module:
   known instructions ("did you mean ...?").
 - `canonical(op)` / `display(op)`: an instruction's names.
 - Key Assignment helpers: `op_for_key_bytes()`, `key_bytes_for()`,
-  `display_for_key_bytes()`, `assignable_display_names()`.
+  `display_for_key_bytes()`, `assignable_display_names()`,
+  `assignable_choices()`.
+
+XROM names come in two layers (GitHub issue #52). The core layer -- the
+mainframe functions, every model's built-in XROMs and the dialect
+spellings -- is checked strictly: a spelling that would mean two
+instructions is a build error. The library layer holds the active plug-in
+libraries (`set_active_libraries()`), highest priority first; there a
+clash is normal, and the first library to claim a number or a spelling
+keeps it. A name can then mean two things, and which one depends on where
+it is used:
+
+- `resolve(token)` is for program listings: the core layer first, so a
+  bare `LOG` keeps meaning the mainframe LOG whatever pac is plugged in
+  (hp41uc reads listings the same way).
+- `resolve(token, prefer_modules=True)` is for a name typed as on the
+  calculator (`ASN "LOG"`): the calculator's own search order,
+  xrom_library.name_search_order() -- the built-in Time ROM, then the
+  plug-in libraries, then everything else -- so the pac's LOG wins, as it
+  does on a real DM41X.
+- `resolve_xrom_name(name)`, for `XROM "NAME"`, searches only XROM
+  functions, in the calculator's order.
+
+Section headers ("-EXT FCN 2X", "MATH 1C") are display-only: a key holding
+one shows its name, but no spelling resolves to it.
 
 An `Op` identifies an instruction by its encoding, not its name:
 
@@ -46,12 +70,26 @@ import itertools
 import logging
 import re
 from dataclasses import dataclass
-from typing import Dict, Hashable, Iterable, List, Optional, Set, Tuple, Union
+from typing import (
+    Dict,
+    Hashable,
+    Iterable,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 
 from .functions import SINGLE_BYTE_FUNCTIONS
-from .xrom_library import builtin_xrom_names
+from .xrom_library import (
+    BUILTIN_MODULES_BEFORE_PLUGINS,
+    XromLibrary,
+    builtin_xrom_names,
+)
 from .mnemonic_dialects import DIALECTS, Dialect
-from .trigraphs import decode_trigraphs, focal_to_unicode
+from .trigraphs import decode_trigraphs, focal_to_unicode, unicode_to_trigraphs
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +153,17 @@ def xrom_text(byte1: int, byte2: int) -> str:
     return f"XROM {module:02d},{function:02d}"
 
 
+# 'XROM "LOG"': a module function by name (GitHub issue #52).
+_XROM_NAME_RE = re.compile(r'^XROM\s+"(.+)"$', re.IGNORECASE)
+
+
+def parse_xrom_name_text(text: str) -> Optional[str]:
+    """The name in 'XROM "NAME"', or None if `text` isn't that form.
+    resolve_xrom_name() looks the name up."""
+    match = _XROM_NAME_RE.match(text.strip())
+    return match.group(1) if match else None
+
+
 def parse_xrom_text(text: str) -> Optional[Tuple[int, int]]:
     """(module, function) if `text` is "XROM mm,ff" (or "XROM mm ff", in
     any case), else None. The numbers are not range-checked here:
@@ -174,6 +223,24 @@ def _ascii_form(display_name: str) -> str:
     return "".join(_SUBSTITUTIONS.get(ch, (ch,))[0] for ch in display_name)
 
 
+def _library_canonical(display_name: str, op: Op) -> str:
+    """A library function's ASCII name: the usual stand-ins (Σ -> S, ...),
+    then trigraphs for any glyph that has none -- P∡V becomes P\\<)V, which
+    resolve() decodes back (GitHub issue #52). The XROM's numbers if even
+    that is not ASCII."""
+    name = unicode_to_trigraphs(_ascii_form(display_name))
+    return name if name.isascii() else xrom_text(*op.code)
+
+
+def _found_before_plugins(op: Op) -> bool:
+    """True for a built-in XROM the calculator searches before the plug-in
+    modules (xrom_library.BUILTIN_MODULES_BEFORE_PLUGINS: the Time ROM)."""
+    return (
+        op.kind is OpKind.XROM
+        and xrom_numbers(*op.code)[0] in BUILTIN_MODULES_BEFORE_PLUGINS
+    )
+
+
 def _substitution_variants(text: str, op: Op) -> Iterable[str]:
     """`text` (a spelling of `op`) with each substitutable glyph replaced
     by each of its stand-ins, in every combination (including `text`
@@ -200,9 +267,13 @@ class Entry:
     # matches of these are accepted too.
     aliases: Tuple[Tuple[str, str], ...]
     # True for an XROM a DM41L doesn't have built in: one the DM41X added
-    # to the HP-41CX set. The registry knows these names whatever the model, so a
-    # program that uses one still compiles and decompiles.
+    # to the HP-41CX set, or any plug-in module's. The registry knows these
+    # names whatever the model, so a program that uses one still compiles
+    # and decompiles.
     dm41x_only: bool = False
+    # The title of the plug-in library the function comes from; None for
+    # the mainframe functions and the built-in XROMs.
+    library: Optional[str] = None
 
 
 class Registry:
@@ -210,7 +281,11 @@ class Registry:
     shared instance built from DIALECTS; tests build their own to check
     the safety rules."""
 
-    def __init__(self, dialects: Iterable[Dialect] = DIALECTS):
+    def __init__(
+        self,
+        dialects: Iterable[Dialect] = DIALECTS,
+        libraries: Sequence[XromLibrary] = (),
+    ):
         base = self._base_entries()
         by_canonical: Dict[str, Op] = {}
         for op, (canonical_name, _display, _prog) in base.items():
@@ -275,6 +350,61 @@ class Registry:
             for op, (canonical_name, display_name, programmable) in base.items()
         }
 
+        # Display-only names: the built-in libraries' section headers.
+        self._headers: Dict[Op, str] = {}
+        for code, name in builtin_xrom_names(headers=True).items():
+            if xrom_op(*code) not in self._entries:
+                self._headers[xrom_op(*code)] = name
+
+        self._library_exact: Dict[str, Op] = {}
+        self._library_folded: Dict[str, Set[Op]] = {}
+        self._add_libraries(libraries)
+        # Every folded spelling of either layer, for "did you mean".
+        self._all_folded: Dict[str, Set[Op]] = {
+            key: set(ops) for key, ops in self._folded.items()
+        }
+        for key, ops in self._library_folded.items():
+            self._all_folded.setdefault(key, set()).update(ops)
+
+    def _add_libraries(self, libraries: Sequence[XromLibrary]) -> None:
+        """The plug-in libraries' functions, highest priority first. A
+        number already taken -- by a built-in XROM or a higher-priority
+        library -- decodes as that one, so the later function is left out
+        entirely: its name would otherwise compile to bytes that decode as
+        something else. A spelling already taken stays with the first
+        library. Built-in libraries are in the core layer already."""
+        for library in libraries:
+            if library.builtin_on:
+                continue
+            for function in library.functions():
+                op = xrom_op(*function.code)
+                if op in self._entries or op in self._headers:
+                    continue
+                if function.header:
+                    self._headers[op] = function.name
+                    continue
+                canonical_name = _library_canonical(function.name, op)
+                spellings: Dict[str, str] = {}
+                candidates = [(canonical_name, "canonical"), (function.name, "display")]
+                candidates += [
+                    (variant, "substitution")
+                    for variant in _substitution_variants(function.name, op)
+                ]
+                for spelling, source in candidates:
+                    if self._library_exact.setdefault(spelling, op) == op:
+                        spellings.setdefault(spelling, source)
+                self._entries[op] = Entry(
+                    op=op,
+                    canonical=canonical_name,
+                    display=function.name,
+                    programmable=True,
+                    aliases=tuple(spellings.items()),
+                    dm41x_only=True,
+                    library=library.title,
+                )
+        for spelling, op in self._library_exact.items():
+            self._library_folded.setdefault(spelling.upper(), set()).add(op)
+
     @staticmethod
     def _base_entries() -> Dict[Op, Tuple[str, str, bool]]:
         """op -> (canonical, display, programmable), before aliases."""
@@ -290,21 +420,40 @@ class Registry:
             base[keyword] = (keyword.code, keyword.code, True)
         return base
 
-    def resolve(self, token: str, *, programmable_only: bool = True) -> Op:
+    def _lookup(
+        self, exact: Dict[str, Op], folded: Dict[str, Set[Op]], text: str, token: str
+    ) -> Optional[Op]:
+        """`text` in one layer: an exact-case match, else the one op whose
+        spelling matches ignoring case. None if neither; raises
+        UnknownMnemonicError if the case-insensitive match is ambiguous."""
+        op = exact.get(text)
+        if op is not None:
+            return op
+        candidates = folded.get(text.upper(), set())
+        if len(candidates) > 1:
+            names = ", ".join(sorted(self._entries[c].canonical for c in candidates))
+            raise UnknownMnemonicError(
+                f"ambiguous instruction {token!r}: could be {names} "
+                "(check upper/lower case)"
+            )
+        return next(iter(candidates), None)
+
+    def resolve(
+        self,
+        token: str,
+        *,
+        programmable_only: bool = True,
+        prefer_modules: bool = False,
+    ) -> Op:
         text = self._normalize(token)
-        op = self._exact.get(text)
-        if op is None:
-            candidates = self._folded.get(text.upper(), set())
-            if len(candidates) > 1:
-                names = ", ".join(
-                    sorted(self._entries[c].canonical for c in candidates)
-                )
-                raise UnknownMnemonicError(
-                    f"ambiguous instruction {token!r}: could be {names} "
-                    "(check upper/lower case)"
-                )
-            if candidates:
-                (op,) = candidates
+        core = self._lookup(self._exact, self._folded, text, token)
+        if core is not None and (not prefer_modules or _found_before_plugins(core)):
+            op = core
+        else:
+            library = self._lookup(
+                self._library_exact, self._library_folded, text, token
+            )
+            op = library or core
         if op is None:
             message = f"unrecognized instruction {token!r}"
             suggestions = self.suggest(text, programmable_only=programmable_only)
@@ -314,6 +463,25 @@ class Registry:
         if programmable_only and not self._entries[op].programmable:
             raise UnknownMnemonicError(
                 f"{token!r} is a keyboard-only function and can't appear in a program"
+            )
+        return op
+
+    def resolve_xrom_name(self, token: str) -> Op:
+        """The XROM function named `token`, in the calculator's search
+        order, never a mainframe function. Raises UnknownMnemonicError if
+        no built-in or active library has it."""
+        text = self._normalize(token)
+        core = self._lookup(self._exact, self._folded, text, token)
+        if core is not None and core.kind is not OpKind.XROM:
+            core = None
+        if core is not None and _found_before_plugins(core):
+            return core
+        op = self._lookup(self._library_exact, self._library_folded, text, token)
+        op = op or core
+        if op is None:
+            raise UnknownMnemonicError(
+                f"no XROM function named {token!r} in the built-in or active "
+                "libraries (write XROM mm,ff for a module that isn't active)"
             )
         return op
 
@@ -344,10 +512,10 @@ class Registry:
         suggestions: List[str] = []
         seen: Set[Op] = set()
         for match in difflib.get_close_matches(
-            wanted, self._folded, n=limit * 4, cutoff=0.7
+            wanted, self._all_folded, n=limit * 4, cutoff=0.7
         ):
             for op in sorted(
-                self._folded[match], key=lambda o: self._entries[o].canonical
+                self._all_folded[match], key=lambda o: self._entries[o].canonical
             ):
                 entry = self._entries[op]
                 if op in seen or (programmable_only and not entry.programmable):
@@ -367,6 +535,10 @@ class Registry:
     def is_known(self, op: Op) -> bool:
         return op in self._entries
 
+    def header_name(self, op: Op) -> Optional[str]:
+        """The name of the section header `op` is, or None."""
+        return self._headers.get(op)
+
     def entries(self) -> List[Entry]:
         return list(self._entries.values())
 
@@ -374,13 +546,39 @@ class Registry:
 _REGISTRY = Registry()
 
 
-def resolve(token: str, *, programmable_only: bool = True) -> Op:
+def set_active_libraries(libraries: Iterable[XromLibrary]) -> None:
+    """Rebuilds the registry with `libraries` as the active plug-in
+    libraries, highest priority first -- typically
+    xrom_library.active_set(...).libraries; the built-in ones in it are
+    skipped, being known already. An empty list goes back to the built-in
+    XROMs alone."""
+    global _REGISTRY
+    _REGISTRY = Registry(libraries=list(libraries))
+
+
+def resolve(
+    token: str, *, programmable_only: bool = True, prefer_modules: bool = False
+) -> Op:
     """The instruction any accepted spelling `token` means. Tries an
     exact-case match first, then a case-insensitive one. Raises
     UnknownMnemonicError (a ValueError) if `token` isn't a known
     spelling, is ambiguous without its exact case, or -- with
-    programmable_only -- names a keyboard-only function."""
-    return _REGISTRY.resolve(token, programmable_only=programmable_only)
+    programmable_only -- names a keyboard-only function.
+
+    By default a name means what it means in a program listing: a
+    mainframe or built-in function before any plug-in library's. With
+    `prefer_modules`, it follows the calculator's own search order, as a
+    name typed into ASN does (see the module docstring)."""
+    return _REGISTRY.resolve(
+        token, programmable_only=programmable_only, prefer_modules=prefer_modules
+    )
+
+
+def resolve_xrom_name(name: str) -> Op:
+    """The XROM function 'XROM "NAME"' means: the built-in XROMs and the
+    active plug-in libraries only, in the calculator's search order.
+    Raises UnknownMnemonicError if none has it."""
+    return _REGISTRY.resolve_xrom_name(name)
 
 
 def canonical(op: Op) -> str:
@@ -402,6 +600,12 @@ def is_dm41x_only(op: Op) -> bool:
     module's functions), so a DM41L doesn't have it. Raises KeyError for an
     op that isn't registered -- check is_known() first."""
     return _REGISTRY.entry(op).dm41x_only
+
+
+def library_of(op: Op) -> Optional[str]:
+    """The title of the active plug-in library `op` comes from, or None
+    for a mainframe function, a built-in XROM or an unknown op."""
+    return _REGISTRY.entry(op).library if _REGISTRY.is_known(op) else None
 
 
 def entries() -> List[Entry]:
@@ -448,12 +652,16 @@ def key_bytes_for(op: Op) -> Union[int, Tuple[int, int]]:
 
 def display_for_key_bytes(fn_byte1: int, fn_byte2: Optional[int]) -> str:
     """The display name for a Key Assignment Register entry's function
-    byte(s). One that isn't a known function falls back to "XROM mm,ff"
-    for an XROM (first byte 0xA0-0xA7), or to "0xNN" / "0xNN 0xNN" for
-    anything else. Never raises."""
+    byte(s): a function's name, or a section header's ("-EXT FCN 2X" for
+    XROM 25,00), as the calculator shows it. Anything else falls back to
+    "XROM mm,ff" for an XROM (first byte 0xA0-0xA7), or to "0xNN" /
+    "0xNN 0xNN". Never raises."""
     op = op_for_key_bytes(fn_byte1, fn_byte2)
     if is_known(op):
         return display(op)
+    header = _REGISTRY.header_name(op)
+    if header is not None:
+        return header
     if fn_byte2 is None:
         return f"0x{fn_byte1:02X}"
     if fn_byte1 in XROM_FIRST_BYTES:
@@ -466,12 +674,13 @@ def is_available_on(op: Op, profile) -> bool:
 
     Only XROMs can be missing: a single-byte function is part of every
     HP-41's own instruction set, while an XROM comes from a module, and
-    `profile.builtin_xroms` is what that model has built in. A `profile`
-    of None means "any model", which is what every caller that does not
-    care about availability passes."""
+    `profile.builtin_xroms` is what that model has built in. A model that
+    loads modules (the DM41X) can have any XROM, by plugging in the module
+    that holds it. A `profile` of None means "any model", which is what
+    every caller that does not care about availability passes."""
     if profile is None or op.kind is not OpKind.XROM:
         return True
-    return op.code in profile.builtin_xroms
+    return op.code in profile.builtin_xroms or profile.loads_modules
 
 
 def assignable_display_names(profile=None) -> List[str]:
@@ -489,3 +698,31 @@ def assignable_display_names(profile=None) -> List[str]:
         for e in _REGISTRY.entries()
         if e.op.kind is not OpKind.KEYWORD and is_available_on(e.op, profile)
     )
+
+
+def assignable_choices(profile=None) -> List[Tuple[str, Op]]:
+    """The key-assignment picker's entries, sorted: (label, op) for each
+    function assignable_display_names() would list. The label is the
+    display name, unless two functions share it -- a pac's SOLVE and
+    another's, or a pac's LOG and the mainframe LOG -- when each is told
+    apart by where it comes from: "SOLVE  (Math Pac, XROM 01,09)",
+    "SIZE?  (built in, XROM 25,44)", "LOG  (HP-41 function)"."""
+    found = [
+        e
+        for e in _REGISTRY.entries()
+        if e.op.kind is not OpKind.KEYWORD and is_available_on(e.op, profile)
+    ]
+    counts: Dict[str, int] = {}
+    for entry in found:
+        counts[entry.display] = counts.get(entry.display, 0) + 1
+    choices = []
+    for entry in found:
+        label = entry.display
+        if counts[label] > 1:
+            if entry.op.kind is not OpKind.XROM:
+                label += "  (HP-41 function)"
+            else:
+                source = entry.library or "built in"
+                label += f"  ({source}, {xrom_text(*entry.op.code)})"
+        choices.append((label, entry.op))
+    return sorted(choices, key=lambda choice: choice[0])

@@ -80,6 +80,7 @@ from .mnemonics import (
     function_op,
     is_known,
     resolve,
+    resolve_xrom_name,
     xrom_bytes,
     xrom_numbers,
     xrom_op,
@@ -997,14 +998,22 @@ def _encode_xrom(tokens: List[str]) -> bytes:
     On the calculator, an XROM for a module that isn't present shows as
     "XROM mm,ff" and only errors (NONEXISTENT) if executed.
 
-    This is only reached for the numeric "XROM mm,ff" spelling -- a
-    function spelled by its own name (e.g. "SEEKPT") resolves directly
+    `XROM "NAME"` names a module function instead (GitHub issue #52): it
+    is looked up among the built-in and active XROM libraries only, in
+    the calculator's own search order, never as a mainframe function --
+    so `XROM "LOG"` is a pac's LOG where a bare `LOG` is the mainframe's.
+
+    A function spelled by its bare name (e.g. "SEEKPT") resolves directly
     to its XROM op in _encode_instruction() and never gets here."""
     if len(tokens) != 2:
         raise ValueError(
-            f"XROM needs exactly one 'mm,ff' operand: {' '.join(tokens)!r}"
+            f"XROM needs exactly one 'mm,ff' or quoted name operand: "
+            f"{' '.join(tokens)!r}"
         )
-    match = _XROM_RE.match(tokens[1])
+    operand = tokens[1]
+    if len(operand) >= 2 and operand[0] == '"' and operand[-1] == '"':
+        return bytes(resolve_xrom_name(operand[1:-1]).code)
+    match = _XROM_RE.match(operand)
     if not match:
         raise ValueError(f"malformed XROM operand (expected 'mm,ff'): {tokens[1]!r}")
     return bytes(xrom_bytes(int(match.group(1)), int(match.group(2))))

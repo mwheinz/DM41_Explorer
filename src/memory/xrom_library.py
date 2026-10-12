@@ -25,10 +25,11 @@ the instruction-name registry. It answers three questions:
   first, then the user's enabled libraries in their order.
 - find_conflicts(): what clashes among the active libraries. Two libraries
   using the same XROM number is a WARNING: a calculator can run only one
-  of them. A function name another one hides -- a mainframe function, or
-  any earlier library's function -- is a NOTICE: the name means the other
-  one, and only "XROM mm,ff" reaches this one. Section headers are never
-  matched by name, so they never hide anything.
+  of them. A function whose name the calculator finds elsewhere first
+  (name_search_order()) is a NOTICE: the name means the other one, and only
+  "XROM mm,ff" reaches this one. So is a function sharing a mainframe
+  function's name, which wins by name but not in a program listing.
+  Section headers are never matched by name, so they never hide anything.
 
 builtin_xrom_names() is what the rest of memory/ builds on: each model's
 built-in XROMs (DeviceProfile.builtin_xroms) and the XROM names the
@@ -422,6 +423,41 @@ def active_set(
     return ActiveSet(tuple(active), tuple(missing))
 
 
+# -- Name search order -------------------------------------------------------
+
+# The built-in XROM modules a DM41X searches for a name *before* the plug-in
+# modules (GitHub issue #52). Tests on a real DM41X found the search goes up
+# through the ROM pages from page 5 (the CX Time ROM, XROM 26) to page F,
+# where the plug-ins sit, and takes page 3 (the Extended Functions ROM, XROM
+# 25) only after them, then the mainframe functions last. So a plug-in's
+# SIZE? beats the built-in SIZE? (25,44), a plug-in's LOG beats the
+# mainframe LOG, and Advantage (pages 8-9) beats Math (page A).
+BUILTIN_MODULES_BEFORE_PLUGINS = frozenset({26})
+
+
+def name_search_order(
+    active: Sequence[XromLibrary],
+) -> List[Tuple[XromLibrary, XromModule]]:
+    """The modules of `active` (highest priority first, as active_set()
+    gives them) in the order the calculator searches them for a name: the
+    built-in modules in BUILTIN_MODULES_BEFORE_PLUGINS, then each plug-in
+    library's modules in priority order -- which stands in for the page
+    order the user cannot always choose -- then the other built-in
+    modules. The mainframe functions, which are not in any library, come
+    after all of them."""
+    builtins = [library for library in active if library.builtin_on]
+    plugins = [library for library in active if not library.builtin_on]
+
+    def modules(libraries, keep):
+        return [(lib, m) for lib in libraries for m in lib.modules if keep(m.xrom)]
+
+    return (
+        modules(builtins, lambda xrom: xrom in BUILTIN_MODULES_BEFORE_PLUGINS)
+        + modules(plugins, lambda xrom: True)
+        + modules(builtins, lambda xrom: xrom not in BUILTIN_MODULES_BEFORE_PLUGINS)
+    )
+
+
 # -- Conflicts --------------------------------------------------------------
 
 _MAINFRAME_NAMES = frozenset(SINGLE_BYTE_FUNCTIONS.values())
@@ -436,7 +472,8 @@ def _join(names: Sequence[str]) -> str:
 def find_conflicts(active: Sequence[XromLibrary]) -> List[XromFinding]:
     """What clashes among `active` (highest priority first): a WARNING for
     each XROM number used by more than one library, then a NOTICE for each
-    function whose name is hidden, in priority order."""
+    function whose name is hidden or shared with a mainframe function, in
+    the calculator's search order."""
     return _number_clashes(active) + _hidden_names(active)
 
 
@@ -471,39 +508,60 @@ def _number_clashes(active: Sequence[XromLibrary]) -> List[XromFinding]:
 
 
 def _hidden_names(active: Sequence[XromLibrary]) -> List[XromFinding]:
-    first_holder: Dict[str, Tuple[XromLibrary, XromFunction]] = {}
+    """A NOTICE for each function a name lookup cannot reach, taking the
+    functions in the calculator's own search order (name_search_order()).
+    A clash with a mainframe function is reported differently: by name the
+    calculator finds the module's, but a program listing's bare name keeps
+    meaning the mainframe function (mnemonics.py), so neither is hidden
+    outright."""
+    holder: Dict[str, Tuple[XromLibrary, XromFunction]] = {}
     findings = []
-    for library in active:
-        for function in library.functions():
+    for library, module in name_search_order(active):
+        for function in module.functions:
             if function.header:
                 continue
             name = function.name
-            here = f"{name} in {library.title} ({function.label})"
-            reach = f"use {function.label} to reach it."
-            if name in _MAINFRAME_NAMES:
-                findings.append(
-                    XromFinding(
-                        NOTICE,
-                        f"{here} is hidden by the HP-41's own {name}; {reach}",
-                        (library.id,),
+            label = function.label
+            here = f"{name} in {library.title} ({label})"
+            winner = holder.setdefault(name, (library, function))
+            if winner == (library, function):
+                if name in _MAINFRAME_NAMES:
+                    findings.append(
+                        XromFinding(
+                            NOTICE,
+                            f"{here} has the same name as the HP-41's own "
+                            f"{name}. By name, the calculator uses "
+                            f"{library.title}'s; in a program listing, {name} "
+                            f"still means the HP-41's own, so write {label} "
+                            "there.",
+                            (library.id,),
+                        )
                     )
+                continue
+            other_library, other = winner
+            if library.builtin_on and not other_library.builtin_on:
+                message = (
+                    f"The built-in {name} ({label}) is hidden by {name} in "
+                    f"{other_library.title} ({other.label}), which the "
+                    f"calculator finds first. In a program listing, {name} "
+                    f"still means the built-in one; elsewhere, use {label} "
+                    "to reach it."
                 )
-                continue
-            holder = first_holder.get(name)
-            if holder is None:
-                first_holder[name] = (library, function)
-                continue
-            other_library, other = holder
-            if other_library.builtin_on:
-                by = f"the built-in {name} ({other.label})"
-            elif other_library is library:
-                by = f"{other.label}, earlier in the same library"
             else:
-                by = f"{name} in {other_library.title} ({other.label})"
+                if other_library is library:
+                    by = f"{other.label}, earlier in the same library"
+                elif other_library.builtin_on:
+                    by = f"the built-in {name} ({other.label})"
+                else:
+                    by = f"{name} in {other_library.title} ({other.label})"
+                message = (
+                    f"{here} is hidden by {by}, which the calculator finds "
+                    f"first; use {label} to reach it."
+                )
             findings.append(
                 XromFinding(
                     NOTICE,
-                    f"{here} is hidden by {by}; {reach}",
+                    message,
                     tuple(dict.fromkeys((library.id, other_library.id))),
                 )
             )
