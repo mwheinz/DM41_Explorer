@@ -42,7 +42,15 @@ from config import ProjectConfig
 from gui.contrast import SECONDARY_TEXT, WARNING_TEXT, improve_theme_contrast
 from gui.dialog_common import ask_yes_no
 from gui.tab_common import ui_font
-from gui.window_geometry import initial_window_size, minimum_window_size, parse_geometry
+from gui.screens import screen_rectangles
+from gui.window_geometry import (
+    geometry_string,
+    initial_window_size,
+    minimum_window_size,
+    parse_geometry,
+    parse_position,
+    restored_position,
+)
 from gui.port_dialog import PortSelectionDialog
 from gui.preferences_dialog import PreferencesDialog
 from gui.xrom_libraries_dialog import XromLibrariesDialog
@@ -278,6 +286,7 @@ class DM41ExplorerApp(ctk.CTk):
         self._closing = False
         self._tracking_size = False
         self._applied_size = None
+        self._applied_position = None
         self._resize_after_id = None
         self._tracking_after_id = None
 
@@ -546,8 +555,15 @@ class DM41ExplorerApp(ctk.CTk):
         width, height = initial_window_size(
             self.config_store.window_size, font_size, needed, screen
         )
-        self.geometry(f"{width}x{height}")
+        # The position saved at the last close too, if the window would
+        # still be on a screen there (GitHub issue #63); otherwise the
+        # window manager places it.
+        position = restored_position(
+            self.config_store.window_position, (width, height), screen_rectangles(self)
+        )
+        self.geometry(geometry_string((width, height), position))
         self._applied_size = (width, height)
+        self._applied_position = position
         # Let the window manager finish placing the window before resizes
         # count as the user's: the size is then re-read, and every later
         # change is saved shortly after it stops (see _on_configure()).
@@ -556,7 +572,9 @@ class DM41ExplorerApp(ctk.CTk):
     def _start_tracking_size(self):
         self._tracking_after_id = None
         self.update_idletasks()
-        self._applied_size = parse_geometry(self.geometry()) or self._applied_size
+        geometry = self.geometry()
+        self._applied_size = parse_geometry(geometry) or self._applied_size
+        self._applied_position = parse_position(geometry) or self._applied_position
         self._tracking_size = True
         self.bind("<Configure>", self._on_configure, add="+")
 
@@ -604,20 +622,33 @@ class DM41ExplorerApp(ctk.CTk):
             return False
 
     def _remember_window_size(self):
-        """Saves the current window size to the preferences, for the next
-        launch. Never raises: failing to save a size mustn't stop the app
-        from closing."""
+        """Saves the current window size and position to the preferences,
+        for the next launch. Only what the user changed is saved, and the
+        position only once tracking has started: until then the window
+        manager may still be placing the window. Never raises: failing to
+        save mustn't stop the app from closing."""
         try:
             if self._window_is_maximized():
                 return
-            size = parse_geometry(self.geometry())
-            if size is None or size == self._applied_size:
+            geometry = self.geometry()
+            size = parse_geometry(geometry)
+            position = parse_position(geometry) if self._tracking_size else None
+            new_size = size is not None and size != self._applied_size
+            new_position = position is not None and position != self._applied_position
+            if not (new_size or new_position):
                 return  # nothing the user changed: don't touch the file
-            self.config_store.window_size = size
+            if new_size:
+                self.config_store.window_size = size
+            if new_position:
+                self.config_store.window_position = position
             self.config_store.save()
-            self._applied_size = size
+            # Only once saved, so a failed save is tried again later.
+            if new_size:
+                self._applied_size = size
+            if new_position:
+                self._applied_position = position
         except Exception as e:
-            logger.warning("Could not save the window size: %s", e)
+            logger.warning("Could not save the window size and position: %s", e)
 
     # -- Layout ---------------------------------------------------------
 

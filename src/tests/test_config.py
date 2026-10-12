@@ -397,3 +397,36 @@ def test_the_xrom_folder_is_named_after_the_preferences_file(prefs_file):
         == prefs_file.parent / ".dm41_test_prefs" / "xroms"
     )
     assert ProjectConfig.PREFS_FILE.name.endswith(".json")
+
+
+# -- Window position (GitHub issue #63) -----------------------------------------
+
+
+def test_no_window_position_is_saved_by_default(prefs_file):
+    assert ProjectConfig().window_position is None
+
+
+@pytest.mark.parametrize("position", [(40, 60), (-1200, 100), (0, -900)])
+def test_window_position_round_trips(prefs_file, position):
+    config = ProjectConfig()
+    config.window_position = position
+    config.save()
+    reloaded = ProjectConfig()
+    reloaded.load()
+    assert reloaded.window_position == position
+
+
+@pytest.mark.parametrize(
+    "stored",
+    [
+        {"window_x": "40", "window_y": 60},
+        {"window_x": 40},
+        {"window_x": True, "window_y": 60},
+        {"window_x": 4.5, "window_y": 60},
+    ],
+)
+def test_an_unusable_window_position_reads_as_none(prefs_file, stored):
+    prefs_file.write_text(json.dumps(stored))
+    config = ProjectConfig()
+    config.load()
+    assert config.window_position is None

@@ -159,3 +159,69 @@ def test_the_macos_quit_command_still_asks_about_unsaved_changes(mac_app, monkey
     mac_app.tk.call("::tk::mac::Quit")
     assert asked, "Cmd+Q must show the unsaved-changes prompt"
     assert mac_app.winfo_exists(), "answering No must keep the app open"
+
+
+# -- Position (GitHub issue #63) -------------------------------------------------
+
+
+def _report_geometry(app, monkeypatch, geometry):
+    monkeypatch.setattr(app, "geometry", lambda *args: geometry)
+
+
+def _saved_position(prefs_file):
+    data = json.loads(prefs_file.read_text())
+    return data.get("window_x"), data.get("window_y")
+
+
+def test_a_moved_window_saves_its_position(app, prefs_file, monkeypatch):
+    app._tracking_size = True
+    width, height = app._applied_size
+    _report_geometry(app, monkeypatch, f"{width}x{height}+-1200+150")
+    app.on_close()
+    assert _saved_position(prefs_file) == (-1200, 150)
+    assert _saved(prefs_file) == (0, 0), "the size didn't change, so isn't saved"
+
+
+def test_no_position_is_saved_before_tracking_starts(app, prefs_file, monkeypatch):
+    """Until then the window manager may still be placing the window."""
+    app._tracking_size = False
+    width, height = app._applied_size
+    _report_geometry(app, monkeypatch, f"{width}x{height}+300+200")
+    app.on_close()
+    assert _saved_position(prefs_file) == (None, None)
+
+
+def test_an_unmoved_window_writes_nothing(app, prefs_file, monkeypatch):
+    app._tracking_size = True
+    app._applied_position = (300, 200)
+    width, height = app._applied_size
+    _report_geometry(app, monkeypatch, f"{width}x{height}+300+200")
+    before = prefs_file.read_text()
+    app.on_close()
+    assert prefs_file.read_text() == before
+
+
+def _launch_with(prefs_file, monkeypatch, position, screen):
+    data = json.loads(prefs_file.read_text())
+    data.update(window_x=position[0], window_y=position[1])
+    prefs_file.write_text(json.dumps(data))
+    monkeypatch.setattr("gui.app.screen_rectangles", lambda window: [screen])
+    from gui.app import DM41ExplorerApp
+
+    return DM41ExplorerApp()
+
+
+def test_the_saved_position_is_used_at_launch(prefs_file, monkeypatch):
+    app = _launch_with(prefs_file, monkeypatch, (-1200, 150), (-1600, 0, 1600, 1200))
+    try:
+        assert app._applied_position == (-1200, 150)
+    finally:
+        app.destroy()
+
+
+def test_a_saved_position_off_every_screen_is_ignored(prefs_file, monkeypatch):
+    app = _launch_with(prefs_file, monkeypatch, (-1200, 150), (0, 0, 1920, 1080))
+    try:
+        assert app._applied_position is None
+    finally:
+        app.destroy()

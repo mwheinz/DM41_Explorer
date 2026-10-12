@@ -12,9 +12,12 @@ from gui.window_geometry import (
     default_window_size,
     dialog_size,
     font_scale,
+    geometry_string,
     initial_window_size,
     minimum_window_size,
     parse_geometry,
+    parse_position,
+    restored_position,
     scaled_row_height,
     scaled_width,
 )
@@ -145,3 +148,61 @@ def test_dialog_size_never_exceeds_the_screen():
 
 def test_a_smaller_font_does_not_shrink_a_dialog():
     assert dialog_size(8, (460, 300), (0, 0), BIG_SCREEN) == (460, 300)
+
+
+# -- Position (GitHub issue #63) ------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "geometry, expected",
+    [
+        ("1080x768+10+20", (10, 20)),
+        ("1080x768+-1200+100", (-1200, 100)),
+        ("1080x768+40+-30", (40, -30)),
+        ("1080x768", None),
+        ("", None),
+        (None, None),
+    ],
+)
+def test_parse_position(geometry, expected):
+    assert parse_position(geometry) == expected
+
+
+def test_geometry_string():
+    assert geometry_string((1080, 768)) == "1080x768"
+    assert geometry_string((1080, 768), (10, 20)) == "1080x768+10+20"
+    assert geometry_string((1080, 768), (-1200, 100)) == "1080x768+-1200+100"
+    assert parse_position(geometry_string((900, 600), (-1200, -40))) == (-1200, -40)
+
+
+MAIN = (0, 0, 1920, 1080)
+LEFT = (-1600, 0, 1600, 900)  # a second monitor left of the main one
+ABOVE = (0, -1080, 1920, 1080)  # and one above it
+SIZE = (1080, 768)
+
+
+@pytest.mark.parametrize(
+    "saved, screens, expected",
+    [
+        ((100, 50), [MAIN], (100, 50)),
+        ((-1200, 100), [MAIN, LEFT], (-1200, 100)),
+        ((200, -900), [MAIN, ABOVE], (200, -900)),
+        # Mostly off the right edge, but its title bar still reachable.
+        ((1800, 200), [MAIN], (1800, 200)),
+        # The monitor it was on has gone.
+        ((-1200, 100), [MAIN], None),
+        ((200, -900), [MAIN], None),
+        # Off every edge of the one screen.
+        ((1900, 200), [MAIN], None),
+        ((-1050, 200), [MAIN], None),
+        ((100, 1070), [MAIN], None),
+        ((100, -5), [MAIN], None),
+        (None, [MAIN], None),
+    ],
+)
+def test_restored_position(saved, screens, expected):
+    assert restored_position(saved, SIZE, screens) == expected
+
+
+def test_a_narrow_window_needs_only_its_own_width_on_screen():
+    assert restored_position((1850, 10), (60, 400), [MAIN]) == (1850, 10)

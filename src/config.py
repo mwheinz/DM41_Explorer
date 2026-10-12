@@ -65,6 +65,10 @@ class ProjectConfig:
         "recent_files": [],  # paths of recently opened/saved state files, most-recent first
         "window_width": 0,  # main window size at last close; 0 = not saved yet
         "window_height": 0,
+        # main window position at last close, in the window system's own
+        # units (GitHub issue #63); None = not saved yet
+        "window_x": None,
+        "window_y": None,
         # Per mode, the XROM libraries the user has arranged, highest
         # priority first: {"DM41X": [{"id": "math", "enabled": true}, ...]}.
         # The mode's built-in library is implied, not stored (GitHub issue
@@ -194,6 +198,22 @@ class ProjectConfig:
         width, height = value
         self._prefs["window_width"] = int(width)
         self._prefs["window_height"] = int(height)
+
+    @property
+    def window_position(self):
+        """The main window's (x, y) saved at the last close, or None if none
+        was saved (or the saved values are unusable). Either number can be
+        negative: a monitor left of or above the main one."""
+        x, y = self._prefs.get("window_x"), self._prefs.get("window_y")
+        if not all(isinstance(v, int) and not isinstance(v, bool) for v in (x, y)):
+            return None
+        return (x, y)
+
+    @window_position.setter
+    def window_position(self, value):
+        x, y = value
+        self._prefs["window_x"] = int(x)
+        self._prefs["window_y"] = int(y)
 
     @property
     def recent_files(self) -> list:

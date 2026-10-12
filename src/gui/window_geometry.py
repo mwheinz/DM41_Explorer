@@ -13,6 +13,12 @@ The three rules:
     ask for, so a large font can't clip the tabs.
   * A size saved from the last session wins over the default, but is still
     held between the minimum and the screen.
+
+And for the position (GitHub issue #63): one saved from the last session
+is used only if the window's title bar would land on a screen, so the
+window can't open somewhere it can't be seen or dragged -- after a monitor
+is unplugged, say. Positions are in the window system's own units, which
+CustomTkinter passes through unscaled (unlike sizes).
 """
 
 import re
@@ -28,6 +34,15 @@ BASE_MINIMUM_SIZE = (800, 560)
 MAX_SCREEN_FRACTION = (0.95, 0.90)
 
 _GEOMETRY = re.compile(r"^(\d+)x(\d+)")
+# The position part of a Tk geometry string: "+x+y", where either number
+# can be negative ("+-1200+100" on a monitor left of the main one).
+_POSITION = re.compile(r"\+(-?\d+)\+(-?\d+)$")
+
+# How much of the window's top edge must be on one screen for a saved
+# position to be used: a strip TITLE_STRIP high (the title bar), at least
+# MIN_VISIBLE_WIDTH of it across.
+TITLE_STRIP = 30
+MIN_VISIBLE_WIDTH = 100
 
 
 def font_scale(font_size) -> float:
@@ -48,6 +63,42 @@ def parse_geometry(geometry: str):
     if not match:
         return None
     return int(match.group(1)), int(match.group(2))
+
+
+def parse_position(geometry: str):
+    """(x, y) from a Tk geometry string such as "1080x768+10+20" or
+    "1080x768+-1200+100", or None if it has no position."""
+    match = _POSITION.search(geometry or "")
+    if not match:
+        return None
+    return int(match.group(1)), int(match.group(2))
+
+
+def geometry_string(size, position=None) -> str:
+    """ "WxH", or "WxH+X+Y" with a position (negative numbers as Tk writes
+    them, "+-1200")."""
+    text = f"{size[0]}x{size[1]}"
+    if position is not None:
+        text += f"+{position[0]}+{position[1]}"
+    return text
+
+
+def restored_position(saved, size, screens):
+    """`saved` (x, y), or None if it shouldn't be used: the window's title
+    bar -- its top TITLE_STRIP, at least MIN_VISIBLE_WIDTH of it across
+    (less for a narrower window) -- must be on one of `screens`, each an
+    (x, y, width, height) rectangle, and not above that screen's top edge.
+    Otherwise the window could open off screen or with nothing to drag."""
+    if saved is None:
+        return None
+    x, y = saved
+    width = size[0]
+    needed_width = min(MIN_VISIBLE_WIDTH, width)
+    for left, top, screen_width, screen_height in screens:
+        across = min(x + width, left + screen_width) - max(x, left)
+        if across >= needed_width and top <= y <= top + screen_height - TITLE_STRIP:
+            return saved
+    return None
 
 
 def _cap(screen):
