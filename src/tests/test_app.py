@@ -23,6 +23,7 @@ from config import ProjectConfig
 from engine.command_engine import CommandEngine
 from memory import DM41L, DM41X, DeviceMode, Memory
 from gui.app import DM41ExplorerApp
+from memory.mnemonics import resolve, set_active_libraries, xrom_op
 from gui.overview_tab import xm_total_registers
 
 
@@ -59,6 +60,7 @@ def _reset(app):
     app.config_store = ProjectConfig()
     app.config_store.load()
     app.mode = app.config_store.mode
+    app._apply_xrom_libraries()
     app.serial.is_connected = False
     app.serial.serial_inst = None
     app.serial.__dict__.pop("profile", None)  # a test may override it
@@ -1101,3 +1103,107 @@ def test_busy_send_is_reported_and_nothing_is_transferred(busy_app):
 
     _assert_reported_busy(busy_app)
     transfer.assert_not_called()
+
+
+# -- XROM libraries (GitHub issue #53) ----------------------------------------
+
+
+@pytest.fixture
+def builtin_xroms_after():
+    """Puts the name registry back to the built-in XROMs after a test that
+    activates libraries, so no later test (in any module) sees them."""
+    yield
+    set_active_libraries([])
+
+
+def _xrom_prefs(tmp_path, monkeypatch, **arrangement):
+    path = tmp_path / ".dm41_test_prefs.json"
+    stored = {
+        mode: [{"id": i, "enabled": True} for i in ids]
+        for mode, ids in arrangement.items()
+    }
+    _write_prefs(path, xrom_libraries=stored)
+    monkeypatch.setattr(ProjectConfig, "PREFS_FILE", path)
+    return path
+
+
+def _active_ids(app):
+    return [library.id for library in app.xrom_active.libraries]
+
+
+def test_the_saved_arrangement_is_active_at_start(
+    _shared_app, tmp_path, monkeypatch, builtin_xroms_after
+):
+    _xrom_prefs(tmp_path, monkeypatch, DM41X=["math"])
+    _reset(_shared_app)
+    assert _active_ids(_shared_app) == ["dm41x-cx", "math"]
+    assert resolve("SOLVE") == xrom_op(0xA0, 0x49)
+
+
+def test_without_an_arrangement_only_the_builtin_library_is_active(app):
+    assert _active_ids(app) == ["dm41x-cx"]
+    with pytest.raises(ValueError):
+        resolve("SOLVE")
+
+
+def test_each_mode_has_its_own_arrangement(
+    _shared_app, tmp_path, monkeypatch, builtin_xroms_after
+):
+    _xrom_prefs(tmp_path, monkeypatch, DM41X=["math"], DM41L=["stat"])
+    _reset(_shared_app)
+    with _yes():
+        _shared_app.set_mode(DeviceMode.DM41L, persist=False)
+    assert _active_ids(_shared_app) == ["hp41cx", "stat"]
+    with pytest.raises(ValueError):
+        resolve("SOLVE")
+
+
+def test_saving_from_the_manager_applies_and_persists(
+    app, prefs_file, builtin_xroms_after
+):
+    with mock.patch("gui.app.messagebox.showwarning") as warn:
+        app._on_xrom_libraries_saved([("math", True), ("stat", False)])
+
+    warn.assert_not_called()
+    assert _active_ids(app) == ["dm41x-cx", "math"]
+    assert resolve("SOLVE") == xrom_op(0xA0, 0x49)
+    stored = json.loads(prefs_file.read_text())["xrom_libraries"]["DM41X"]
+    assert stored == [{"id": "math", "enabled": True}, {"id": "stat", "enabled": False}]
+    assert "1 plug-in library active" in app._status_label.cget("text")
+
+
+def test_a_number_clash_is_shown_once_after_a_change(app, builtin_xroms_after):
+    entries = [("aviation", True), ("clinical", True)]
+    with mock.patch("gui.app.messagebox.showwarning") as warn:
+        app._on_xrom_libraries_saved(entries)
+        app._on_xrom_libraries_saved(entries)  # nothing changed this time
+    warn.assert_called_once()
+    assert "both use XROM 19" in warn.call_args.args[1]
+
+
+def _menu_labels(app, name):
+    menu = app.nametowidget(app._menubar.entrycget(name, "menu"))
+    return [
+        menu.entrycget(i, "label")
+        for i in range(menu.index("end") + 1)
+        if menu.type(i) == "command"
+    ]
+
+
+def test_the_tools_menu_opens_the_manager(app):
+    labels = _menu_labels(app, "Tools")
+    assert "XROM Libraries..." not in _menu_labels(app, "File")
+    assert "XROM Libraries..." in labels
+    dialog = app.show_xrom_libraries()
+    assert dialog.winfo_exists()
+    dialog.destroy()
+
+
+def test_a_library_file_that_cannot_load_is_reported(app, prefs_file):
+    folder = ProjectConfig().xrom_directory
+    folder.mkdir(parents=True)
+    (folder / "broken.json").write_text("{not json")
+    errors = app._apply_xrom_libraries()
+    assert len(errors) == 1
+    assert str(errors[0]).startswith("broken.json: not valid JSON (line 1")
+    assert _active_ids(app) == ["dm41x-cx"]

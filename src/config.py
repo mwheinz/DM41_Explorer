@@ -65,6 +65,11 @@ class ProjectConfig:
         "recent_files": [],  # paths of recently opened/saved state files, most-recent first
         "window_width": 0,  # main window size at last close; 0 = not saved yet
         "window_height": 0,
+        # Per mode, the XROM libraries the user has arranged, highest
+        # priority first: {"DM41X": [{"id": "math", "enabled": true}, ...]}.
+        # The mode's built-in library is implied, not stored (GitHub issue
+        # #53).
+        "xrom_libraries": {},
     }
 
     # File > Open Recent is capped at this many entries -- oldest
@@ -224,6 +229,57 @@ class ProjectConfig:
         """Empties the recent-files list entirely -- File > Open
         Recent > Clear Recent Files."""
         self._prefs["recent_files"] = []
+
+    @property
+    def xrom_directory(self) -> Path:
+        """Where the user's own XROM library files live: a folder named
+        after the preferences file, ~/.dm41_explorer/xroms for
+        ~/.dm41_explorer.json, so each app (and each test's preferences
+        file) has its own."""
+        return self.PREFS_FILE.with_suffix("") / "xroms"
+
+    def xrom_library_entries(self, mode) -> list:
+        """The XROM libraries arranged for `mode` (a DeviceMode or its
+        name), highest priority first, as (id, enabled) pairs. Entries
+        that can't be read -- a hand-edited file -- are skipped, and a
+        repeated id keeps its first place, so a bad setting can't stop the
+        app starting. Ids are returned whether or not a library still has
+        them: the caller shows the missing ones rather than dropping
+        them."""
+        stored = self._prefs.get("xrom_libraries")
+        entries = (
+            stored.get(DeviceMode.from_value(mode).value)
+            if isinstance(stored, dict)
+            else None
+        )
+        if not isinstance(entries, list):
+            return []
+        result, seen = [], set()
+        for entry in entries:
+            if not isinstance(entry, dict):
+                continue
+            library_id = entry.get("id")
+            if not isinstance(library_id, str) or not library_id or library_id in seen:
+                continue
+            seen.add(library_id)
+            result.append((library_id, entry.get("enabled") is True))
+        return result
+
+    def set_xrom_library_entries(self, mode, entries) -> None:
+        """Stores `entries`, (id, enabled) pairs highest priority first,
+        for `mode`. The other mode's arrangement is kept."""
+        stored = self._prefs.get("xrom_libraries")
+        stored = dict(stored) if isinstance(stored, dict) else {}
+        stored[DeviceMode.from_value(mode).value] = [
+            {"id": library_id, "enabled": bool(enabled)}
+            for library_id, enabled in entries
+        ]
+        self._prefs["xrom_libraries"] = stored
+
+    def enabled_xrom_library_ids(self, mode) -> list:
+        """The ids of the libraries enabled for `mode`, highest priority
+        first -- what xrom_library.active_set() takes."""
+        return [i for i, enabled in self.xrom_library_entries(mode) if enabled]
 
     def get_all(self) -> dict:
         return self._prefs

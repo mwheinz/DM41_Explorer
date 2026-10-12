@@ -316,3 +316,84 @@ def test_unusable_saved_window_sizes_read_as_none(prefs_file, width, height):
     config = ProjectConfig()
     config.load()
     assert config.window_size is None
+
+
+# -- XROM libraries (GitHub issue #53) ----------------------------------------
+
+
+def test_no_xrom_libraries_are_arranged_by_default(prefs_file):
+    config = ProjectConfig()
+    assert config.xrom_library_entries(DeviceMode.DM41X) == []
+    assert config.enabled_xrom_library_ids("DM41L") == []
+
+
+def test_xrom_library_entries_round_trip_per_mode(prefs_file):
+    config = ProjectConfig()
+    config.set_xrom_library_entries(
+        DeviceMode.DM41X, [("advantage", True), ("math", False), ("gone", True)]
+    )
+    config.set_xrom_library_entries("DM41L", [("math", True)])
+    config.save()
+
+    reloaded = ProjectConfig()
+    reloaded.load()
+    assert reloaded.xrom_library_entries("DM41X") == [
+        ("advantage", True),
+        ("math", False),
+        ("gone", True),
+    ]
+    assert reloaded.enabled_xrom_library_ids(DeviceMode.DM41X) == ["advantage", "gone"]
+    assert reloaded.xrom_library_entries(DeviceMode.DM41L) == [("math", True)]
+    stored = json.loads(prefs_file.read_text())["xrom_libraries"]
+    assert stored["DM41X"][0] == {"id": "advantage", "enabled": True}
+
+
+def test_setting_one_modes_libraries_keeps_the_others(prefs_file):
+    config = ProjectConfig()
+    config.set_xrom_library_entries("DM41L", [("math", True)])
+    config.set_xrom_library_entries("DM41X", [("stat", True)])
+    assert config.xrom_library_entries("DM41L") == [("math", True)]
+
+
+@pytest.mark.parametrize(
+    "stored",
+    [
+        "not a dict",
+        {"DM41X": "not a list"},
+        {"DM41X": ["math", 7, None]},
+        {"DM41X": [{"id": 3}, {"enabled": True}, {"id": ""}]},
+    ],
+)
+def test_unreadable_xrom_library_settings_read_as_none(prefs_file, stored):
+    """A hand-edited preferences file must not stop the app starting."""
+    prefs_file.write_text(json.dumps({"xrom_libraries": stored}))
+    config = ProjectConfig()
+    config.load()
+    assert config.xrom_library_entries("DM41X") == []
+
+
+def test_xrom_library_entries_skip_repeats_and_need_true_to_enable(prefs_file):
+    prefs_file.write_text(
+        json.dumps(
+            {
+                "xrom_libraries": {
+                    "DM41X": [
+                        {"id": "math", "enabled": "yes"},
+                        {"id": "stat", "enabled": True},
+                        {"id": "math", "enabled": True},
+                    ]
+                }
+            }
+        )
+    )
+    config = ProjectConfig()
+    config.load()
+    assert config.xrom_library_entries("DM41X") == [("math", False), ("stat", True)]
+
+
+def test_the_xrom_folder_is_named_after_the_preferences_file(prefs_file):
+    assert (
+        ProjectConfig().xrom_directory
+        == prefs_file.parent / ".dm41_test_prefs" / "xroms"
+    )
+    assert ProjectConfig.PREFS_FILE.name.endswith(".json")
