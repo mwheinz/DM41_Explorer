@@ -335,7 +335,8 @@ class PreferencesDialog(ctk.CTkToplevel):
                 row=row, column=3, sticky="w", pady=(8, 0)
             )
 
-            sample_font = ctk.CTkFont()
+            # Redrawn in the chosen font by _update_font_samples().
+            sample_font = font_for(role)
             ctk.CTkLabel(
                 grid,
                 text=sample_text,
