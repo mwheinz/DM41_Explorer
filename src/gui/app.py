@@ -723,6 +723,7 @@ class DM41ExplorerApp(ctk.CTk):
         file_menu.add_command(
             label="Save State As...",
             command=self.save_state_as,
+            accelerator=f"{acc}+Shift+S",
             underline=13,
         )
         if PLATFORM_SYSTEM != "Darwin":
@@ -841,6 +842,11 @@ class DM41ExplorerApp(ctk.CTk):
         self.bind(f"<{acc}-n>", lambda e: self.new_memory_buffer())
         self.bind(f"<{acc}-o>", lambda e: self.load_state_from_file())
         self.bind(f"<{acc}-s>", lambda e: self.save_state_to_file())
+        # Shift turns the key into "S" on some platforms but not others, so
+        # both are bound. Either is more specific than <{acc}-s> above,
+        # which therefore doesn't also fire.
+        for key in ("S", "s"):
+            self.bind(f"<{acc}-Shift-{key}>", lambda e: self.save_state_as())
         self.bind(f"<{acc}-q>", lambda e: self.on_close())
         # A menu's `accelerator=` text is only a label in Tk -- every
         # shortcut shown in the menus needs its own bind() here.

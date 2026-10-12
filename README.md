@@ -210,6 +210,7 @@ macOS uses `Cmd` for the same shortcuts.
 | New Memory Buffer | Ctrl+N | Cmd+N |
 | Open State... | Ctrl+O | Cmd+O |
 | Save State | Ctrl+S | Cmd+S |
+| Save State As... | Ctrl+Shift+S | Cmd+Shift+S |
 | Preferences | Ctrl+, | Cmd+, |
 | Quit | Ctrl+Q | Cmd+Q |
 | Connect / Reconnect... | Ctrl+K | Cmd+K |

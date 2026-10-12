@@ -1240,3 +1240,33 @@ def test_preferences_opens_only_once(app):
     first.destroy()
     second = app.show_preferences()
     assert second is not first and second.winfo_exists()
+
+
+# -- Save As shortcut ---------------------------------------------------------
+
+
+def _accelerator(app, menu_name, label):
+    menu = app.nametowidget(app._menubar.entrycget(menu_name, "menu"))
+    for i in range(menu.index("end") + 1):
+        if menu.type(i) == "command" and menu.entrycget(i, "label") == label:
+            return menu.entrycget(i, "accelerator")
+    raise LookupError(label)
+
+
+@pytest.mark.parametrize("key", ["S", "s"])
+def test_save_as_has_a_shift_shortcut(app, key):
+    """Cmd/Ctrl+Shift+S, shown on the menu item, runs Save As -- not Save."""
+    acc = "Command" if app_module.PLATFORM_SYSTEM == "Darwin" else "Control"
+    assert _accelerator(app, "File", "Save State As...") == f"{acc}+Shift+S"
+
+    with (
+        mock.patch.object(app, "save_state_as") as save_as,
+        mock.patch.object(app, "save_state_to_file") as save,
+    ):
+        app.focus_force()
+        app.update()
+        app.event_generate(f"<{acc}-Shift-{key}>")
+        app.update()
+
+    save_as.assert_called_once()
+    save.assert_not_called()

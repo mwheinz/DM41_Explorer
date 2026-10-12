@@ -27,6 +27,7 @@ _SECTIONS = [
             ("New Memory Buffer", f"{_ACC}+N"),
             ("Open State...", f"{_ACC}+O"),
             ("Save State", f"{_ACC}+S"),
+            ("Save State As...", f"{_ACC}+Shift+S"),
             ("Preferences", f"{_ACC}+,"),
             ("Quit", f"{_ACC}+Q"),
         ],
