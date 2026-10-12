@@ -27,6 +27,7 @@ from memory import DeviceMode
 from gui import fonts
 from gui.fonts import font_for
 from gui.dialog_common import build_dialog_button_row, center_on_master, scaled
+from gui.font_family_dialog import FontFamilyDialog
 from gui.contrast import SECONDARY_TEXT, WARNING_TEXT
 
 logger = logging.getLogger(__name__)
@@ -311,15 +312,15 @@ class PreferencesDialog(ctk.CTkToplevel):
             ctk.CTkLabel(grid, text=f"{name}:").grid(
                 row=row, column=0, sticky="w", padx=(0, 8), pady=(8, 0)
             )
-            family_choice = family or FONT_DEFAULT_LABEL
-            families = [FONT_DEFAULT_LABEL] + self._installed_families
-            if family_choice not in families:
-                # e.g. a family from another machine's preferences file
-                families.append(family_choice)
-            family_var = ctk.StringVar(value=family_choice)
-            ctk.CTkOptionMenu(grid, values=families, variable=family_var).grid(
-                row=row, column=1, sticky="ew", padx=(0, 8), pady=(8, 0)
-            )
+            # A button opening a list, not a drop-down menu: Tk menus can't
+            # scroll on Linux -- see gui/font_family_dialog.py.
+            family_var = ctk.StringVar(value=family or FONT_DEFAULT_LABEL)
+            ctk.CTkButton(
+                grid,
+                textvariable=family_var,
+                anchor="w",
+                command=lambda role=role: self._choose_font_family(role),
+            ).grid(row=row, column=1, sticky="ew", padx=(0, 8), pady=(8, 0))
 
             size_choice = str(size) if size else FONT_SIZE_DEFAULT_LABEL
             sizes = [FONT_SIZE_DEFAULT_LABEL] + FONT_SIZES
@@ -365,6 +366,31 @@ class PreferencesDialog(ctk.CTkToplevel):
         ).pack(anchor="w", padx=8, pady=(4, 0))
 
         self._update_font_samples()
+
+    def _choose_font_family(self, role):
+        """Opens the family picker for `role`'s row. The mono row lists
+        only fixed-width families; a family not installed here (from
+        another machine's preferences file) stays listed while chosen."""
+        family_var = self._font_vars[role][0]
+        current = family_var.get()
+        if role == "mono":
+            families = fonts.monospace_families(self)
+            note = "Only fixed-width fonts are listed."
+        else:
+            families = list(self._installed_families)
+            note = None
+        if current != FONT_DEFAULT_LABEL and current not in families:
+            families.append(current)
+        name, _sample = FONT_ROLE_ROWS[role]
+        return FontFamilyDialog(
+            self,
+            f"{name} Font",
+            families,
+            default_label=FONT_DEFAULT_LABEL,
+            current=current,
+            on_chosen=family_var.set,
+            note=note,
+        )
 
     def _chosen_font_roles(self) -> dict:
         """{role: (family, size, bold)} as the Fonts tab stands, in the

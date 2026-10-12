@@ -167,3 +167,44 @@ def test_samples_left_at_their_defaults_follow_the_ui_choice(root, config, famil
 
 def test_the_offered_sizes_reach_down_to_the_floor():
     assert int(FONT_SIZES[0]) == fonts.MIN_FONT_SIZE
+
+
+# ---- the family picker (a list, since Tk menus can't scroll on Linux) ----
+
+
+def test_the_mono_row_offers_only_monospace_families(root, config):
+    dialog = _dialog(root, config)
+    picker = dialog._choose_font_family("mono")
+    assert picker._families == fonts.monospace_families(root)
+    picker._close()
+    dialog.destroy()
+
+
+def test_the_other_rows_offer_every_installed_family(root, config):
+    dialog = _dialog(root, config)
+    for role in ("ui", "small", "title"):
+        picker = dialog._choose_font_family(role)
+        assert picker._families == fonts.installed_families(root)
+        picker._close()
+    dialog.destroy()
+
+
+def test_a_saved_family_not_installed_here_is_still_listed(root, config):
+    config.set_font_role("mono", "Nowhere Mono", 0, False)
+    dialog = _dialog(root, config)
+    picker = dialog._choose_font_family("mono")
+    assert "Nowhere Mono" in picker._families
+    picker._close()
+    dialog.destroy()
+
+
+def test_picking_a_family_sets_the_row_and_redraws_its_sample(root, config):
+    dialog = _dialog(root, config)
+    family = fonts.monospace_families(root)[0]
+    picker = dialog._choose_font_family("mono")
+    picker._tree.selection_set(family)
+    picker.update()
+    picker._choose()
+    assert _choices(dialog, "mono")[0] == family
+    assert _sample(dialog, "mono")[0] == family
+    dialog.destroy()

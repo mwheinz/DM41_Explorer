@@ -155,6 +155,36 @@ def installed_families(root) -> list:
     return sorted(families, key=str.casefold)
 
 
+# The size, in pixels, monospace_families() measures each family at.
+_MEASURE_SIZE = 13
+# Monospace families found by monospace_families(); None until it runs.
+_monospace = None
+
+
+def _is_monospace(root, family: str) -> bool:
+    """Whether `family` is fixed-width. Tk's own "fixed" flag alone lets
+    some symbol fonts through (Wingdings 2), and comparing widths alone
+    lets others through (Webdings), so both must agree."""
+    font = tkfont.Font(root=root, family=family, size=-_MEASURE_SIZE)
+    return bool(font.metrics("fixed")) and font.measure("iiii") == font.measure("MMMM")
+
+
+def monospace_families(root) -> list:
+    """The installed families that are fixed-width, sorted like
+    installed_families() -- what the mono role's picker offers. Measuring
+    every family takes a moment (about 0.3 s for 190 families), so it is
+    done once, the first time it's asked for. The platform's own default
+    monospace family is always included."""
+    global _monospace
+    if _monospace is None:
+        found = [f for f in installed_families(root) if _is_monospace(root, f)]
+        default = _named_font_family(root, "TkFixedFont")
+        if default not in found:
+            found.append(default)
+        _monospace = sorted(found, key=str.casefold)
+    return list(_monospace)
+
+
 def apply(config_store, root=None) -> dict:
     """Works out every role's font from `config_store` (a ProjectConfig, or
     None for all defaults) and this machine, records them for font_for(),
