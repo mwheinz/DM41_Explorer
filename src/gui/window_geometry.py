@@ -179,3 +179,29 @@ def dialog_size(font_size, base, needed, screen):
         min(max(int(wanted * scale), int(need)), limit)
         for wanted, need, limit in zip(base, needed, cap)
     )
+
+
+def centered_position(size, parent, screens):
+    """Where to put a window of `size` (width, height) so it is centred on
+    `parent`, an (x, y, width, height) rectangle -- a dialog over the main
+    window (GitHub issue #64) -- but wholly on the screen that holds the
+    parent's centre (the first of `screens` if none does). A window larger
+    than that screen goes to its top-left corner."""
+    width, height = size
+    parent_x, parent_y, parent_width, parent_height = parent
+    x = parent_x + (parent_width - width) // 2
+    y = parent_y + (parent_height - height) // 2
+    middle_x = parent_x + parent_width // 2
+    middle_y = parent_y + parent_height // 2
+    screen = next(
+        (
+            s
+            for s in screens
+            if s[0] <= middle_x < s[0] + s[2] and s[1] <= middle_y < s[1] + s[3]
+        ),
+        screens[0],
+    )
+    left, top, screen_width, screen_height = screen
+    x = max(left, min(x, left + screen_width - width))
+    y = max(top, min(y, top + screen_height - height))
+    return x, y

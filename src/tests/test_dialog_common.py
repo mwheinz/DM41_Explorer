@@ -17,14 +17,18 @@ pytest.importorskip("customtkinter")
 
 import customtkinter as ctk
 
+from gui import dialog_common
 from gui.dialog_common import (
     CONFIRM_DIALOG_WIDTH,
     ConfirmDialog,
     _is_multiline_text_widget,
     ask_yes_no,
     build_dialog_button_row,
+    center_on_master,
+    fit_dialog,
     scaled,
 )
+from gui.window_geometry import centered_position
 
 
 def _buttons_by_text(widget) -> dict:
@@ -279,3 +283,82 @@ def test_ask_yes_no_returns_the_dialog_answer(root):
 
     with mock.patch.object(root, "wait_window", side_effect=lambda dialog: None):
         assert ask_yes_no(root, "Question", "Really?") is False
+
+
+# -- center_on_master (GitHub issue #64) -----------------------------------------
+
+
+@pytest.fixture
+def shown_parent():
+    parent = ctk.CTk()
+    parent.geometry("900x700+120+90")
+    if not _show(parent):
+        parent.destroy()
+        pytest.skip("the window never became viewable on this display")
+    yield parent
+    parent.destroy()
+
+
+def _requested_position(dialog, monkeypatch):
+    """Records the "+x+y" center_on_master() asks for, rather than reading
+    back where the window manager put the dialog, which it may adjust."""
+    asked = []
+    monkeypatch.setattr(dialog, "geometry", lambda text=None: asked.append(text))
+    return asked
+
+
+def test_a_dialog_is_centred_on_its_window(shown_parent, monkeypatch):
+    monkeypatch.setattr(
+        dialog_common,
+        "screen_rectangles",
+        lambda _window: [(-5000, -5000, 20000, 20000)],
+    )
+    dialog = ctk.CTkToplevel(shown_parent)
+    dialog.wm_geometry("300x200")
+    asked = _requested_position(dialog, monkeypatch)
+
+    center_on_master(dialog)
+
+    parent_box = (
+        shown_parent.winfo_rootx(),
+        shown_parent.winfo_rooty(),
+        shown_parent.winfo_width(),
+        shown_parent.winfo_height(),
+    )
+    # The size as center_on_master() reads it: Tk's own, which the window
+    # manager may have adjusted from 300x200.
+    reported = dialog_common._RAW_SIZE.match(dialog.wm_geometry())
+    width = max(int(reported.group(1)), dialog.winfo_reqwidth())
+    height = max(int(reported.group(2)), dialog.winfo_reqheight())
+    x, y = centered_position(
+        (width, height), parent_box, [(-5000, -5000, 20000, 20000)]
+    )
+    assert asked == [f"+{x}+{y}"]
+    dialog.destroy()
+
+
+def test_nothing_moves_while_the_parent_is_hidden(root, monkeypatch):
+    dialog = ctk.CTkToplevel(root)  # `root` is withdrawn
+    asked = _requested_position(dialog, monkeypatch)
+    center_on_master(dialog)
+    assert asked == []
+    dialog.destroy()
+
+
+def test_fit_dialog_centres_the_dialog(root, monkeypatch):
+    centred = []
+    monkeypatch.setattr(dialog_common, "center_on_master", centred.append)
+    dialog = ctk.CTkToplevel(root)
+    fit_dialog(dialog, 300, 200)
+    assert centred == [dialog]
+    dialog.destroy()
+
+
+def test_a_failure_while_centring_is_harmless(shown_parent, monkeypatch):
+    def broken(_window):
+        raise RuntimeError("no screens")
+
+    monkeypatch.setattr(dialog_common, "screen_rectangles", broken)
+    dialog = ctk.CTkToplevel(shown_parent)
+    center_on_master(dialog)  # must not raise
+    dialog.destroy()

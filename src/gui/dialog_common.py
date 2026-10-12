@@ -5,11 +5,16 @@ buttons the same way instead of each hand-rolling a slightly different
 pack() order that drifts apart over time -- GitHub issue #13.
 """
 
+import logging
 import platform
+import re
 import tkinter as tk
 import customtkinter as ctk
 
-from gui.window_geometry import dialog_size, scaled_width
+from gui.screens import screen_rectangles
+from gui.window_geometry import centered_position, dialog_size, scaled_width
+
+logger = logging.getLogger(__name__)
 
 # Every dialog's button row used this width for every button before this
 # was centralized -- kept as the shared default so build_dialog_button_row
@@ -54,6 +59,46 @@ def fit_dialog(dialog, base_width=0, base_height=0, *, minimum=None, content=Tru
     )
     dialog.geometry(f"{size[0]}x{size[1]}")
     dialog.minsize(*smallest)
+    center_on_master(dialog)
+
+
+_RAW_SIZE = re.compile(r"^(\d+)x(\d+)")
+
+
+def center_on_master(dialog):
+    """Puts `dialog` in the middle of the window it belongs to, kept on
+    that window's screen (GitHub issue #64). Without this, macOS and
+    Windows open every dialog in a corner of the screen, however far that
+    is from the main window; Linux window managers mostly centre dialogs
+    themselves, and this lands in the same place.
+
+    Call it once the dialog's size is set: fit_dialog() does, so only a
+    dialog that doesn't use that needs to call it. Does nothing while the
+    parent isn't on screen (a hidden root, as in the tests), and never
+    raises -- a misplaced dialog mustn't stop it opening."""
+    try:
+        dialog.update_idletasks()
+        parent = dialog.master.winfo_toplevel()
+        if not parent.winfo_viewable():
+            return
+        # Tk's own (scaled) units throughout: CustomTkinter passes window
+        # positions through unscaled, so sizes have to be raw too.
+        match = _RAW_SIZE.match(dialog.wm_geometry())
+        width = max(int(match.group(1)) if match else 0, dialog.winfo_reqwidth())
+        height = max(int(match.group(2)) if match else 0, dialog.winfo_reqheight())
+        x, y = centered_position(
+            (width, height),
+            (
+                parent.winfo_rootx(),
+                parent.winfo_rooty(),
+                parent.winfo_width(),
+                parent.winfo_height(),
+            ),
+            screen_rectangles(dialog),
+        )
+        dialog.geometry(f"+{x}+{y}")
+    except Exception as e:
+        logger.debug("Could not centre %s on its window: %s", dialog, e)
 
 
 def wrap_labels_to_width(dialog, labels, margin):

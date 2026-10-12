@@ -18,7 +18,7 @@ from memory import (
     NAME_MIN_CHAR,
     NAME_MAX_CHAR,
 )
-from gui.dialog_common import build_dialog_button_row, scaled
+from gui.dialog_common import build_dialog_button_row, center_on_master, scaled
 from gui.tab_common import MONOSPACE_FONT_FAMILY
 
 logger = logging.getLogger(__name__)
@@ -157,6 +157,8 @@ class XMFileDialog(ctk.CTkToplevel):
             on_primary=self._on_save_clicked,
             pack_kwargs={"padx": 16, "pady": (12, 16), "fill": "x", "side": "bottom"},
         )
+        # In the middle of the window it belongs to (GitHub issue #64).
+        center_on_master(self)
 
     def _on_type_changed(self, value):
         self._data_label.pack_forget()

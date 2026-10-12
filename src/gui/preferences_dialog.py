@@ -23,7 +23,7 @@ import tkinter.font as tkfont
 import customtkinter as ctk
 
 from memory import DeviceMode
-from gui.dialog_common import build_dialog_button_row, scaled
+from gui.dialog_common import build_dialog_button_row, center_on_master, scaled
 from gui.contrast import SECONDARY_TEXT, WARNING_TEXT
 from gui.tab_common import ui_font
 
@@ -104,6 +104,8 @@ class PreferencesDialog(ctk.CTkToplevel):
             on_primary=self._on_save,
             pack_kwargs={"padx": 16, "pady": (0, 16), "fill": "x"},
         )
+        # In the middle of the window it belongs to (GitHub issue #64).
+        center_on_master(self)
 
     # -- Connection tab -------------------------------------------------
 

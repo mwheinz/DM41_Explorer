@@ -15,7 +15,7 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from memory import Alarm
-from gui.dialog_common import build_dialog_button_row, scaled
+from gui.dialog_common import build_dialog_button_row, center_on_master, scaled
 from gui.contrast import SECONDARY_TEXT
 from gui.tab_common import ui_font
 
@@ -139,6 +139,8 @@ class AlarmEditDialog(ctk.CTkToplevel):
             on_primary=self._on_save_clicked,
             pack_kwargs={"padx": 16, "pady": (0, 16), "fill": "x", "side": "bottom"},
         )
+        # In the middle of the window it belongs to (GitHub issue #64).
+        center_on_master(self)
 
     def _on_type_changed(self, label_value):
         alarm_type = _TYPE_BY_LABEL[label_value]

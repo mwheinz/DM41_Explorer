@@ -7,6 +7,7 @@ import pytest
 
 from gui.window_geometry import (
     BASE_DEFAULT_SIZE,
+    centered_position,
     BASE_FONT_SIZE,
     BASE_MINIMUM_SIZE,
     default_window_size,
@@ -206,3 +207,32 @@ def test_restored_position(saved, screens, expected):
 
 def test_a_narrow_window_needs_only_its_own_width_on_screen():
     assert restored_position((1850, 10), (60, 400), [MAIN]) == (1850, 10)
+
+
+# -- Centring dialogs (GitHub issue #64) ----------------------------------------
+
+PARENT = (100, 50, 1080, 768)
+DIALOG = (400, 300)
+
+
+@pytest.mark.parametrize(
+    "parent, screens, expected",
+    [
+        # Centred on the parent.
+        (PARENT, [MAIN], (100 + 340, 50 + 234)),
+        # A parent hanging off the left: kept on the screen.
+        ((-900, 50, 1080, 768), [MAIN], (0, 284)),
+        # Off the bottom-right corner.
+        ((1600, 900, 1080, 768), [MAIN], (1920 - 400, 1080 - 300)),
+        # On a second monitor, left of the main one: centred there.
+        ((-1500, 100, 1080, 768), [MAIN, LEFT], (-1500 + 340, 100 + 234)),
+        # Its centre on no screen: the first one keeps it.
+        ((5000, 5000, 1080, 768), [MAIN, LEFT], (1920 - 400, 1080 - 300)),
+    ],
+)
+def test_centered_position(parent, screens, expected):
+    assert centered_position(DIALOG, parent, screens) == expected
+
+
+def test_a_dialog_larger_than_the_screen_goes_to_its_corner():
+    assert centered_position((2500, 1500), PARENT, [MAIN]) == (0, 0)

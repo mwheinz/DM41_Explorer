@@ -14,7 +14,7 @@ import platform
 from tkinter import messagebox
 import customtkinter as ctk
 
-from gui.dialog_common import build_dialog_button_row, scaled
+from gui.dialog_common import build_dialog_button_row, center_on_master, scaled
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +69,8 @@ class RegisterRangeDialog(ctk.CTkToplevel):
         )
 
         self.protocol("WM_DELETE_WINDOW", self.destroy)
+        # In the middle of the window it belongs to (GitHub issue #64).
+        center_on_master(self)
 
     def _on_confirm_clicked(self):
         try:
@@ -154,6 +156,8 @@ class RegisterImportLocationDialog(ctk.CTkToplevel):
         )
 
         self.protocol("WM_DELETE_WINDOW", self.destroy)
+        # In the middle of the window it belongs to (GitHub issue #64).
+        center_on_master(self)
 
     def _on_confirm_clicked(self):
         try:
