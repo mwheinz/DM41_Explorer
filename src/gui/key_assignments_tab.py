@@ -167,7 +167,7 @@ STATIC_CELL_TEXT_COLORS = {
 }
 
 # Key sizing (GitHub issue #41). Everything on the keys follows the
-# application font (Preferences > Font): the key number, the assignment text
+# application font (Preferences > Fonts): the key number, the assignment text
 # and the labels of the fixed physical keys all use it, and a key button is
 # never narrower than KEY_MIN_CHARS characters of that font -- so a long
 # function name (the longest are 7 characters, e.g. "RCLFLAG") doesn't make

@@ -2,7 +2,8 @@
 Preferences dialog, in three tabs (GitHub issue #43):
 
   General     the DM41L/DM41X mode, and logging (level, directory)
-  Appearance  light/dark, color theme, contrast, font
+  Appearance  light/dark, color theme, contrast
+  Fonts       the four font roles (GitHub issue #61)
   Connection  default serial port, baud rate, console timeout
 
 The mode is the odd one out: every other setting here is written straight
@@ -19,10 +20,11 @@ import logging
 import platform
 from pathlib import Path
 from tkinter import filedialog, messagebox
-import tkinter.font as tkfont
 import customtkinter as ctk
 
+from config import FONT_ROLES
 from memory import DeviceMode
+from gui import fonts
 from gui.fonts import font_for
 from gui.dialog_common import build_dialog_button_row, center_on_master, scaled
 from gui.contrast import SECONDARY_TEXT, WARNING_TEXT
@@ -39,7 +41,16 @@ COLOR_THEMES = ["blue", "dark-blue", "gold", "green"]
 
 FONT_DEFAULT_LABEL = "System Default"
 FONT_SIZE_DEFAULT_LABEL = "Default"
-FONT_SIZES = ["9", "10", "11", "12", "13", "14", "16", "18", "20"]
+FONT_SIZES = ["8", "9", "10", "11", "12", "13", "14", "16", "18", "20", "24"]
+
+# Each font role's row on the Fonts tab: its name, and the sample text
+# drawn in the font chosen, so the effect shows before restarting.
+FONT_ROLE_ROWS = {
+    "ui": ("Application", "Labels, buttons and tables"),
+    "small": ("Small text", "Captions, hints and key labels"),
+    "title": ("Headings", "Section and dialog headings"),
+    "mono": ("Monospace", "0x1A2B  XROM 25,00  ALPHA"),
+}
 
 # The mode selector's choices, in the order they are offered. Taken from
 # DeviceMode so a model added later cannot be left out of the dialog.
@@ -92,10 +103,12 @@ class PreferencesDialog(ctk.CTkToplevel):
         # Connection. CTkTabview shows whichever was added first.
         tabs.add("General")
         tabs.add("Appearance")
+        tabs.add("Fonts")
         tabs.add("Connection")
 
         self._build_general_tab(tabs.tab("General"))
         self._build_appearance_tab(tabs.tab("Appearance"))
+        self._build_fonts_tab(tabs.tab("Fonts"))
         self._build_connection_tab(tabs.tab("Connection"))
 
         build_dialog_button_row(
@@ -254,42 +267,9 @@ class PreferencesDialog(ctk.CTkToplevel):
             variable=self._high_contrast_var,
         ).pack(anchor="w", padx=8, pady=(12, 0))
 
-        font_row = ctk.CTkFrame(tab, fg_color="transparent")
-        font_row.pack(anchor="w", padx=8, pady=(16, 0), fill="x")
-        font_row.grid_columnconfigure(0, weight=1)
-        font_row.grid_columnconfigure(1, weight=0)
-
-        family_col = ctk.CTkFrame(font_row, fg_color="transparent")
-        family_col.grid(row=0, column=0, sticky="ew")
-        ctk.CTkLabel(family_col, text="Application font:").pack(anchor="w")
-        families = [FONT_DEFAULT_LABEL] + self._get_font_families()
-        current_family = self._config.font_family or FONT_DEFAULT_LABEL
-        if current_family not in families:
-            families.append(current_family)
-        self._font_family_var = ctk.StringVar(value=current_family)
-        ctk.CTkOptionMenu(
-            family_col, values=families, variable=self._font_family_var
-        ).pack(anchor="w", pady=(4, 0), fill="x")
-
-        size_col = ctk.CTkFrame(font_row, fg_color="transparent")
-        size_col.grid(row=0, column=1, sticky="ew", padx=(8, 0))
-        ctk.CTkLabel(size_col, text="Size:").pack(anchor="w")
-        sizes = [FONT_SIZE_DEFAULT_LABEL] + FONT_SIZES
-        current_size = (
-            str(self._config.font_size)
-            if self._config.font_size
-            else FONT_SIZE_DEFAULT_LABEL
-        )
-        if current_size not in sizes:
-            sizes.append(current_size)
-        self._font_size_var = ctk.StringVar(value=current_size)
-        ctk.CTkOptionMenu(
-            size_col, values=sizes, variable=self._font_size_var, width=scaled(90)
-        ).pack(anchor="w", pady=(4, 0))
-
         ctk.CTkLabel(
             tab,
-            text="Font, color theme and contrast changes\n"
+            text="Color theme and contrast changes\n"
             "take effect after restarting DM41_Explorer.",
             justify="left",
             text_color=WARNING_TEXT,
@@ -304,15 +284,125 @@ class PreferencesDialog(ctk.CTkToplevel):
         if chosen:
             self._log_dir_var.set(chosen)
 
-    @staticmethod
-    def _get_font_families() -> list:
-        """Returns the system's installed font family names, sorted and
-        de-duplicated (font backends commonly report the same family
-        multiple times across styles/weights). Vertical-writing CJK
-        families (Tk lists these with a "@" prefix) are dropped since
-        they're not meant for horizontal UI text."""
-        families = {f for f in tkfont.families() if not f.startswith("@")}
-        return sorted(families, key=str.casefold)
+    # -- Fonts tab --------------------------------------------------------
+
+    def _build_fonts_tab(self, tab):
+        """One row per font role (GitHub issue #61): family, size, bold,
+        and a sample in the font chosen. "System Default" and "Default"
+        store "" and 0, so the role follows this platform's default."""
+        self._font_defaults = fonts.platform_defaults(self)
+        self._installed_families = fonts.installed_families(self)
+        self._font_vars = {}
+        self._font_samples = {}
+
+        grid = ctk.CTkFrame(tab, fg_color="transparent")
+        grid.pack(anchor="w", padx=8, pady=(12, 0), fill="x")
+        grid.grid_columnconfigure(1, weight=1)
+        for column, heading in enumerate(("", "Family", "Size", "")):
+            ctk.CTkLabel(grid, text=heading, font=font_for("small")).grid(
+                row=0, column=column, sticky="w", padx=(0, 8)
+            )
+
+        for index, role in enumerate(FONT_ROLES):
+            name, sample_text = FONT_ROLE_ROWS[role]
+            family, size, bold = self._config.font_role(role)
+            row = 1 + 2 * index
+
+            ctk.CTkLabel(grid, text=f"{name}:").grid(
+                row=row, column=0, sticky="w", padx=(0, 8), pady=(8, 0)
+            )
+            family_choice = family or FONT_DEFAULT_LABEL
+            families = [FONT_DEFAULT_LABEL] + self._installed_families
+            if family_choice not in families:
+                # e.g. a family from another machine's preferences file
+                families.append(family_choice)
+            family_var = ctk.StringVar(value=family_choice)
+            ctk.CTkOptionMenu(grid, values=families, variable=family_var).grid(
+                row=row, column=1, sticky="ew", padx=(0, 8), pady=(8, 0)
+            )
+
+            size_choice = str(size) if size else FONT_SIZE_DEFAULT_LABEL
+            sizes = [FONT_SIZE_DEFAULT_LABEL] + FONT_SIZES
+            if size_choice not in sizes:
+                sizes.append(size_choice)
+            size_var = ctk.StringVar(value=size_choice)
+            ctk.CTkOptionMenu(
+                grid, values=sizes, variable=size_var, width=scaled(90)
+            ).grid(row=row, column=2, sticky="w", padx=(0, 8), pady=(8, 0))
+
+            bold_var = ctk.BooleanVar(value=bold)
+            ctk.CTkCheckBox(grid, text="Bold", variable=bold_var).grid(
+                row=row, column=3, sticky="w", pady=(8, 0)
+            )
+
+            sample_font = ctk.CTkFont()
+            ctk.CTkLabel(
+                grid,
+                text=sample_text,
+                font=sample_font,
+                text_color=SECONDARY_TEXT,
+                anchor="w",
+            ).grid(row=row + 1, column=1, columnspan=3, sticky="w")
+
+            self._font_vars[role] = (family_var, size_var, bold_var)
+            self._font_samples[role] = sample_font
+            for var in (family_var, size_var, bold_var):
+                var.trace_add("write", lambda *_: self._update_font_samples())
+
+        ctk.CTkButton(
+            tab,
+            text="Restore Defaults",
+            width=scaled(140),
+            command=self._restore_default_fonts,
+        ).pack(anchor="w", padx=8, pady=(16, 0))
+        ctk.CTkLabel(
+            tab,
+            text="Font changes take effect after restarting DM41_Explorer.",
+            justify="left",
+            text_color=WARNING_TEXT,
+            font=font_for("small"),
+        ).pack(anchor="w", padx=8, pady=(4, 0))
+
+        self._update_font_samples()
+
+    def _chosen_font_roles(self) -> dict:
+        """{role: (family, size, bold)} as the Fonts tab stands, in the
+        form the preferences file stores. A size that isn't a number
+        (only possible by hand-editing the file) counts as the default."""
+        chosen = {}
+        for role, (family_var, size_var, bold_var) in self._font_vars.items():
+            family = family_var.get()
+            size = size_var.get()
+            chosen[role] = (
+                "" if family == FONT_DEFAULT_LABEL else family,
+                int(size) if size.isdigit() else 0,
+                bool(bold_var.get()),
+            )
+        return chosen
+
+    def _update_font_samples(self):
+        """Redraws each sample in the font its role would have after a
+        restart -- so a role left at its defaults shows the ui role's
+        effect on it, as it will be."""
+        resolved = fonts.resolve_roles(
+            self._chosen_font_roles(), self._font_defaults, self._installed_families
+        )
+        for role, sample_font in self._font_samples.items():
+            spec = resolved[role]
+            sample_font.configure(
+                family=spec.family,
+                size=spec.size,
+                weight="bold" if spec.bold else "normal",
+            )
+
+    def _restore_default_fonts(self):
+        """Sets every role back to this platform's default. Nothing is
+        stored until Save."""
+        for role, (family_var, size_var, bold_var) in self._font_vars.items():
+            _family, _size, bold = self._config.DEFAULT_PREFS[f"font_{role}"]
+            family_var.set(FONT_DEFAULT_LABEL)
+            size_var.set(FONT_SIZE_DEFAULT_LABEL)
+            bold_var.set(bold)
 
     # -- Save -------------------------------------------------------------
 
@@ -342,17 +432,8 @@ class PreferencesDialog(ctk.CTkToplevel):
         self._config.appearance_mode = self._appearance_var.get()
         self._config.color_theme = self._color_theme_var.get()
         self._config.high_contrast = self._high_contrast_var.get()
-        family_choice = self._font_family_var.get()
-        self._config.font_family = (
-            "" if family_choice == FONT_DEFAULT_LABEL else family_choice
-        )
-        size_choice = self._font_size_var.get()
-        try:
-            self._config.font_size = (
-                0 if size_choice == FONT_SIZE_DEFAULT_LABEL else int(size_choice)
-            )
-        except ValueError as e:
-            logger.warning("Invalid font size %r, not saved: %s", size_choice, e)
+        for role, (family, size, bold) in self._chosen_font_roles().items():
+            self._config.set_font_role(role, family, size, bold)
         self._config.log_directory = log_dir_str
 
         try:

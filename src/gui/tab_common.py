@@ -30,7 +30,7 @@ from pathlib import Path
 from tkinter import ttk, filedialog, messagebox
 import customtkinter as ctk
 
-from gui.fonts import font_for, font_spec
+from gui.fonts import font_for, font_spec, widget_scaling
 from gui.contrast import SECONDARY_TEXT
 from gui.scroll_support import SmoothTreeview
 from gui.window_geometry import scaled_row_height, scaled_width
@@ -98,12 +98,18 @@ def stripe_bg_color() -> str:
     return STRIPE_BG_DARK if ctk.get_appearance_mode() == "Dark" else STRIPE_BG_LIGHT
 
 
-def treeview_fonts():
+def treeview_fonts(widget=None):
     """(cell font, heading font) as Tk font tuples -- the mono font role
     for cells, which are register and memory content, and the title role
-    for headings. The one place both style_treeview() and fit_columns()
-    get them from, so what is measured is what is drawn."""
-    return (font_spec("mono").tk_tuple(), font_spec("title").tk_tuple())
+    for headings -- sized as CustomTkinter sizes the same roles elsewhere
+    (see FontSpec.tk_tuple()) for `widget`'s window, the main window if
+    None. The one place both style_treeview() and fit_columns() get them
+    from, so what is measured is what is drawn."""
+    scaling = widget_scaling(widget)
+    return (
+        font_spec("mono").tk_tuple(scaling),
+        font_spec("title").tk_tuple(scaling),
+    )
 
 
 def style_treeview(style_name: str = "Treeview", *, selectable: bool = True) -> str:
@@ -238,7 +244,7 @@ def fit_columns(tree: ttk.Treeview, columns: list) -> None:
     Fixed pixel widths (even scaled with the font) turned out not to be
     enough: the Alarms tab's 150-pixel time column truncated a full
     "YYYY-MM-DD HH:MM:SS" even at the default font size."""
-    cell_spec, heading_spec = treeview_fonts()
+    cell_spec, heading_spec = treeview_fonts(tree)
     cell_font = tkfont.Font(font=cell_spec)
     heading_font = tkfont.Font(font=heading_spec)
     font_size = font_spec("mono").size

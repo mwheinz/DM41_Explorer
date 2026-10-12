@@ -307,27 +307,6 @@ class ProjectConfig:
             raise ValueError(f"Unknown font role {role!r}")
         self._prefs[f"font_{role}"] = [str(family), int(size), bool(bold)]
 
-    # The application font as Preferences offered it before the font roles
-    # existed: the "ui" role's family and size. Kept until the Preferences
-    # dialog edits the roles directly.
-    @property
-    def font_family(self) -> str:
-        return self.font_role("ui")[0]
-
-    @font_family.setter
-    def font_family(self, value):
-        _, size, bold = self.font_role("ui")
-        self.set_font_role("ui", value, size, bold)
-
-    @property
-    def font_size(self) -> int:
-        return self.font_role("ui")[1]
-
-    @font_size.setter
-    def font_size(self, value):
-        family, _, bold = self.font_role("ui")
-        self.set_font_role("ui", family, value, bold)
-
     @property
     def xrom_directory(self) -> Path:
         """Where the user's own XROM library files live: a folder named

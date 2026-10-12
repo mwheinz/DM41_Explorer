@@ -56,11 +56,17 @@ class FontSpec(NamedTuple):
     size: int
     bold: bool
 
-    def tk_tuple(self) -> tuple:
-        """The Tk font description, e.g. for a ttk style's font=."""
+    def tk_tuple(self, scaling: float = 1.0) -> tuple:
+        """The Tk font description, e.g. for a ttk style's font=, sized the
+        way CustomTkinter sizes a CTkFont: in pixels (a negative size, to
+        Tk), times CTk's widget scaling -- see widget_scaling(). A positive
+        size would be points, which Tk enlarges by its own `tk scaling`
+        (about 1.33 on macOS), so a table would be drawn larger than a
+        label of the same role."""
+        size = -abs(round(self.size * scaling))
         if self.bold:
-            return (self.family, self.size, "bold")
-        return (self.family, self.size)
+            return (self.family, size, "bold")
+        return (self.family, size)
 
 
 class PlatformDefaults(NamedTuple):
@@ -106,12 +112,47 @@ def resolve_roles(stored: dict, defaults: PlatformDefaults, installed) -> dict:
     }
 
 
+def widget_scaling(widget=None) -> float:
+    """CustomTkinter's widget scaling for `widget`'s window (the default
+    root if None): the factor every CTkFont's size is multiplied by. Its
+    user setting alone if the window isn't one CTk tracks."""
+    try:
+        widget = widget or tkinter._get_default_root("look up the scaling")
+        return ctk.ScalingTracker.get_widget_scaling(widget)
+    except (KeyError, RuntimeError, AttributeError):
+        return ctk.ScalingTracker.widget_scaling
+
+
 # The fonts apply() settled on, {role: FontSpec}; empty until it runs.
 _resolved: dict = {}
+# The color theme's own font size, as it was before apply() replaced it
+# with the ui role's -- so platform_defaults() still knows it afterwards
+# (the Preferences dialog's samples ask). None until apply() runs.
+_theme_size = None
 
 
 def _named_font_family(root, name: str) -> str:
     return tkfont.nametofont(name, root=root).actual("family")
+
+
+def platform_defaults(root) -> PlatformDefaults:
+    """This machine's defaults for a role left at "" / 0. The size is the
+    color theme's own: the one apply() found, since apply() then replaces
+    the theme's size with the ui role's."""
+    size = _theme_size or ctk.ThemeManager.theme["CTkFont"]["size"]
+    return PlatformDefaults(
+        ui_family=_named_font_family(root, "TkDefaultFont"),
+        mono_family=_named_font_family(root, "TkFixedFont"),
+        size=size,
+    )
+
+
+def installed_families(root) -> list:
+    """The font family names installed on this machine, sorted without
+    case and de-duplicated. Vertical-writing CJK families (listed with a
+    leading "@") are left out: they're not meant for horizontal text."""
+    families = {f for f in tkfont.families(root) if not f.startswith("@")}
+    return sorted(families, key=str.casefold)
 
 
 def apply(config_store, root=None) -> dict:
@@ -123,19 +164,17 @@ def apply(config_store, root=None) -> dict:
     Has to run after the color theme is set (which resets the theme font)
     and before any widget is built. `root` is any Tk widget; it defaults
     to the default root. Returns {role: FontSpec}."""
+    global _theme_size
     root = root or tkinter._get_default_root("look up the platform fonts")
     theme_font = ctk.ThemeManager.theme["CTkFont"]
-    defaults = PlatformDefaults(
-        ui_family=_named_font_family(root, "TkDefaultFont"),
-        mono_family=_named_font_family(root, "TkFixedFont"),
-        size=theme_font["size"],
-    )
+    # Freshly set by the color theme, so this is the theme's own size.
+    _theme_size = theme_font["size"]
     stored = (
         {role: config_store.font_role(role) for role in FONT_ROLES}
         if config_store is not None
         else {}
     )
-    resolved = resolve_roles(stored, defaults, tkfont.families(root))
+    resolved = resolve_roles(stored, platform_defaults(root), installed_families(root))
     theme_font["family"] = resolved["ui"].family
     theme_font["size"] = resolved["ui"].size
     _resolved.clear()
@@ -146,7 +185,9 @@ def apply(config_store, root=None) -> dict:
 def reset() -> None:
     """Forgets the fonts apply() settled on, so the next font_for() works
     them out again. For tests."""
+    global _theme_size
     _resolved.clear()
+    _theme_size = None
 
 
 def font_spec(role: str) -> FontSpec:

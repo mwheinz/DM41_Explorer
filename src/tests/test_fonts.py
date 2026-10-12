@@ -106,8 +106,12 @@ def test_no_size_goes_below_the_floor():
 
 
 def test_tk_tuple_names_bold_only_when_bold():
-    assert FontSpec("Sans", 12, False).tk_tuple() == ("Sans", 12)
-    assert FontSpec("Sans", 12, True).tk_tuple() == ("Sans", 12, "bold")
+    assert FontSpec("Sans", 12, False).tk_tuple() == ("Sans", -12)
+    assert FontSpec("Sans", 12, True).tk_tuple() == ("Sans", -12, "bold")
+
+
+def test_tk_tuple_is_in_scaled_pixels_like_a_ctkfont():
+    assert FontSpec("Sans", 12, False).tk_tuple(1.5) == ("Sans", -18)
 
 
 # ---- apply / font_for: against a live Tk ----
@@ -194,9 +198,23 @@ def large_mono(root, tmp_path, monkeypatch):
 
 
 def test_table_cells_use_mono_and_headings_use_title(large_mono):
-    assert treeview_fonts() == (
-        font_spec("mono").tk_tuple(),
-        font_spec("title").tk_tuple(),
+    scaling = fonts.widget_scaling(large_mono)
+    assert treeview_fonts(large_mono) == (
+        font_spec("mono").tk_tuple(scaling),
+        font_spec("title").tk_tuple(scaling),
+    )
+
+
+def test_a_table_heading_is_drawn_the_size_of_a_title_label(root):
+    """A ttk heading and a CTk label of the same role must come out the
+    same size -- a positive (point) size made the tables about a third
+    larger on macOS."""
+    fonts.apply(None, root)
+    _cells, heading = treeview_fonts(root)
+    label = ctk.CTkLabel(root, text="Address", font=font_for("title"))
+    tk_font = tkfont.Font(root=root, font=label._label.cget("font"))
+    assert tkfont.Font(root=root, font=heading).measure("Address") == (
+        tk_font.measure("Address")
     )
 
 

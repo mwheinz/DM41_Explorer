@@ -285,12 +285,12 @@ def test_load_and_save_failures_are_preferences_errors(prefs_file, monkeypatch):
 def test_plain_settings_round_trip_through_the_file(prefs_file):
     config = ProjectConfig()
     config.serial_port = "/dev/ttyTEST"
-    config.font_size = 15
+    config.color_theme = "green"
     config.save()
     reloaded = ProjectConfig()
     reloaded.load()
     assert reloaded.serial_port == "/dev/ttyTEST"
-    assert reloaded.font_size == 15
+    assert reloaded.color_theme == "green"
 
 
 def test_window_size_defaults_to_none(prefs_file):
@@ -521,14 +521,3 @@ def test_an_unknown_font_role_is_an_error(prefs_file):
         config.font_role("huge")
     with pytest.raises(ValueError):
         config.set_font_role("huge", "Helvetica", 12, False)
-
-
-def test_font_family_and_size_still_edit_the_ui_role(prefs_file):
-    """Preferences still offers one application font until it edits the
-    roles directly; that font is the ui role."""
-    config = ProjectConfig()
-    config.set_font_role("ui", "", 0, True)
-    config.font_family = "Helvetica"
-    config.font_size = 15
-    assert config.font_role("ui") == ("Helvetica", 15, True)
-    assert (config.font_family, config.font_size) == ("Helvetica", 15)

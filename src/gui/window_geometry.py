@@ -8,7 +8,7 @@ big the screen is) and applies the answer.
 The three rules:
 
   * The default size and the minimum size grow with the application font
-    (Preferences > Font), because everything inside the window does.
+    (Preferences > Fonts), because everything inside the window does.
   * The minimum size is never smaller than what the tab bar and status bar
     ask for, so a large font can't clip the tabs.
   * A size saved from the last session wins over the default, but is still
