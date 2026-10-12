@@ -1526,6 +1526,9 @@ class DM41ExplorerApp(ctk.CTk):
                 ", ".join(self.xrom_active.missing),
             )
         set_active_libraries(self.xrom_active.libraries)
+        reference = getattr(self, "_mnemonics_reference", None)
+        if reference is not None and reference.winfo_exists():
+            reference.refresh_rows()
         return errors
 
     def show_xrom_libraries(self):

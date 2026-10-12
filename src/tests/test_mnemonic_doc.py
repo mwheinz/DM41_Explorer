@@ -145,3 +145,20 @@ def test_markdown_escapes_pipes_in_table_cells():
         if line.startswith("| `"):
             cells = line.replace("\\|", "").count("|")
             assert cells in (4, 6), line
+
+
+def test_an_active_librarys_functions_are_noted_with_its_title():
+    """GitHub issue #54: the reference names the pac a function comes
+    from. The committed docs/mnemonics.md is unaffected, being generated
+    with the built-in XROMs alone."""
+    from memory.mnemonics import set_active_libraries
+    from memory.xrom_library import active_set, load_libraries
+
+    libraries, _ = load_libraries()
+    set_active_libraries(active_set(libraries, "DM41X", ["math"]).libraries)
+    try:
+        solve = next(r for r in mnemonic_reference_rows() if r.display == "SOLVE")
+        assert (solve.encoding, solve.notes) == ("XROM 01,09", "Math Pac")
+    finally:
+        set_active_libraries([])
+    assert not any(r.display == "SOLVE" for r in mnemonic_reference_rows())

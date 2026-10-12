@@ -17,7 +17,12 @@ serial console or USB disk interface.
   text, or raw hex.
 - **XM Files** — list, add, edit, and remove files stored in extended memory
   (Data, ASCII, and Program types).
-- **Key Assignments** - view, add, edit, and remove user key assignments.
+- **Key Assignments** - view, add, edit, and remove user key assignments,
+  including any XROM function, by name or by its module and function
+  numbers.
+- **XROM libraries** — names for the functions of the DM41X's application
+  pacs (Math, Stat, Advantage, PPC and the rest) and of any other ROM you add
+  as a `.mod` file or an hp41uc XROM list (Tools > XROM Libraries).
 - Connect directly to a DM41L over USB serial, or work entirely offline from a
   saved `.dm41` state file (File > Open / Save State).
 - **Hex View** — a full, color-coded map of the entire memory space (status
@@ -135,9 +140,39 @@ The Key Assignments tab allows you to view and edit the user key assignments in
 the loaded state. It has two sub-tabs: the first shows the keys in the DM41L
 layout, and the second in the DM41X layout. Both show the same assignments, so
 an edit made on either one appears on the other. Clicking on a key will let you
-edit that key's current assignment - you can either select one of the built-in
-HP41CX functions, or one of the currently loaded programs, or enter in two
-hexadecimal bytes if you want to experiment with synthetic programming.
+edit that key's current assignment. You can choose:
+
+- **Function:** a built-in function, or one from an active [XROM
+  library](#xrom-libraries), by picking it or typing its name. A typed name
+  is looked up the way `ASN` does it on the calculator, so with the Standard
+  Applications Pac active, `LOG` is the pac's LOG. When two functions share
+  a name, the list shows where each comes from. You can also type
+  `XROM 26,38` or `XROM "LOG"`.
+- **XROM:** any XROM function by its module (1–31) and function (0–63)
+  numbers, whether or not a library names it. A function a DM41L doesn't
+  have can still be assigned in DM41L mode, after a confirmation.
+- **Program:** one of the currently loaded programs.
+- **Raw Hex:** two hexadecimal bytes, if you want to experiment with
+  synthetic programming.
+
+![Key assignment dialog, XROM tab](resources/screenshots/key_assign_xrom.png)
+
+### XROM Libraries
+
+![XROM Libraries](resources/screenshots/xrom_libraries.png)
+
+An XROM instruction stores only a module and function number; its name
+comes from the ROM it calls. DM41_Explorer knows the built-in ROMs of each
+model, and **Tools > XROM Libraries** lets you turn on names for others:
+the 20 application pacs on the DM41X's disk and the Thermal Printer come
+with DM41_Explorer, and **Add…** imports any other ROM from a `.mod` file,
+an hp41uc XROM list or a library file. Tick the libraries you use and put
+them in the order of the calculator's ROM pages. A conflict panel shows
+where they clash, for instance two pacs that share an XROM number. Each
+mode keeps its own list.
+
+See [docs/xrom_libraries.md](docs/xrom_libraries.md) for how names are
+looked up, what the conflict messages mean and the library file format.
 
 ### Data Registers Tab
 
@@ -207,6 +242,7 @@ DM41_Explorer works as one model at a time, chosen in Preferences → General
 | Serial connection | Yes | No — a DM41X has no serial console |
 | Extended memory | 362 registers | 600 registers |
 | Functions | the HP-41CX set | that, plus the DM41X’s own |
+| Plug-in modules | none — it can’t load modules | any, named by the [XROM libraries](#xrom-libraries) you turn on |
 | Key Assignments tab | the DM41L keyboard | the classic HP-41 keyboard |
 | New files default to | `.dm41` | `.d41` |
 
@@ -230,6 +266,8 @@ read.
 There are many markdown files in the [`docs`](https://github.com/mwheinz/DM41_Explorer/tree/main/docs) directory. These represent my
 research notes from developing this project. Hopefully they will be useful to
 you if you are curious about the internals of the HP41 and the DM41L/X emulator.
+[`docs/xrom_libraries.md`](docs/xrom_libraries.md) is the user's guide to XROM
+libraries, including the file format for writing your own.
 
 Most of my notes are derived from 40 year old memories and classic HP41 texts
 like *Synthetic Programming* by Jonathan Wickes, supplemented by

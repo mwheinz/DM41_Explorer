@@ -63,7 +63,18 @@ SHOTS = {
     # The empty buffer plus the port dialog, so DM41L mode: a DM41X has
     # no serial console and the Connect action refuses outright.
     "connection": (None, "Overview", DM41L_MODE, {}),
+    # The XROM library manager (GitHub issue #53), with a few pacs
+    # arranged (XROM_SAMPLE) so the list and the conflict panel show
+    # something.
+    "xrom_libraries": ("dm41x_manyfiles.dm41", "Overview", DM41X_MODE, {}),
+    # The key-assignment dialog's XROM tab (issue #49), on ABSP.
+    "key_assign_xrom": ("keyassigns.dm41", "Key Assignments", DM41X_MODE, {}),
 }
+
+# The libraries the "xrom_libraries" picture shows arranged: the Standard
+# Applications Pac and the Math Pac on, Advantage off. Standard's LOG and
+# Math's SOLVE give the conflict panel its notices.
+XROM_SAMPLE = [("standard", True), ("math", True), ("advantage", False)]
 
 
 def settle(app, seconds=0.6):
@@ -143,12 +154,16 @@ def use_mode(app, app_module, mode):
     is the throwaway one in `scratch`."""
     if app.mode is mode:
         return
-    original = app_module.messagebox.askyesno
+    # The question is asked in the app's own wide dialog since GitHub
+    # issue #55 (ask_yes_no); the discard prompt before it is still a
+    # native message box.
+    original = app_module.messagebox.askyesno, app_module.ask_yes_no
     app_module.messagebox.askyesno = lambda *args, **kwargs: True
+    app_module.ask_yes_no = lambda *args, **kwargs: True
     try:
         app.set_mode(mode, persist=True)
     finally:
-        app_module.messagebox.askyesno = original
+        app_module.messagebox.askyesno, app_module.ask_yes_no = original
 
 
 def main():
@@ -185,6 +200,14 @@ def main():
         for name in args.only or SHOTS:
             state, tab, mode, options = SHOTS[name]
             app.geometry(options.get("size", "1080x768") + "+40+40")
+            # The shot's own tab first: a mode switch or a new state
+            # re-renders whichever tab is showing, and if that is still
+            # the previous shot's (the Hex View's 752 rows, say) the
+            # capture can come before macOS repaints over it -- the
+            # picture then shows both tabs at once.
+            app.tabview.set(tab)
+            app._on_tab_changed()
+            settle(app)
             use_mode(app, app_module, mode)
             if state is None:
                 app.memory_source = None
@@ -194,13 +217,50 @@ def main():
                 app._load_state_into_buffer(str(scratch / state))
             app.tabview.set(tab)
             app._on_tab_changed()
-            settle(app)
+            # Long enough for the whole tab to be drawn before a dialog
+            # opens over it or the window is captured.
+            settle(app, 1.0)
             if "first_row" in options:
                 tree = app.hex_view_tab._tree
                 rows = tree.get_children()
                 tree.yview_moveto(options["first_row"] / len(rows))
                 settle(app)
-            if name == "connection":
+            if name == "xrom_libraries":
+                app.config_store.set_xrom_library_entries(mode, XROM_SAMPLE)
+                app._apply_xrom_libraries()
+                dialog = app.show_xrom_libraries()
+                dialog.geometry(
+                    "+%d+%d" % (app.winfo_rootx() + 230, app.winfo_rooty() + 40)
+                )
+                settle(app, 1.2)
+                grab(app, args.out / f"{name}.png")
+                dialog.destroy()
+                app.config_store.set_xrom_library_entries(mode, [])
+                app._apply_xrom_libraries()
+            elif name == "key_assign_xrom":
+                from gui.key_assignment_edit_dialog import KeyAssignmentEditDialog
+
+                dialog = KeyAssignmentEditDialog(
+                    app,
+                    key_number=11,
+                    shifted=False,
+                    assignment=None,
+                    program_assignment=None,
+                    program_names=[],
+                    on_save=lambda *args: None,
+                    on_delete=lambda: None,
+                    profile=app.profile,
+                )
+                dialog._tabs.set("XROM")
+                dialog._xrom_module_var.set("26")
+                dialog._xrom_function_var.set("38")
+                dialog.geometry(
+                    "+%d+%d" % (app.winfo_rootx() + 330, app.winfo_rooty() + 160)
+                )
+                settle(app, 1.2)
+                grab(app, args.out / f"{name}.png")
+                dialog.destroy()
+            elif name == "connection":
                 from gui.port_dialog import PortSelectionDialog
 
                 dialog = PortSelectionDialog(
@@ -209,7 +269,7 @@ def main():
                 dialog.geometry(
                     "+%d+%d" % (app.winfo_rootx() + 330, app.winfo_rooty() + 220)
                 )
-                settle(app, 0.8)
+                settle(app, 1.2)
                 grab(app, args.out / f"{name}.png")
                 dialog.destroy()
             else:

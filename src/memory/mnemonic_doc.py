@@ -63,6 +63,8 @@ def _notes(entry: Entry) -> str:
         return "keyboard only"
     if entry.op.kind is OpKind.KEYWORD:
         return "text keyword"
+    if entry.library is not None:
+        return entry.library  # an active plug-in library's (issue #54)
     if entry.dm41x_only:
         return "DM41X only"
     return ""

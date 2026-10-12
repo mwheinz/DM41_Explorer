@@ -183,6 +183,12 @@ class MnemonicsReferenceDialog(ctk.CTkToplevel):
         else:
             self._count_label.configure(text=f"{total} instructions")
 
+    def refresh_rows(self):
+        """Re-reads the instructions after the active XROM libraries
+        changed (GitHub issue #54), keeping the filter as typed."""
+        self._rows = mnemonic_reference_rows()
+        self._apply_filter()
+
     def visible_displays(self):
         """The Display column of every row currently shown (for tests)."""
         return [self._tree.item(i, "values")[0] for i in self._tree.get_children()]

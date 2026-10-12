@@ -68,3 +68,22 @@ def test_substitution_and_trigraph_tabs_exist(dialog):
     for name in ("Instructions", "Substitutions", "Trigraphs"):
         dlg._tabs.set(name)
         assert dlg._tabs.get() == name
+
+
+def test_refresh_rows_picks_up_newly_active_libraries(root):
+    """GitHub issue #54: an open reference follows the XROM manager."""
+    from memory.mnemonics import set_active_libraries
+    from memory.xrom_library import active_set, load_libraries
+
+    dialog = MnemonicsReferenceDialog(root)
+    try:
+        dialog._filter_var.set("SOLVE")
+        assert dialog.visible_displays() == []
+        libraries, _ = load_libraries()
+        set_active_libraries(active_set(libraries, "DM41X", ["math"]).libraries)
+        dialog.refresh_rows()
+        assert dialog.visible_displays() == ["SOLVE"]
+        assert dialog._filter_var.get() == "SOLVE", "the filter is kept"
+    finally:
+        set_active_libraries([])
+        dialog.destroy()
