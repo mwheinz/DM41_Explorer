@@ -18,8 +18,13 @@ from memory import (
     NAME_MIN_CHAR,
     NAME_MAX_CHAR,
 )
-from gui.dialog_common import build_dialog_button_row, center_on_master, scaled
-from gui.tab_common import MONOSPACE_FONT_FAMILY
+from gui.fonts import font_for
+from gui.dialog_common import (
+    build_dialog_button_row,
+    center_on_master,
+    scaled,
+    scaled_for,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -127,9 +132,9 @@ class XMFileDialog(ctk.CTkToplevel):
             data_default = initial.get("content", "")
         self._data_box = ctk.CTkTextbox(
             self,
-            width=scaled(320),
-            height=scaled(140),
-            font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+            width=scaled_for("mono", 320),
+            height=scaled_for("mono", 140),
+            font=font_for("mono"),
         )
         if data_default:
             self._data_box.insert("1.0", data_default)
@@ -141,9 +146,9 @@ class XMFileDialog(ctk.CTkToplevel):
             ascii_default = initial.get("content", "")
         self._ascii_box = ctk.CTkTextbox(
             self,
-            width=scaled(320),
-            height=scaled(140),
-            font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+            width=scaled_for("mono", 320),
+            height=scaled_for("mono", 140),
+            font=font_for("mono"),
         )
         if ascii_default:
             self._ascii_box.insert("1.0", ascii_default)

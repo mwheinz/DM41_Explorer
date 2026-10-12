@@ -11,7 +11,6 @@ import customtkinter as ctk
 from memory import Register, zero_register
 from gui.fonts import font_for
 from gui.dialog_common import build_dialog_button_row, center_on_master, scaled
-from gui.tab_common import MONOSPACE_FONT_FAMILY
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +78,7 @@ class RegisterEditDialog(ctk.CTkToplevel):
         ctk.CTkEntry(
             tabs.tab("Number"),
             textvariable=self._number_var,
-            font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+            font=font_for("mono"),
         ).pack(anchor="w", padx=8, fill="x")
 
         text_default = _decode_text_register(register)
@@ -90,7 +89,7 @@ class RegisterEditDialog(ctk.CTkToplevel):
         ctk.CTkEntry(
             tabs.tab("Text"),
             textvariable=self._text_var,
-            font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+            font=font_for("mono"),
         ).pack(anchor="w", padx=8, fill="x")
 
         self._hex_var = ctk.StringVar(value=register.get_hex())
@@ -100,7 +99,7 @@ class RegisterEditDialog(ctk.CTkToplevel):
         ctk.CTkEntry(
             tabs.tab("Hex"),
             textvariable=self._hex_var,
-            font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+            font=font_for("mono"),
         ).pack(anchor="w", padx=8, fill="x")
 
         self._tabs = tabs

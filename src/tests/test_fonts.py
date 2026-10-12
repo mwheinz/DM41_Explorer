@@ -5,6 +5,7 @@ need a real Tk display (Xvfb in CI/sandboxes), like test_app.py.
 """
 
 import tkinter.font as tkfont
+from tkinter import ttk
 
 import pytest
 
@@ -23,6 +24,9 @@ from gui.fonts import (
     font_spec,
     resolve_roles,
 )
+from gui.dialog_common import scaled, scaled_for
+from gui.tab_common import build_tree_with_scrollbar, style_treeview, treeview_fonts
+from gui.window_geometry import BASE_FONT_SIZE, scaled_width
 
 DEFAULTS = PlatformDefaults(ui_family="Sans", mono_family="Mono", size=13)
 INSTALLED = {"Sans", "Mono", "Helvetica", "Menlo"}
@@ -174,3 +178,37 @@ def test_font_spec_applies_the_defaults_if_nothing_has(root):
 def test_an_unknown_role_is_an_error(root):
     with pytest.raises(ValueError):
         font_spec("huge")
+
+
+# ---- what follows the mono role ----
+
+
+@pytest.fixture
+def large_mono(root, tmp_path, monkeypatch):
+    """The fonts with only the mono role set, to twice the base size."""
+    monkeypatch.setattr(ProjectConfig, "PREFS_FILE", tmp_path / "prefs.json")
+    config = ProjectConfig()
+    config.set_font_role("mono", "", 2 * BASE_FONT_SIZE, False)
+    fonts.apply(config, root)
+    return root
+
+
+def test_table_cells_use_mono_and_headings_use_title(large_mono):
+    assert treeview_fonts() == (
+        font_spec("mono").tk_tuple(),
+        font_spec("title").tk_tuple(),
+    )
+
+
+def test_table_rows_and_columns_grow_with_the_mono_font(large_mono):
+    style_treeview("Fonts.Treeview")
+    assert int(ttk.Style().lookup("Fonts.Treeview", "rowheight")) == 44
+    tree, _ = build_tree_with_scrollbar(
+        ctk.CTkFrame(large_mono), [("value", "Value", 100, False)]
+    )
+    assert tree.column("value", "width") == 200
+
+
+def test_scaled_for_follows_the_role_and_scaled_the_ui_font(large_mono):
+    assert scaled_for("mono", 100) == 200
+    assert scaled(100) == scaled_width(100, font_spec("ui").size)

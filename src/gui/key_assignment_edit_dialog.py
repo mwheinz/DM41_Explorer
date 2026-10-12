@@ -25,9 +25,13 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from gui.fonts import font_for
-from gui.dialog_common import build_dialog_button_row, center_on_master, scaled
+from gui.dialog_common import (
+    build_dialog_button_row,
+    center_on_master,
+    scaled,
+    scaled_for,
+)
 from gui.contrast import SECONDARY_TEXT
-from gui.tab_common import MONOSPACE_FONT_FAMILY
 from memory.mnemonics import (
     XROM_FIRST_BYTES,
     assignable_choices,
@@ -283,8 +287,8 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
             ctk.CTkEntry(
                 fields,
                 textvariable=var,
-                width=scaled(48),
-                font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+                width=scaled_for("mono", 48),
+                font=font_for("mono"),
             ).pack(side="left", padx=(6, 0))
             if after:
                 ctk.CTkLabel(fields, text=after).pack(side="left", padx=(2, 0))
@@ -313,7 +317,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         ctk.CTkEntry(
             tabs.tab("Raw Hex"),
             textvariable=self._hex_var,
-            font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+            font=font_for("mono"),
         ).pack(anchor="w", padx=8, fill="x")
 
         # -- Program tab: pick a global label (sec 4.6) -------------------

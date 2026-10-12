@@ -11,6 +11,7 @@ import re
 import tkinter as tk
 import customtkinter as ctk
 
+from gui.fonts import font_spec
 from gui.screens import screen_rectangles
 from gui.window_geometry import centered_position, dialog_size, scaled_width
 
@@ -32,6 +33,13 @@ def scaled(width) -> int:
     proportion above it so a larger font doesn't squeeze the dialog
     (GitHub issue #42)."""
     return scaled_width(width, _font_size())
+
+
+def scaled_for(role: str, width) -> int:
+    """Like scaled(), but for a dimension that holds text in font role
+    `role` rather than the application font -- a text box of monospace
+    content grows with the mono font (GitHub issue #61)."""
+    return scaled_width(width, font_spec(role).size)
 
 
 def fit_dialog(dialog, base_width=0, base_height=0, *, minimum=None, content=True):

@@ -17,7 +17,7 @@ from memory import (
 from gui.fonts import font_for
 from gui.scroll_support import bind_touchpad_scroll
 from gui.contrast import SECONDARY_TEXT
-from gui.tab_common import MONOSPACE_FONT_FAMILY, CARD_KWARGS
+from gui.tab_common import CARD_KWARGS
 
 logger = logging.getLogger(__name__)
 
@@ -152,7 +152,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
             ctk.CTkLabel(
                 cell,
                 text=value,
-                font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+                font=font_for("mono"),
                 anchor="w",
             ).pack(side="left")
         return start_row + (-(-len(rows) // columns) if rows else 0)  # ceil div
@@ -185,7 +185,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
         ctk.CTkLabel(
             self._stack_frame,
             text=repr(str(sr.alpha)),
-            font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+            font=font_for("mono"),
             anchor="w",
         ).grid(row=next_row, column=1, columnspan=4, sticky="w", padx=10, pady=(8, 0))
 
@@ -260,7 +260,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
             self._partition_frame,
             textvariable=self._r00_var,
             width=100,
-            font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+            font=font_for("mono"),
         )
         entry.grid(row=1, column=1, sticky="w", padx=10, pady=(2, 10))
         ctk.CTkButton(
@@ -273,7 +273,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
         ctk.CTkLabel(
             self._partition_frame,
             text=f"0x{dot_end:03x}",
-            font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+            font=font_for("mono"),
         ).grid(row=2, column=1, columnspan=2, sticky="w", padx=10, pady=2)
 
         ctk.CTkLabel(self._partition_frame, text="ΣREG address:").grid(
@@ -282,7 +282,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
         ctk.CTkLabel(
             self._partition_frame,
             text=f"0x{sigma_reg:03x}",
-            font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+            font=font_for("mono"),
         ).grid(row=3, column=1, sticky="w", padx=10, pady=2)
 
         # Key Assignments and Alarms sit back-to-back, below whatever's left
@@ -304,7 +304,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
         ctk.CTkLabel(
             self._partition_frame,
             text=self._format_partition_span(key_span.start, key_span.end + 1),
-            font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+            font=font_for("mono"),
         ).grid(row=4, column=1, columnspan=2, sticky="w", padx=10, pady=2)
 
         ctk.CTkLabel(self._partition_frame, text="Alarms:").grid(
@@ -313,7 +313,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
         ctk.CTkLabel(
             self._partition_frame,
             text=self._format_partition_span(alarms_span.start, alarms_span.end + 1),
-            font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+            font=font_for("mono"),
         ).grid(row=5, column=1, columnspan=2, sticky="w", padx=10, pady=(2, 10))
 
     @staticmethod
@@ -456,7 +456,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
                 anchor="w",
                 justify="left",
                 wraplength=280,
-                font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+                font=font_for("mono"),
             ).grid(row=i, column=1, sticky="w", padx=10, pady=2)
         ctk.CTkFrame(self._summary_frame, fg_color="transparent", height=6).grid(
             row=len(rows) + 1, column=0

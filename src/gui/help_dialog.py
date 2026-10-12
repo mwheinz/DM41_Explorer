@@ -14,7 +14,6 @@ import customtkinter as ctk
 
 from gui.fonts import font_for
 from gui.dialog_common import fit_dialog, scaled
-from gui.tab_common import MONOSPACE_FONT_FAMILY
 
 PLATFORM_SYSTEM = platform.system()
 
@@ -111,7 +110,7 @@ class KeyboardShortcutsDialog(ctk.CTkToplevel):
                     body,
                     text=shortcut,
                     anchor="e",
-                    font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+                    font=font_for("mono"),
                 ).grid(row=row, column=1, sticky="e", pady=2)
                 row += 1
 

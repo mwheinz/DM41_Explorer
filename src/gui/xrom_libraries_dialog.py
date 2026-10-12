@@ -33,8 +33,7 @@ import customtkinter as ctk
 
 from gui.fonts import font_for
 from gui.contrast import SECONDARY_TEXT, WARNING_TEXT
-from gui.dialog_common import build_dialog_button_row, fit_dialog, scaled
-from gui.tab_common import MONOSPACE_FONT_FAMILY
+from gui.dialog_common import build_dialog_button_row, fit_dialog, scaled, scaled_for
 from memory.xrom_import import (
     convert_file,
     save_user_library,
@@ -462,9 +461,9 @@ class LibraryDetailsDialog(ctk.CTkToplevel):
             )
         text = ctk.CTkTextbox(
             self,
-            width=scaled(460),
-            height=scaled(420),
-            font=ctk.CTkFont(family=MONOSPACE_FONT_FAMILY),
+            width=scaled_for("mono", 460),
+            height=scaled_for("mono", 420),
+            font=font_for("mono"),
         )
         text.insert("1.0", "\n".join(lines))
         text.configure(state="disabled")

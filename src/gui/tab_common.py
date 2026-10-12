@@ -30,20 +30,12 @@ from pathlib import Path
 from tkinter import ttk, filedialog, messagebox
 import customtkinter as ctk
 
-from gui.fonts import font_for
+from gui.fonts import font_for, font_spec
 from gui.contrast import SECONDARY_TEXT
 from gui.scroll_support import SmoothTreeview
 from gui.window_geometry import scaled_row_height, scaled_width
 
 logger = logging.getLogger(__name__)
-
-# Font family used for any field that displays or edits raw register/file
-# *content* (hex bytes, addresses, decoded numbers, alpha text) -- as
-# opposed to labels, names, or descriptive prose. A fixed-width font keeps
-# these fields' columns aligned and makes it easy to eyeball hex digit
-# counts. Centralized here so every tab/dialog that shows register content
-# uses the same family instead of each hard-coding "Courier" separately.
-MONOSPACE_FONT_FAMILY = "Courier"
 
 # Alternating-row background shade, shared by every tab with a table (Data
 # Registers' ttk.Treeview, and the XM Files/Programs tabs' CTkScrollableFrame
@@ -107,21 +99,17 @@ def stripe_bg_color() -> str:
 
 
 def treeview_fonts():
-    """(cell font, heading font) as Tk font tuples -- the monospace
-    family at the application font size for cells, the UI family in bold
+    """(cell font, heading font) as Tk font tuples -- the mono font role
+    for cells, which are register and memory content, and the title role
     for headings. The one place both style_treeview() and fit_columns()
     get them from, so what is measured is what is drawn."""
-    theme_font = ctk.ThemeManager.theme["CTkFont"]
-    return (
-        (MONOSPACE_FONT_FAMILY, theme_font["size"]),
-        (theme_font["family"], theme_font["size"], "bold"),
-    )
+    return (font_spec("mono").tk_tuple(), font_spec("title").tk_tuple())
 
 
 def style_treeview(style_name: str = "Treeview", *, selectable: bool = True) -> str:
     """Applies the shared dark/light ttk.Treeview theming -- field/heading
-    colors, the app's shared monospace font (see MONOSPACE_FONT_FAMILY),
-    fixed row height -- under `style_name` (and f"{style_name}.Heading"),
+    colors, the mono font role (see treeview_fonts()), a row height for
+    that font -- under `style_name` (and f"{style_name}.Heading"),
     and returns the current stripe background color for the caller to use
     with `tree.tag_configure("oddrow", background=...)` (see
     apply_row_tags() below, which does exactly that).
@@ -156,14 +144,13 @@ def style_treeview(style_name: str = "Treeview", *, selectable: bool = True) -> 
     bg = stripe_bg_color()
     field_bg = TREEVIEW_FIELD_BG[1 if dark else 0]
     fg = TREEVIEW_FG[1 if dark else 0]
-    theme_font = ctk.ThemeManager.theme["CTkFont"]
     font, heading_font = treeview_fonts()
     style.configure(
         style_name,
         background=field_bg,
         fieldbackground=field_bg,
         foreground=fg,
-        rowheight=scaled_row_height(theme_font["size"]),
+        rowheight=scaled_row_height(font_spec("mono").size),
         borderwidth=0,
         font=font,
     )
@@ -194,7 +181,7 @@ def build_tree_with_scrollbar(
     `columns` is a list of (column_id, heading_text, width, stretch)
     tuples, applied in order via `tree.heading()`/`tree.column()`. Widths
     are for the default font size and grow in proportion with a larger
-    application font (GitHub issue #42).
+    mono font (GitHub issues #42, #61).
     `style`, if given, is passed through as the Treeview's ttk style name
     (see style_treeview() above) -- omit it to use ttk's built-in
     "Treeview" style.
@@ -213,7 +200,9 @@ def build_tree_with_scrollbar(
     if style:
         kwargs["style"] = style
     tree = SmoothTreeview(parent, columns=[col[0] for col in columns], **kwargs)
-    font_size = ctk.ThemeManager.theme["CTkFont"]["size"]
+    # The cells are in the mono font, so its size is what the widths scale
+    # with.
+    font_size = font_spec("mono").size
     for col, text, width, stretch in columns:
         tree.heading(col, text=text)
         tree.column(
@@ -252,7 +241,7 @@ def fit_columns(tree: ttk.Treeview, columns: list) -> None:
     cell_spec, heading_spec = treeview_fonts()
     cell_font = tkfont.Font(font=cell_spec)
     heading_font = tkfont.Font(font=heading_spec)
-    font_size = ctk.ThemeManager.theme["CTkFont"]["size"]
+    font_size = font_spec("mono").size
     ids = [col[0] for col in columns]
     widest = {col[0]: heading_font.measure(col[1]) + HEADING_PADDING for col in columns}
     for iid in tree.get_children()[:FIT_ROW_LIMIT]:
