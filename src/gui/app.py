@@ -689,7 +689,13 @@ class DM41ExplorerApp(ctk.CTk):
         menubar = Menu(self)
 
         if PLATFORM_SYSTEM == "Darwin":
+            # About and Preferences live in the application menu (under the
+            # app's name), where Mac users look for them. Tk shows that menu's
+            # Preferences item, with its standard Cmd+, shortcut, only once
+            # this command exists; a Preferences item elsewhere doesn't get
+            # to show Cmd+, at all (GitHub issue #62).
             self.createcommand("tkAboutDialog", self._show_about)
+            self.createcommand("::tk::mac::ShowPreferences", self.show_preferences)
 
         # File Menu
         file_menu = Menu(menubar, tearoff=0)
@@ -719,18 +725,18 @@ class DM41ExplorerApp(ctk.CTk):
             command=self.save_state_as,
             underline=13,
         )
-        file_menu.add_separator()
         if PLATFORM_SYSTEM != "Darwin":
+            # On macOS these are in the application menu instead (above).
+            file_menu.add_separator()
             file_menu.add_command(
                 label="About Box", command=self._show_about, underline=0
             )
-        file_menu.add_command(
-            label="Preferences",
-            command=self.show_preferences,
-            accelerator=f"{acc}+,",
-            underline=0,
-        )
-        if PLATFORM_SYSTEM != "Darwin":
+            file_menu.add_command(
+                label="Preferences",
+                command=self.show_preferences,
+                accelerator=f"{acc}+,",
+                underline=0,
+            )
             file_menu.add_separator()
             file_menu.add_command(
                 label="Quit", command=self.on_close, accelerator=f"{acc}+Q", underline=0
@@ -1494,13 +1500,22 @@ class DM41ExplorerApp(ctk.CTk):
         )
 
     def show_preferences(self):
-        PreferencesDialog(
+        """Opens Preferences, or raises the one already open -- the menu
+        item and the Cmd/Ctrl+, binding may both deliver the same key
+        press on macOS. Returns the dialog."""
+        dialog = getattr(self, "_preferences_dialog", None)
+        if dialog is not None and dialog.winfo_exists():
+            dialog.lift()
+            dialog.focus_set()
+            return dialog
+        self._preferences_dialog = PreferencesDialog(
             self,
             self.config_store,
             self.serial,
             on_saved=self._on_preferences_saved,
             mode=self.config_store.mode,
         )
+        return self._preferences_dialog
 
     # -- XROM libraries (GitHub issue #53) ------------------------------------
 

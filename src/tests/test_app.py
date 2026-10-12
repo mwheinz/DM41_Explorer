@@ -22,6 +22,7 @@ from unittest import mock
 from config import ProjectConfig
 from engine.command_engine import CommandEngine
 from memory import DM41L, DM41X, DeviceMode, Memory
+import gui.app as app_module
 from gui.app import DM41ExplorerApp
 from memory.mnemonics import resolve, set_active_libraries, xrom_op
 from gui.overview_tab import xm_total_registers
@@ -72,6 +73,10 @@ def _reset(app):
     if dialog is not None and dialog.winfo_exists():
         dialog.destroy()
     app._mnemonics_reference = None
+    dialog = getattr(app, "_preferences_dialog", None)
+    if dialog is not None and dialog.winfo_exists():
+        dialog.destroy()
+    app._preferences_dialog = None
     app._apply_mode_to_menus()
     app._refresh_mode_indicator()
     app.tabview.set("Overview")
@@ -1207,3 +1212,31 @@ def test_a_library_file_that_cannot_load_is_reported(app, prefs_file):
     assert len(errors) == 1
     assert str(errors[0]).startswith("broken.json: not valid JSON (line 1")
     assert _active_ids(app) == ["dm41x-cx"]
+
+
+# -- Preferences in the macOS application menu (GitHub issue #62) ------------
+
+
+def test_preferences_is_in_the_file_menu_except_on_macos(app):
+    """On macOS it is in the application menu instead, the one place Tk
+    shows its Cmd+, shortcut."""
+    in_file_menu = "Preferences" in _menu_labels(app, "File")
+    assert in_file_menu is (app_module.PLATFORM_SYSTEM != "Darwin")
+
+
+@pytest.mark.skipif(
+    app_module.PLATFORM_SYSTEM != "Darwin", reason="the macOS application menu"
+)
+def test_the_macos_application_menu_opens_preferences(app):
+    assert app.tk.call("info", "commands", "::tk::mac::ShowPreferences")
+    app.tk.call("::tk::mac::ShowPreferences")
+    assert app._preferences_dialog.winfo_exists()
+
+
+def test_preferences_opens_only_once(app):
+    """The menu item and the key binding can both deliver one Cmd+,."""
+    first = app.show_preferences()
+    assert app.show_preferences() is first
+    first.destroy()
+    second = app.show_preferences()
+    assert second is not first and second.winfo_exists()
