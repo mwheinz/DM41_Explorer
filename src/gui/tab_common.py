@@ -30,6 +30,7 @@ from pathlib import Path
 from tkinter import ttk, filedialog, messagebox
 import customtkinter as ctk
 
+from gui.fonts import font_for
 from gui.contrast import SECONDARY_TEXT
 from gui.scroll_support import SmoothTreeview
 from gui.window_geometry import scaled_row_height, scaled_width
@@ -43,21 +44,6 @@ logger = logging.getLogger(__name__)
 # counts. Centralized here so every tab/dialog that shows register content
 # uses the same family instead of each hard-coding "Courier" separately.
 MONOSPACE_FONT_FAMILY = "Courier"
-
-# The smallest font size ui_font() will return, so a hint label never
-# becomes unreadable however small the main font is set.
-MIN_UI_FONT_SIZE = 8
-
-
-def ui_font(offset: int = 0, **kwargs) -> "ctk.CTkFont":
-    """A CTkFont whose size follows the application font (Preferences >
-    Font): the configured size plus `offset` points, never below
-    MIN_UI_FONT_SIZE. Use it instead of a hard-coded `size=` so captions
-    and the status bar scale with the rest of the UI (GitHub issue #42).
-    Extra keyword arguments (weight=, family=) pass through to CTkFont."""
-    base = ctk.ThemeManager.theme["CTkFont"]["size"]
-    return ctk.CTkFont(size=max(MIN_UI_FONT_SIZE, base + offset), **kwargs)
-
 
 # Alternating-row background shade, shared by every tab with a table (Data
 # Registers' ttk.Treeview, and the XM Files/Programs tabs' CTkScrollableFrame
@@ -424,7 +410,7 @@ def build_caption_label(master, text: str) -> ctk.CTkLabel:
     label = ctk.CTkLabel(
         master,
         text=text,
-        font=ui_font(-1),
+        font=font_for("small"),
         text_color=SECONDARY_TEXT,
         anchor="w",
         justify="left",
@@ -453,7 +439,7 @@ def build_tab_header(master, button_kwargs: dict = None):
     header.pack(fill="x", padx=8, pady=8)
 
     label = ctk.CTkLabel(
-        header, text="(no memory state loaded)", font=ctk.CTkFont(weight="bold")
+        header, text="(no memory state loaded)", font=font_for("title")
     )
     label.pack(side="left")
 

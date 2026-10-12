@@ -12,6 +12,7 @@ changed, or removed in `app.py`, update _SECTIONS below to match.
 import platform
 import customtkinter as ctk
 
+from gui.fonts import font_for
 from gui.dialog_common import fit_dialog, scaled
 from gui.tab_common import MONOSPACE_FONT_FAMILY
 
@@ -92,7 +93,7 @@ class KeyboardShortcutsDialog(ctk.CTkToplevel):
             ctk.CTkLabel(
                 body,
                 text=section_title,
-                font=ctk.CTkFont(weight="bold"),
+                font=font_for("title"),
                 anchor="w",
             ).grid(
                 row=row,

@@ -39,9 +39,10 @@ from engine.commands import (
 )
 
 from config import ProjectConfig
+from gui import fonts
+from gui.fonts import font_for
 from gui.contrast import SECONDARY_TEXT, WARNING_TEXT, improve_theme_contrast
 from gui.dialog_common import ask_yes_no
-from gui.tab_common import ui_font
 from gui.screens import screen_rectangles
 from gui.window_geometry import (
     geometry_string,
@@ -234,27 +235,6 @@ def _apply_color_theme(name):
         ctk.set_default_color_theme(default)
 
 
-def _apply_font_prefs(config_store):
-    """Overrides CustomTkinter's default UI font family/size, if configured.
-
-    CTkFont() instances read `ThemeManager.theme["CTkFont"]` at construction
-    time for whichever of family/size/weight isn't explicitly passed in, so
-    this has to run before any widget with a default (unset) font is built
-    -- in practice, right after `set_default_color_theme()` and before
-    `_build_layout()`. There's no supported way to retroactively change the
-    font of widgets that already exist, which is why a font change made in
-    Preferences only takes effect after a restart (see
-    gui/preferences_dialog.py).
-
-    Leaves CTk's own per-platform default (set by `set_default_color_theme`
-    above) alone for whichever of family/size the user hasn't overridden.
-    """
-    if config_store.font_family:
-        ctk.ThemeManager.theme["CTkFont"]["family"] = config_store.font_family
-    if config_store.font_size:
-        ctk.ThemeManager.theme["CTkFont"]["size"] = config_store.font_size
-
-
 # A DM41L `.dm41` state and a DM41X `.d41` state file are the same text format.
 STATE_EXTENSIONS = (".dm41", ".d41")
 
@@ -300,7 +280,7 @@ class DM41ExplorerApp(ctk.CTk):
 
         ctk.set_appearance_mode(self.config_store.appearance_mode)
         _apply_color_theme(self.config_store.color_theme)
-        _apply_font_prefs(self.config_store)
+        fonts.apply(self.config_store, self)
         if self.config_store.high_contrast:
             improve_theme_contrast(ctk.ThemeManager.theme)
 
@@ -673,26 +653,26 @@ class DM41ExplorerApp(ctk.CTk):
         self._mode_label = ctk.CTkLabel(
             status_bar,
             text=self._mode_status_text(),
-            font=ui_font(),
+            font=font_for("ui"),
             text_color=SECONDARY_TEXT,
         )
         self._mode_label.pack(side="left", padx=8, pady=6)
         self._status_label = ctk.CTkLabel(
-            status_bar, text=self._idle_status(), font=ui_font()
+            status_bar, text=self._idle_status(), font=font_for("ui")
         )
         self._status_label.pack(side="left", padx=8, pady=6)
         self._modified_label = ctk.CTkLabel(
-            status_bar, text="", font=ui_font(), text_color=WARNING_TEXT
+            status_bar, text="", font=font_for("ui"), text_color=WARNING_TEXT
         )
         self._modified_label.pack(side="left", padx=8, pady=6)
-        self._battery_label = ctk.CTkLabel(status_bar, text="", font=ui_font())
+        self._battery_label = ctk.CTkLabel(status_bar, text="", font=font_for("ui"))
         self._battery_label.pack(side="right", padx=16, pady=6)
-        self._calc_time_label = ctk.CTkLabel(status_bar, text="", font=ui_font())
+        self._calc_time_label = ctk.CTkLabel(status_bar, text="", font=font_for("ui"))
         self._calc_time_label.pack(side="right", padx=16, pady=6)
         self._source_label = ctk.CTkLabel(
             status_bar,
             text="(new, unsaved buffer)",
-            font=ui_font(),
+            font=font_for("ui"),
             text_color=SECONDARY_TEXT,
         )
         self._source_label.pack(side="right", padx=16, pady=6)

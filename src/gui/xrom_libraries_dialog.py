@@ -31,9 +31,10 @@ from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 
+from gui.fonts import font_for
 from gui.contrast import SECONDARY_TEXT, WARNING_TEXT
 from gui.dialog_common import build_dialog_button_row, fit_dialog, scaled
-from gui.tab_common import MONOSPACE_FONT_FAMILY, ui_font
+from gui.tab_common import MONOSPACE_FONT_FAMILY
 from memory.xrom_import import (
     convert_file,
     save_user_library,
@@ -139,7 +140,7 @@ class XromLibrariesDialog(ctk.CTkToplevel):
             button.pack(pady=(0, 6))
             self._buttons[text] = button
 
-        ctk.CTkLabel(self, text="Conflicts:", font=ui_font(weight="bold")).pack(
+        ctk.CTkLabel(self, text="Conflicts:", font=font_for("title")).pack(
             padx=16, pady=(12, 2), anchor="w"
         )
         self._conflicts = ctk.CTkTextbox(self, height=scaled(130), wrap="word")
@@ -249,7 +250,7 @@ class XromLibrariesDialog(ctk.CTkToplevel):
         note = ctk.CTkLabel(
             frame,
             text=detail,
-            font=ui_font(-2),
+            font=font_for("small"),
             text_color=WARNING_TEXT if detail.startswith("missing") else SECONDARY_TEXT,
         )
         note.pack(anchor="w", padx=34, pady=(0, 4))

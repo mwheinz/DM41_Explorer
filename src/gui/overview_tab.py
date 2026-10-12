@@ -14,6 +14,7 @@ from memory import (
     PRIMARY_DATA_END,
     MIN_SANE_R00,
 )
+from gui.fonts import font_for
 from gui.scroll_support import bind_touchpad_scroll
 from gui.contrast import SECONDARY_TEXT
 from gui.tab_common import MONOSPACE_FONT_FAMILY, CARD_KWARGS
@@ -115,7 +116,7 @@ class OverviewTab(ctk.CTkScrollableFrame):
         bold title, used to visually separate sections from each other."""
         card = ctk.CTkFrame(self, **CARD_KWARGS)
         card.grid(row=row, column=column, sticky="nsew", padx=8, pady=4)
-        ctk.CTkLabel(card, text=title, font=ctk.CTkFont(weight="bold")).grid(
+        ctk.CTkLabel(card, text=title, font=font_for("title")).grid(
             row=0, column=0, columnspan=4, sticky="w", padx=10, pady=(10, 6)
         )
         return card

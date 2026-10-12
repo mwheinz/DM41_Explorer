@@ -49,13 +49,13 @@ import customtkinter as ctk
 
 from memory import Memory
 from memory.mnemonics import assignable_display_names
+from gui.fonts import font_for
 from gui.contrast import SECONDARY_TEXT
 from gui.key_assignment_edit_dialog import KeyAssignmentEditDialog
 from gui.scroll_support import bind_touchpad_scroll
 from gui.tab_common import (
     build_tab_header,
     build_caption_label,
-    ui_font,
     CARD_FG,
     CARD_BORDER,
 )
@@ -325,11 +325,11 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         # grids were drawn at once -- one button per grid.)
         self._key_buttons = {}
 
-        # Fonts and sizes for the keys, all from the application font
-        # (issue #41); see KEY_MIN_CHARS.
-        self._key_font = ui_font()
-        self._key_number_font = ui_font(-3, weight="bold")
-        self._static_font = ui_font(-3)
+        # Fonts and sizes for the keys, from the ui and small font roles
+        # (issues #41, #61); see KEY_MIN_CHARS.
+        self._key_font = font_for("ui")
+        self._key_number_font = font_for("small", weight="bold")
+        self._static_font = font_for("small")
         self._key_width = key_button_min_width(self._key_font)
         font_size = ctk.ThemeManager.theme["CTkFont"]["size"]
         self._key_height = scaled_row_height(font_size, KEY_BUTTON_BASE_HEIGHT)

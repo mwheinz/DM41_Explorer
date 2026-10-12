@@ -15,9 +15,9 @@ from tkinter import messagebox
 import customtkinter as ctk
 
 from memory import Alarm
+from gui.fonts import font_for
 from gui.dialog_common import build_dialog_button_row, center_on_master, scaled
 from gui.contrast import SECONDARY_TEXT
-from gui.tab_common import ui_font
 
 _TYPE_LABELS = {
     Alarm.TYPE_MESSAGE: "Message",
@@ -83,7 +83,7 @@ class AlarmEditDialog(ctk.CTkToplevel):
                 "FOCAL has no lowercase letters above 'e' -- use uppercase, "
                 "or a \\nnn trigraph (docs/trigraphs.md) for a special character."
             ),
-            font=ui_font(-2),
+            font=font_for("small"),
             text_color=SECONDARY_TEXT,
             wraplength=scaled(440),
             justify="left",

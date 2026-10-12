@@ -23,9 +23,9 @@ import tkinter.font as tkfont
 import customtkinter as ctk
 
 from memory import DeviceMode
+from gui.fonts import font_for
 from gui.dialog_common import build_dialog_button_row, center_on_master, scaled
 from gui.contrast import SECONDARY_TEXT, WARNING_TEXT
-from gui.tab_common import ui_font
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +178,7 @@ class PreferencesDialog(ctk.CTkToplevel):
             text=MODE_HINTS[self._saved_mode],
             justify="left",
             text_color=SECONDARY_TEXT,
-            font=ui_font(-2),
+            font=font_for("small"),
         )
         self._mode_hint.pack(anchor="w", padx=8, pady=(4, 0))
         ctk.CTkLabel(
@@ -186,7 +186,7 @@ class PreferencesDialog(ctk.CTkToplevel):
             text="Changing the model starts a new, empty memory state.",
             justify="left",
             text_color=WARNING_TEXT,
-            font=ui_font(-2),
+            font=font_for("small"),
         ).pack(anchor="w", padx=8, pady=(4, 0))
 
         ctk.CTkLabel(tab, text="Log level:").pack(anchor="w", padx=8, pady=(16, 4))
@@ -293,7 +293,7 @@ class PreferencesDialog(ctk.CTkToplevel):
             "take effect after restarting DM41_Explorer.",
             justify="left",
             text_color=WARNING_TEXT,
-            font=ui_font(-2),
+            font=font_for("small"),
         ).pack(anchor="w", padx=8, pady=(4, 0))
 
     def _pick_log_directory(self):

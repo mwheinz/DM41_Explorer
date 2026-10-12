@@ -21,8 +21,8 @@ transition as you scroll through it.
 import customtkinter as ctk
 
 from memory import Memory
+from gui.fonts import font_for
 from gui.tab_common import (
-    ui_font,
     build_tab_header,
     build_tree_with_scrollbar,
     style_treeview,
@@ -124,7 +124,7 @@ class HexViewTab(ctk.CTkFrame):
                 corner_radius=3,
             )
             swatch.pack(side="left", padx=(0, 5))
-            ctk.CTkLabel(chip, text=label, font=ui_font(-2)).pack(side="left")
+            ctk.CTkLabel(chip, text=label, font=font_for("small")).pack(side="left")
             self._legend_swatches.append((light, dark_color, swatch))
 
     def _apply_region_tags(self):

@@ -24,6 +24,7 @@ import platform
 from tkinter import messagebox
 import customtkinter as ctk
 
+from gui.fonts import font_for
 from gui.dialog_common import build_dialog_button_row, center_on_master, scaled
 from gui.contrast import SECONDARY_TEXT
 from gui.tab_common import MONOSPACE_FONT_FAMILY
@@ -211,7 +212,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         ctk.CTkLabel(
             self,
             text=f"Key {key_number:02d} ({shift_label}) -- {current_text}",
-            font=ctk.CTkFont(weight="bold"),
+            font=font_for("title"),
             wraplength=scaled(340),
             justify="left",
         ).pack(padx=16, pady=(16, 4), anchor="w")

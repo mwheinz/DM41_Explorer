@@ -50,7 +50,7 @@ def test_the_stored_defaults_resolve_like_no_stored_values():
 
 def test_small_title_and_mono_follow_a_chosen_ui_font():
     """Left at their defaults, the other roles are worked out from the ui
-    role the user picked, the way ui_font(offset) followed the
+    role the user picked, the way the old ui_font(offset) followed the
     application font."""
     resolved = resolve_roles({"ui": ("Helvetica", 16, False)}, DEFAULTS, INSTALLED)
     assert resolved["small"] == FontSpec("Helvetica", 14, False)
