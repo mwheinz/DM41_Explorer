@@ -2,7 +2,7 @@ import json
 import os
 import platform
 import pytest
-from config import ProjectConfig
+from config import FONT_ROLES, ProjectConfig
 from memory import DeviceMode
 
 running_as_root = hasattr(os, "geteuid") and os.geteuid() == 0
@@ -430,3 +430,105 @@ def test_an_unusable_window_position_reads_as_none(prefs_file, stored):
     config = ProjectConfig()
     config.load()
     assert config.window_position is None
+
+
+# -- font roles (GitHub issue #61) ---------------------------------------------
+
+
+def test_every_font_role_defaults_to_the_platform_default(prefs_file):
+    config = ProjectConfig()
+    config.load()
+    assert {role: config.font_role(role) for role in FONT_ROLES} == {
+        "ui": ("", 0, False),
+        "small": ("", 0, False),
+        "title": ("", 0, True),
+        "mono": ("", 0, False),
+    }
+
+
+def test_font_roles_round_trip_through_the_file(prefs_file):
+    config = ProjectConfig()
+    config.set_font_role("mono", "Menlo", 12, True)
+    config.set_font_role("title", "Helvetica", 18, False)
+    config.save()
+    assert json.loads(prefs_file.read_text())["font_mono"] == ["Menlo", 12, True]
+    reloaded = ProjectConfig()
+    reloaded.load()
+    assert reloaded.font_role("mono") == ("Menlo", 12, True)
+    assert reloaded.font_role("title") == ("Helvetica", 18, False)
+
+
+def test_the_old_application_font_becomes_the_ui_role(prefs_file):
+    prefs_file.write_text(json.dumps({"font_family": "Helvetica", "font_size": 15}))
+    config = ProjectConfig()
+    config.load()
+    assert config.font_role("ui") == ("Helvetica", 15, False)
+    config.save()
+    saved = json.loads(prefs_file.read_text())
+    assert "font_family" not in saved and "font_size" not in saved
+    assert saved["font_ui"] == ["Helvetica", 15, False]
+
+
+def test_the_old_default_application_font_migrates_to_the_default(prefs_file):
+    prefs_file.write_text(json.dumps({"font_family": "", "font_size": 0}))
+    config = ProjectConfig()
+    config.load()
+    assert config.font_role("ui") == ("", 0, False)
+    assert "font_family" not in config.get_all()
+
+
+def test_a_saved_ui_role_wins_over_leftover_old_font_keys(prefs_file):
+    prefs_file.write_text(
+        json.dumps(
+            {
+                "font_ui": ["Menlo", 11, True],
+                "font_family": "Helvetica",
+                "font_size": 15,
+            }
+        )
+    )
+    config = ProjectConfig()
+    config.load()
+    assert config.font_role("ui") == ("Menlo", 11, True)
+
+
+@pytest.mark.parametrize(
+    "stored, expected",
+    [
+        ("Helvetica", ("", 0, True)),
+        (["Helvetica", 12], ("", 0, True)),
+        (None, ("", 0, True)),
+        ([7, 12, False], ("", 12, False)),
+        (["Helvetica", "12", False], ("Helvetica", 0, False)),
+        (["Helvetica", -4, False], ("Helvetica", 0, False)),
+        (["Helvetica", True, False], ("Helvetica", 0, False)),
+        (["Helvetica", 12, "yes"], ("Helvetica", 12, True)),
+        ([" Helvetica ", 12, False], ("Helvetica", 12, False)),
+    ],
+)
+def test_a_hand_edited_font_role_reads_part_by_part_as_the_default(
+    prefs_file, stored, expected
+):
+    prefs_file.write_text(json.dumps({"font_title": stored}))
+    config = ProjectConfig()
+    config.load()
+    assert config.font_role("title") == expected
+
+
+def test_an_unknown_font_role_is_an_error(prefs_file):
+    config = ProjectConfig()
+    with pytest.raises(ValueError):
+        config.font_role("huge")
+    with pytest.raises(ValueError):
+        config.set_font_role("huge", "Helvetica", 12, False)
+
+
+def test_font_family_and_size_still_edit_the_ui_role(prefs_file):
+    """Preferences still offers one application font until it edits the
+    roles directly; that font is the ui role."""
+    config = ProjectConfig()
+    config.set_font_role("ui", "", 0, True)
+    config.font_family = "Helvetica"
+    config.font_size = 15
+    assert config.font_role("ui") == ("Helvetica", 15, True)
+    assert (config.font_family, config.font_size) == ("Helvetica", 15)

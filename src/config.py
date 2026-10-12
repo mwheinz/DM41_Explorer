@@ -20,6 +20,27 @@ class PreferencesError(OSError):
     names the file; the underlying error is chained as __cause__."""
 
 
+# The font roles stored as "font_<role>" -- see gui/fonts.py (GitHub issue
+# #61).
+FONT_ROLES = ("ui", "small", "title", "mono")
+
+
+def _migrate_font_prefs(loaded: dict) -> None:
+    """Rewrites a preferences file's old single application font
+    ("font_family", "font_size") as the "ui" font role, in place. The old
+    keys are dropped either way, so the next save no longer writes them;
+    a file that already has "font_ui" keeps it."""
+    family = loaded.pop("font_family", None)
+    size = loaded.pop("font_size", None)
+    if "font_ui" in loaded or (not family and not size):
+        return
+    loaded["font_ui"] = [
+        family if isinstance(family, str) else "",
+        size if isinstance(size, int) and not isinstance(size, bool) else 0,
+        False,
+    ]
+
+
 class _Pref:
     """A preference stored as-is under the attribute's own name, for the
     settings that need no conversion or validation. Settings that do (mode,
@@ -60,8 +81,14 @@ class ProjectConfig:
         "appearance_mode": "System",  # "System", "Light", "Dark"
         "color_theme": "blue",  # CustomTkinter built-in theme name (or a theme file's path)
         "high_contrast": True,  # True = gui/contrast.py adjusts the theme's colors so text is readable
-        "font_family": "",  # "" = use CustomTkinter's built-in per-platform default
-        "font_size": 0,  # 0 = use CustomTkinter's built-in default size
+        # The four font roles (GitHub issue #61), each [family, size, bold]:
+        # "" / 0 = this platform's default family / size -- see
+        # gui/fonts.py. Replaces the old "font_family"/"font_size" pair,
+        # which load() migrates into "font_ui".
+        "font_ui": ["", 0, False],
+        "font_small": ["", 0, False],
+        "font_title": ["", 0, True],
+        "font_mono": ["", 0, False],
         "recent_files": [],  # paths of recently opened/saved state files, most-recent first
         "window_width": 0,  # main window size at last close; 0 = not saved yet
         "window_height": 0,
@@ -87,8 +114,6 @@ class ProjectConfig:
     logging_level = _Pref()
     appearance_mode = _Pref()
     color_theme = _Pref()
-    font_family = _Pref()
-    font_size = _Pref()
 
     def __init__(self, prefs_filename: str = None):
         """Initializes the config with default values.
@@ -123,6 +148,7 @@ class ProjectConfig:
                 f"Could not load preferences from {self.PREFS_FILE}: "
                 f"expected a JSON object, found {type(loaded).__name__}"
             )
+        _migrate_font_prefs(loaded)
         self._prefs.update(loaded)
 
     def save(self) -> None:
@@ -249,6 +275,58 @@ class ProjectConfig:
         """Empties the recent-files list entirely -- File > Open
         Recent > Clear Recent Files."""
         self._prefs["recent_files"] = []
+
+    def font_role(self, role: str):
+        """The stored (family, size, bold) of font role `role` (one of
+        FONT_ROLES). "" and 0 mean "this platform's default" -- gui/fonts.py
+        resolves them. A hand-edited value that can't be read falls back,
+        part by part, to the default, so a bad preferences file cannot
+        stop the app starting."""
+        if role not in FONT_ROLES:
+            raise ValueError(f"Unknown font role {role!r}")
+        key = f"font_{role}"
+        default_family, default_size, default_bold = self.DEFAULT_PREFS[key]
+        stored = self._prefs.get(key)
+        if not isinstance(stored, (list, tuple)) or len(stored) != 3:
+            if stored is not None:
+                logger.warning("Unreadable %s preference %r ignored", key, stored)
+            return (default_family, default_size, default_bold)
+        family, size, bold = stored
+        if not isinstance(family, str):
+            family = default_family
+        if not isinstance(size, int) or isinstance(size, bool) or size < 0:
+            size = default_size
+        if not isinstance(bold, bool):
+            bold = default_bold
+        return (family.strip(), size, bold)
+
+    def set_font_role(self, role: str, family: str, size: int, bold: bool) -> None:
+        """Stores font role `role` as [family, size, bold]; pass "" / 0 for
+        this platform's default family / size."""
+        if role not in FONT_ROLES:
+            raise ValueError(f"Unknown font role {role!r}")
+        self._prefs[f"font_{role}"] = [str(family), int(size), bool(bold)]
+
+    # The application font as Preferences offered it before the font roles
+    # existed: the "ui" role's family and size. Kept until the Preferences
+    # dialog edits the roles directly.
+    @property
+    def font_family(self) -> str:
+        return self.font_role("ui")[0]
+
+    @font_family.setter
+    def font_family(self, value):
+        _, size, bold = self.font_role("ui")
+        self.set_font_role("ui", value, size, bold)
+
+    @property
+    def font_size(self) -> int:
+        return self.font_role("ui")[1]
+
+    @font_size.setter
+    def font_size(self, value):
+        family, _, bold = self.font_role("ui")
+        self.set_font_role("ui", family, value, bold)
 
     @property
     def xrom_directory(self) -> Path:
