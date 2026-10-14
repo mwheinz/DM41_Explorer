@@ -294,6 +294,17 @@ class XMFilesTab(ctk.CTkFrame):
             logger.warning("Could not %s XM file %r: %s", verb, name, e)
             messagebox.showerror(f"Could Not {verb.title()} File", str(e))
             return
+        except Exception as e:
+            # A bug, not a rejection -- but the transaction has already put
+            # memory back, so say so rather than leave the dialog sitting
+            # there with nothing reported (GitHub issue #68).
+            verb = "save" if replacing_addr is not None else "add"
+            logger.exception("Unexpected error trying to %s XM file %r", verb, name)
+            messagebox.showerror(
+                f"Could Not {verb.title()} File",
+                f"Unexpected error: {e}\n\nExtended memory was not changed.",
+            )
+            return
         logger.info(
             "XM file %s: %r (%s)",
             "edited" if replacing_addr is not None else "added",

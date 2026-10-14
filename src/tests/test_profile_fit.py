@@ -40,7 +40,7 @@ DM41X_ADDED = {
 DATA_DIR = Path(__file__).parent / "data"
 
 # Files in tests/data that were not captured on a DM41L.
-NOT_DM41L = {"dm41xn.dm41", "dm41x_manyfiles.dm41"}
+NOT_DM41L = {"dm41xn.dm41", "dm41x_manyfiles.dm41", "xm2-full.dm41"}
 
 
 def _load(name, profile=DM41X):

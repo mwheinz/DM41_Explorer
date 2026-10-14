@@ -109,3 +109,27 @@ def test_failed_add_does_not_touch_existing_files(root, monkeypatch):
 
     xm = ExtendedMemory(memory, address_range=[0x40, 0x2EF])
     assert [f.name.rstrip() for f in xm.list_files()] == ["ONLY"]
+
+
+def test_an_unexpected_error_is_reported_and_changes_nothing(root, monkeypatch):
+    """An add that fails with something other than a rejection (a bug, as
+    in GitHub issue #68, where an IndexError left the Add dialog open with
+    nothing reported) still gets an error box, and memory is untouched."""
+    errors = []
+    monkeypatch.setattr(messagebox, "showerror", lambda *a, **k: errors.append(a))
+
+    memory = Memory.from_file(DATA_DIR / "xm0-full.dm41")
+    before = memory.to_string()
+    tab = XMFilesTab(root)
+    tab.render(memory)
+
+    def broken_place_file(self, *args, **kwargs):
+        self.set_register(0x041, self.get_register(0x0BF))  # a partial write
+        raise IndexError("list index out of range")
+
+    monkeypatch.setattr(ExtendedMemory, "_place_file", broken_place_file)
+    tab._save_new_or_edited_file("NEW", ExtendedMemory.TYPE_DATA, {"data_lines": ["1"]})
+
+    assert len(errors) == 1
+    assert "list index out of range" in errors[0][1]
+    assert memory.to_string() == before

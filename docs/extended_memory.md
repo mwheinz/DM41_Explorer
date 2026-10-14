@@ -109,10 +109,13 @@ Observed values in `dm41x_manyfiles.dm41` (52 files):
   memory for internal operations.
 
 The directory itself is read exactly the same way on every model: start at
-TTT of region 0, walk files downward, and whenever a file's data runs past
-the bottom of a region's usable registers it continues at the top of the next
+TTT of region 0, walk files downward, and whenever a file runs past the
+bottom of a region's usable registers it continues at the top of the next
 region (possibly more than one region, for a very large file), until the
-FF-filled end-of-directory register is reached. In `dm41x_manyfiles.dm41` that
+FF-filled end-of-directory register is reached. The usable registers form one
+continuous run, and the split can fall anywhere in a file: in its data, or
+between its name and its header -- a name on 0x041 has its header at 0x2EF
+(`xm_file_cross.dm41`, GitHub issue #68). In `dm41x_manyfiles.dm41` that
 register is 0x34f, in region 2.
 
 ## 2 XM File Structure — General Layout
@@ -186,8 +189,10 @@ the file.
   file.
 - Files are stored in creation order.
 - Files can span between the extended memory regions. When this happens, there
-  is no header or other indication; if the next record would be at location
-  0x40, it will be at location 0x2ef instead.
+  is no header or other indication; if the next register would be at location
+  0x40, it will be at location 0x2ef instead. That holds for a file's header
+  as well as its records: a file whose name is on 0x41 has its header at
+  0x2ef.
 - Deleting a file on the actual DM41L (PURFL) will cause XM to be repacked, but
   the `AAA` field is not updated to point to the new location. That is, `AAA`
   points to the original creation point of the file, not necessarily the
