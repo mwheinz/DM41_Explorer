@@ -59,6 +59,35 @@ def test_remove_the_only_program_leaves_program_memory_genuinely_empty():
     assert memory.status_registers.DotEnd == memory.status_registers.R00
 
 
+def test_remove_lone_unlabelled_program_leaves_program_memory_empty():
+    # #67: a program with no global label, closed by a distance-0 `.END.`.
+    memory = load_fixture(DATA_DIR / "nolabel-noend.dm41")
+    programs = memory.programs.list_programs()
+    assert _names_lengths(programs) == [("(unlabelled)", 21)]
+
+    memory.programs.remove_program(programs[0])
+
+    assert memory.programs.list_programs() == []
+    assert memory.programs.list_global_chain() == []
+    assert memory.status_registers.DotEnd == memory.status_registers.R00
+
+
+def test_remove_program_imported_after_lone_unlabelled_program_keeps_it():
+    # #67: removing a newer program used to rebuild program memory without
+    # the unlabelled one, since list_programs() couldn't see it.
+    memory = load_fixture(DATA_DIR / "nolabel-noend.dm41")
+    original = memory.programs.list_programs()[0]
+    original_bytes = memory.programs.get_program_bytes(original)
+    imported = memory.programs.import_program(bytes.fromhex("cf671200c0002f"))
+
+    memory.programs.remove_program(imported)
+
+    after = memory.programs.list_programs()
+    assert _names_lengths(after) == [("(unlabelled)", 21)]
+    assert after[0].terminator == ".END."
+    assert memory.programs.get_program_bytes(after[0]) == original_bytes
+
+
 # -- Content integrity of what's left behind ---------------------------------
 
 
