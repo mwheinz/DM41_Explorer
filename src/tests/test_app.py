@@ -832,10 +832,12 @@ def test_an_unreadable_xm_directory_does_not_offer_dm41x_mode(dm41l_app, tmp_pat
     text = (DATA_DIR / "xm_file_cross.dm41").read_text()
     broken = tmp_path / "broken.dm41"
     # FILL2's header, at the top of region 1, no longer parses as one.
-    broken.write_text(text.replace("2ec  00000000000000  00000000000000  "
-                                   "00000000000000  2000000000007c",
-                                   "2ec  00000000000000  00000000000000  "
-                                   "00000000000000  ffffffffffffff"))
+    broken.write_text(
+        text.replace(
+            "2ec  00000000000000  00000000000000  00000000000000  2000000000007c",
+            "2ec  00000000000000  00000000000000  00000000000000  ffffffffffffff",
+        )
+    )
     assert broken.read_text() != text
 
     with _yes() as ask:

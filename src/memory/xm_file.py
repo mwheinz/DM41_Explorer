@@ -537,11 +537,7 @@ class ExtendedMemory(MemoryRegion):
         header and data are consecutive positions in it, so a name can be
         the last register of one region with its header at the top of the
         next (GitHub issue #68, tests/data/xm_file_cross.dm41)."""
-        return [
-            addr
-            for lo, hi in self._xm_regions
-            for addr in range(hi, lo, -1)
-        ]
+        return [addr for lo, hi in self._xm_regions for addr in range(hi, lo, -1)]
 
     def _layout(self, run: list, name_pos: int, register_count: int) -> tuple:
         """Where a file whose name is at run[name_pos] puts its
@@ -980,8 +976,8 @@ class ExtendedMemory(MemoryRegion):
         """
         name_addr, _, _ = self._next_slot()
         register_length = len(data_registers)
-        header_addr, segments, next_name_addr, ending_region = (
-            self._allocate_segments(name_addr, register_length)
+        header_addr, segments, next_name_addr, ending_region = self._allocate_segments(
+            name_addr, register_length
         )
 
         self.set_register(name_addr, Register(data=name_bytes))
