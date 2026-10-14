@@ -171,7 +171,9 @@ class ProgramMemory(MemoryRegion):
         one label's header.
 
         The permanent `.END.` is included as the last (newest) entry, unless
-        nothing is chained to it at all (empty program memory).
+        program memory is empty: nothing is chained to it and every byte above
+        it is zero. A lone program with no global label has nothing chained
+        to `.END.` either, but its bytes are non-zero, so it is kept (#67).
 
         Returns [] when program memory is empty or R00/`.END.` don't describe a
         real partition. Never raises: the walk stops at the first position that
@@ -191,6 +193,7 @@ class ProgramMemory(MemoryRegion):
             return []
 
         entries = []
+        top_addr = self.top_addr()
         reg, offset = dend, 4
         visited = set()
         for _ in range(512):
@@ -224,13 +227,22 @@ class ProgramMemory(MemoryRegion):
                 )
             else:
                 # The first marker examined is always the permanent `.END.`
-                # (the walk starts there). It is skipped only when it has no
-                # predecessor, i.e. program memory is empty. Otherwise it
+                # (the walk starts there). It is skipped only when program
+                # memory is empty: no predecessor AND nothing but zeroes
+                # above it. A lone program with no global label also leaves
+                # `.END.` with no predecessor (nolabel-noend.dm41), and
+                # skipping it would hide that program from list_programs()
+                # and let import_program() overwrite it (#67). Otherwise it
                 # is the newest chain link, and its distance can cover bytes
                 # CAT 1 counts as part of the newest program (see
                 # ProgramInfo's docstring).
                 is_empty_partition_marker = (
-                    len(entries) == 0 and marker.end_type == 2 and distance_bytes == 0
+                    len(entries) == 0
+                    and marker.end_type == 2
+                    and distance_bytes == 0
+                    and not self._has_nonzero_bytes(
+                        top_addr, top_addr - self.addr_for(reg, offset)
+                    )
                 )
                 if not is_empty_partition_marker:
                     entries.append(

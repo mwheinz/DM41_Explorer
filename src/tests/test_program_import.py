@@ -21,9 +21,10 @@ from pathlib import Path
 
 import pytest
 
-from memory import Memory, DM41MemoryError
+from memory import Memory, DM41MemoryError, Register
 from memory.opcode_scan import find_program_end
 from memory.program_files import decode_program_raw
+from fixture_loading import load_fixture
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -197,6 +198,89 @@ def test_import_key_assignment_case_a():
     assert imported.labels[0].key_assignment == 0
     reimported_bytes = dest.programs.get_program_bytes(imported)
     assert reimported_bytes[3] == 0x00  # the label header's own key byte
+
+
+# -- A lone program with no global label (#67) ------------------------------
+#
+# nolabel-noend.dm41 holds one unpacked program with no global label at all
+# (1 ENTER 2 + 3 * 4 /), closed directly by `.END.`. With nothing to link
+# back to, the calculator wrote that `.END.` with distance 0 -- the same as
+# an empty program memory -- so the program used to be invisible and an
+# import overwrote it.
+
+NOLABEL_BYTES = bytes.fromhex("00 11 83 00 12 40 00 13 42 00 14 43 00 00 00 00 00 00")
+LBL_B_PROGRAM = bytes.fromhex("cf671200c0002f")  # LBL B, 2, .END.
+
+
+def test_lone_unlabelled_program_closed_by_dot_end_is_listed():
+    memory = load_fixture(DATA_DIR / "nolabel-noend.dm41")
+
+    chain = memory.programs.list_global_chain()
+    assert len(chain) == 1
+    assert chain[0].end_type == 2
+    assert chain[0].distance_bytes == 0
+
+    programs = memory.programs.list_programs()
+    assert len(programs) == 1
+    assert programs[0].names_label == "(unlabelled)"
+    assert programs[0].terminator == ".END."
+    program_bytes = memory.programs.get_program_bytes(programs[0])
+    assert program_bytes == NOLABEL_BYTES + bytes.fromhex("c0002d")
+
+
+def test_import_after_lone_unlabelled_program_keeps_it():
+    memory = load_fixture(DATA_DIR / "nolabel-noend.dm41")
+    dot_end = memory.status_registers.DotEnd
+
+    imported = memory.programs.import_program(LBL_B_PROGRAM)
+
+    programs = memory.programs.list_programs()
+    assert len(programs) == 2
+    kept = programs[0]
+    assert kept.terminator == "END"
+    # Case A: the old `.END.` became a plain END in place, still with no
+    # predecessor; only its end-type nibble changed (2d -> 0d).
+    assert memory.programs.get_program_bytes(kept) == NOLABEL_BYTES + bytes.fromhex(
+        "c0000d"
+    )
+    assert programs[1].start_addr == imported.start_addr
+    assert programs[1].start_offset == imported.start_offset
+    # The new program's own END is relinked to the old one, so only its
+    # instructions are compared byte for byte.
+    assert memory.programs.get_program_bytes(imported)[:4] == LBL_B_PROGRAM[:4]
+    old_end, new_end, _ = memory.programs.list_global_chain()
+    assert old_end.header_addr == dot_end
+    assert old_end.distance_bytes == 0
+    new_end_addr = memory.programs.addr_for(new_end.header_addr, new_end.header_offset)
+    old_end_addr = memory.programs.addr_for(old_end.header_addr, old_end.header_offset)
+    assert new_end_addr + new_end.distance_bytes == old_end_addr
+
+
+def test_lone_unlabelled_program_built_by_hand_survives_import():
+    # The reproduction from #67: a 7-byte program (LBL A, 1, .END.) written
+    # straight into otherwise empty program memory.
+    memory = load_fixture(DATA_DIR / "simple.dm41")
+    status = memory.status_registers
+    for addr in range(memory.alarms.end_exclusive, status.R00):
+        memory.set_register(addr, Register(data=bytes(7)))
+    top = status.R00 - 1
+    memory.set_register(top, Register.from_hex("cf661100c0002f"))
+    status.set_DotEnd(top)
+
+    memory.programs.import_program(LBL_B_PROGRAM)
+
+    programs = memory.programs.list_programs()
+    assert len(programs) == 2
+    assert memory.programs.get_program_bytes(programs[0]) == bytes.fromhex(
+        "cf661100c0000f"
+    )
+
+
+def test_empty_program_memory_still_has_no_chain():
+    # The other side of #67's fix: a distance-0 `.END.` with only zeroes
+    # above it is still empty program memory.
+    assert load_fixture(DATA_DIR / "empty.dm41").programs.list_global_chain() == []
+    assert Memory().programs.list_global_chain() == []
 
 
 # -- Validation / error handling -------------------------------------------

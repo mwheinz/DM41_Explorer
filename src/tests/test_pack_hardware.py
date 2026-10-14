@@ -8,6 +8,7 @@ produces, using before/after state pairs captured from a real DM41L/DM41X
     lander.dm41                 -> lander-packed.dm41
     targ.dm41                   -> targ-packed.dm41
     twolabels.dm41              -> twolabels-packed.dm41
+    nolabel-noend.dm41          -> nolabel-packed.dm41
     manyfiles-packed.dm41       -> manyfiles-repacked.dm41   (PACK of a packed file)
 
 What the real PACK was observed to do (see also docs/program.md):
@@ -48,6 +49,7 @@ HARDWARE_PAIRS = [
     ("lander.dm41", "lander-packed.dm41"),
     ("targ.dm41", "targ-packed.dm41"),
     ("twolabels.dm41", "twolabels-packed.dm41"),
+    ("nolabel-noend.dm41", "nolabel-packed.dm41"),
 ]
 HARDWARE_PACKED = [packed for _, packed in HARDWARE_PAIRS] + ["manyfiles-repacked.dm41"]
 

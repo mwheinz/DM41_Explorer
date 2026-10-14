@@ -32,6 +32,11 @@ correctly.
   (XMBCD/XMALPHA/PURXM, keys 11/12/13 unshifted) alongside built-in/peripheral
   ones (EMROOM/XTOA, keys 14/15 unshifted) -- useful for testing that both
   kinds are handled correctly in the same state.
+* nolabel-noend.dm41: A single small program with no global label, never
+  packed, so `.END.` closes it directly and has nothing to link back to
+  (distance 0). Used for #67.
+* nolabel-packed.dm41: nolabel-noend.dm41 after a PACK on the calculator: the
+  program gains a real END and is followed by an empty `.END.`.
 * numtest.dm41: Simple test app to illustrate how BCD numbers are encoded in
   apps.
 * past-due.dm41: A collection of alarms deliberately allowed to enter "past
