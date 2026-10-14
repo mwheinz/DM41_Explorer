@@ -19,13 +19,29 @@ region 0 and a second file created on the calculator after it:
                           ends on 0x41, so FILL2 starts whole in region 1.
                           This layout was always read correctly; it is the
                           control case.
+
+And two that fill extended memory exactly, FILL1 of 124 registers then
+236-register files, each filling the next region:
+
+  xm1-full.dm41   FILL2: name 0x41, header 0x2EF; EOM on 0x202, a DM41L's
+                  last usable register. Made on a DM41L.
+  xm2-full.dm41   + FILL3: name 0x202, header 0x3EF; EOM 0x302. Made on a
+                  DM41X: the same split, between regions 1 and 2.
 """
 
 from pathlib import Path
 
 import pytest
 
-from memory import DM41L, DM41X, DM41MemoryError, Memory, EOM_REGISTER_HEX
+from memory import (
+    DM41L,
+    DM41X,
+    DM41MemoryError,
+    EOM_REGISTER_HEX,
+    ExtendedMemory,
+    Memory,
+    evaluate_mode_switch,
+)
 
 DATA_DIR = Path(__file__).parent / "data"
 
@@ -150,3 +166,63 @@ def test_a_name_slot_with_no_room_for_a_header_is_refused():
     with pytest.raises(DM41MemoryError, match="Not enough free space"):
         xm.add_file("B", xm.TYPE_DATA, numbers=[1.0])
     assert memory.to_string() == before
+
+
+def test_a_dm41l_filled_exactly_reads_and_refuses_another_file():
+    """xm1-full.dm41's EOM is on 0x202: the next name would have no room
+    for a header on a DM41L, so an add is refused and changes nothing."""
+    memory = _load("xm1-full.dm41")
+    xm = memory.extended_memory
+    files = xm.list_files()
+
+    assert [(f.name.strip(), f.name_addr, f.header_addr) for f in files] == [
+        ("FILL1", 0x0BF, 0x0BE),
+        ("FILL2", 0x041, 0x2EF),
+    ]
+    assert files[-1].segments == [[0x203, 0x2EE]]
+    assert memory.get_register(0x202).get_hex() == EOM_REGISTER_HEX
+
+    before = memory.to_string()
+    with pytest.raises(DM41MemoryError, match="Not enough free space"):
+        xm.add_file("FILL3", xm.TYPE_DATA, numbers=[1.0])
+    assert memory.to_string() == before
+
+
+def test_a_name_on_region_1s_last_register_reads_on_a_dm41x():
+    memory = _load("xm2-full.dm41", DM41X)
+    files = memory.extended_memory.list_files()
+
+    assert [(f.name.strip(), f.name_addr, f.header_addr) for f in files] == [
+        ("FILL1", 0x0BF, 0x0BE),
+        ("FILL2", 0x041, 0x2EF),
+        ("FILL3", 0x202, 0x3EF),
+    ]
+    assert files[-1].segments == [[0x303, 0x3EE]]
+    assert memory.get_register(0x302).get_hex() == EOM_REGISTER_HEX
+
+
+def test_xm2_full_is_rebuilt_from_xm1_full_on_a_dm41x():
+    """Adding FILL3 to xm1-full.dm41 on a DM41X puts it where the
+    calculator did in xm2-full.dm41, and brings both later regions'
+    pointer registers to what the calculator wrote. Region 0's pointer
+    and the headers' AAA fields are not compared (see above)."""
+    capture = _load("xm2-full.dm41", DM41X)
+    memory = _load("xm1-full.dm41", DM41X)
+    fill3 = capture.extended_memory.list_files()[-1]
+
+    memory.extended_memory.add_file(
+        "FILL3", ExtendedMemory.TYPE_DATA, data_lines=fill3.get_data_lines()
+    )
+
+    for addr in [0x201, 0x202, 0x301, 0x302, *range(0x303, 0x3EF)]:
+        assert memory.get_register(addr) == capture.get_register(addr), hex(addr)
+
+
+def test_xm2_full_needs_dm41x_mode():
+    """In DM41L mode, xm2-full.dm41 is too big -- reported as XM a DM41L
+    does not have, not as a directory that cannot be read."""
+    findings = evaluate_mode_switch(_load("xm2-full.dm41"), DM41L)
+
+    assert len(findings) == 1
+    assert "use memory a DM41L does not have" in findings[0].message
+    assert "'FILL3'" in findings[0].message
