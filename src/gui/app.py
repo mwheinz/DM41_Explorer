@@ -1382,7 +1382,18 @@ class DM41ExplorerApp(ctk.CTk):
             return
 
         findings = evaluate_mode_switch(loaded, self.profile)
-        if findings:
+        if findings and evaluate_mode_switch(loaded, DeviceMode.DM41X.profile):
+            # It does not fit DM41X mode either -- an XM directory that
+            # cannot be read in any mode -- so offering that mode as the
+            # cure would be wrong (GitHub issue #68). It opens as it is,
+            # as it would in DM41X mode, and the XM Files tab says why
+            # the directory cannot be listed.
+            logger.warning(
+                "%s has problems no mode fixes: %s",
+                path,
+                "; ".join(str(finding) for finding in findings),
+            )
+        elif findings:
             if not self._offer_mode_switch_for_load(path, findings):
                 return
             # The mode moved, so the state has to be re-read under the new

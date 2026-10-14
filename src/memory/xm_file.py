@@ -63,10 +63,14 @@ class XMFile:
         declared_length: int,
         byte_length: Optional[int] = None,
         name_bytes: Optional[bytes] = None,
+        name_addr: Optional[int] = None,
     ):
         self._memory = memory
         self.header_addr = header_addr
-        self.name_addr = header_addr + 1
+        # Directly above the header, except when the name is on one
+        # region's last usable register and the header at the top of the
+        # next (GitHub issue #68; see ExtendedMemory._usable_run()).
+        self.name_addr = header_addr + 1 if name_addr is None else name_addr
         self.file_type = file_type
         self.name = name
 
@@ -81,8 +85,10 @@ class XMFile:
         # segments is a list of inclusive (start, end) address ranges, in
         # record order: the first segment is in the header's own region and
         # starts at data_end == header_addr-1 (the register directly below
-        # the header); a file whose declared_length doesn't fit in that
-        # region's remaining space continues with one or more further
+        # the header -- an empty [header_addr, header_addr-1] when the
+        # header is its region's last usable register); a file whose
+        # declared_length doesn't fit in that region's remaining space
+        # continues with one or more further
         # segments at the top of the next region(s) -- see the note on
         # ExtendedMemory.list_files() about cross-region continuation.
         # Each segment's start is derived structurally (from the next file
@@ -443,8 +449,10 @@ class ExtendedMemory(MemoryRegion):
         Walks every XM region top-down and returns the files found, in
         address order.
 
-        A file's data can span multiple regions -- including more than two,
-        on a model with more than two (see device_profile.py).
+        A file can span multiple regions -- including more than two, on a
+        model with more than two (see device_profile.py) -- and the split
+        can fall anywhere in it: in its data, or between its name and its
+        header (see _usable_run()).
         """
         files = []
         regions = self._xm_regions
@@ -475,49 +483,43 @@ class ExtendedMemory(MemoryRegion):
                 f"Invalid XM header: {addr:x} != 0x{regions[current_region][1]}"
             )
 
-        while self.get_register(addr) != eom_register():
-            name_register = self.get_register(addr)
+        # Everything below walks positions in the continuous run of usable
+        # registers (see _usable_run()), so a file's name, header and data
+        # simply follow one another, whichever region each lands in.
+        run = self._usable_run()
+        pos = 0
+        while self.get_register(run[pos]) != eom_register():
+            name_register = self.get_register(run[pos])
             name = name_register.get_ascii()
             name_bytes = name_register.get_bytes()
-            addr -= 1
-            segments = []
-            header_addr = addr
+            if pos + 1 >= len(run):
+                raise DM41MemoryError(
+                    f"XM file {name!r} (name at 0x{run[pos]:x}) has no room "
+                    "for a header before the end of the last XM region."
+                )
+            name_addr, header_addr = run[pos], run[pos + 1]
             try:
-                header_register = self.get_register(addr)
+                header_register = self.get_register(header_addr)
                 header = ExtendedMemory._parse_header(header_register.get_bytes())
             except Exception as e:
                 raise DM41MemoryError(
                     "Detected invalid XM file header. "
-                    f"0x{addr:x}: {header_register.get_hex()}"
+                    f"0x{header_addr:x}: {header_register.get_hex()}"
                 ) from e
 
-            # `addr` is now where this file's successor (or the EOM sentinel)
-            # would sit if the whole file fit in the current region. If that
-            # lands on or below the region's pointer register, the rest of
-            # the file continues at the top of the next region -- and, for a
-            # file big enough, the one after that.
-            addr -= header.register_length + 1
-            top = header_addr - 1
-            while addr <= regions[current_region][0]:
-                segments.append([regions[current_region][0] + 1, top])
-
-                s = regions[current_region][0] - addr
-                current_region += 1
-                if current_region >= len(regions):
-                    raise DM41MemoryError(
-                        f"XM file {name!r} (header at 0x{header_addr:x}) runs "
-                        "past the last XM region."
-                    )
-                addr = regions[current_region][1] - s
-                top = regions[current_region][1]
-
-            segments.append([addr + 1, top])
+            segments, pos = self._layout(run, pos, header.register_length)
+            if pos >= len(run):
+                raise DM41MemoryError(
+                    f"XM file {name!r} (header at 0x{header_addr:x}) runs "
+                    "past the last XM region."
+                )
 
             file = XMFile(
                 memory=self._memory,
                 name=name,
                 name_bytes=name_bytes,
                 header_addr=header_addr,
+                name_addr=name_addr,
                 file_type=header.file_type,
                 declared_length=header.register_length,
                 byte_length=header.byte_length,
@@ -525,6 +527,54 @@ class ExtendedMemory(MemoryRegion):
             )
             files.append(file)
         return files
+
+    def _usable_run(self) -> list:
+        """Every usable XM register, in the order the calculator fills them:
+        each region from its ceiling down, skipping its pointer register,
+        then on to the next region.
+
+        The calculator treats this as one continuous run: a file's name,
+        header and data are consecutive positions in it, so a name can be
+        the last register of one region with its header at the top of the
+        next (GitHub issue #68, tests/data/xm_file_cross.dm41)."""
+        return [
+            addr
+            for lo, hi in self._xm_regions
+            for addr in range(hi, lo, -1)
+        ]
+
+    def _layout(self, run: list, name_pos: int, register_count: int) -> tuple:
+        """Where a file whose name is at run[name_pos] puts its
+        register_count data registers.
+
+        Returns (segments, next_pos): segments in XMFile's [[start, end],
+        ...] shape, and the run position of the file's successor (another
+        name, or the EOM sentinel). next_pos can be len(run) or beyond --
+        no room for a successor -- which the caller checks.
+
+        Two empty, start > end, segments keep XMFile's address properties
+        meaningful (see XMFile.spans_regions):
+          - a header on its region's last usable register gets an empty
+            first segment just below it, so data_end is still header-1;
+          - a successor in a later region than the file's last data
+            register gets an empty last segment just above it, so
+            data_start - 1 is still the successor's address.
+        """
+        header_addr = run[name_pos + 1]
+        data = run[name_pos + 2 : name_pos + 2 + register_count]
+        next_pos = name_pos + 2 + register_count
+
+        segments = []
+        if data and data[0] != header_addr - 1:
+            segments.append([header_addr, header_addr - 1])
+        for addr in data:
+            if segments and segments[-1][0] - 1 == addr:
+                segments[-1][0] = addr
+            else:
+                segments.append([addr, addr])
+        if next_pos < len(run) and data and run[next_pos] != data[-1] - 1:
+            segments.append([run[next_pos] + 1, run[next_pos]])
+        return segments, next_pos
 
     def _find_region(self, addr: int) -> int:
         """The index into this memory's XM regions whose *usable* span (just
@@ -567,62 +617,42 @@ class ExtendedMemory(MemoryRegion):
         addr = (region0_header[1] & 0x0F) * 256 + region0_header[0]
         return addr, self._find_region(addr), False
 
-    def _allocate_segments(
-        self, name_addr: int, region_index: int, register_count: int
-    ) -> tuple:
+    def _allocate_segments(self, name_addr: int, register_count: int) -> tuple:
         """
-        Works out where a new file's register_count data registers land,
-        starting immediately below the header at name_addr - 1, spilling
-        into the next XM region(s) if it doesn't fit in this one's remaining
-        space -- the exact inverse of the address math in list_files()
-        (see its comments for the cross-region-continuation details), so
-        that list_files() reading the result back reconstructs the same
-        segments.
+        Works out where a new file whose name goes at name_addr puts its
+        header and its register_count data registers: the next positions
+        in the continuous run of usable registers (see _usable_run()),
+        laid out by the same _layout() list_files() reads them back with,
+        so the two always agree.
 
-        Returns (segments, next_name_addr, ending_region): segments is in
-        the same [[start, end], ...] shape list_files() produces;
-        next_name_addr is where *this* file's own successor (or an EOM
-        sentinel) belongs, in ending_region.
+        Returns (header_addr, segments, next_name_addr, ending_region):
+        segments is in the same [[start, end], ...] shape list_files()
+        produces; next_name_addr is where *this* file's own successor (or
+        an EOM sentinel) belongs, in ending_region.
+
+        The successor's slot must itself be a usable register: a file
+        that would use the very last one would leave no room for the
+        terminator, and the next list_files() would walk past it into
+        unrelated memory. Such a file is refused here, before any
+        registers are written, so a nearly-full directory's terminator
+        stays intact.
         """
-        regions = self._xm_regions
-        header_addr = name_addr - 1
-        cursor = header_addr - (register_count + 1)
-        segments = []
-        top = header_addr - 1
-        ri = region_index
-
-        # The `<=` (not `<`) is deliberate, not itself an off-by-one:
-        # `cursor` is also next_name_addr's starting point, and it must land
-        # on a real, writable address strictly ABOVE a region's own reserved
-        # pointer register for a terminator (this file's successor's name
-        # register, or list_files()'s EOM sentinel) to go. So a file that
-        # would leave *zero* room for one (cursor landing exactly on the
-        # region's pointer register) spills too, even though none of its own
-        # data actually overflows: `s` (below) is 0 in that case, the segment
-        # added in the next region is empty, and XMFile.spans_regions reports
-        # False -- "spans" means real data in a later region, not merely that
-        # the terminator was pushed there.
-        #
-        # This boundary matters: a file allowed to use the last usable
-        # register would leave no room for the terminator, and the next
-        # list_files() would walk past it into unrelated memory. Rejecting
-        # such a file here, before any registers are written, keeps a
-        # nearly-full directory's terminator intact.
-        while cursor <= regions[ri][0]:
-            segments.append([regions[ri][0] + 1, top])
-            s = regions[ri][0] - cursor
-            ri += 1
-            if ri >= len(regions):
-                raise DM41MemoryError(
-                    "Not enough free space in extended memory for this "
-                    "file -- no further XM region is available to spill "
-                    "into."
-                )
-            cursor = regions[ri][1] - s
-            top = regions[ri][1]
-
-        segments.append([cursor + 1, top])
-        return segments, cursor, ri
+        run = self._usable_run()
+        name_pos = run.index(name_addr)
+        next_pos = name_pos + 2 + register_count
+        if next_pos >= len(run):
+            raise DM41MemoryError(
+                "Not enough free space in extended memory for this file -- "
+                "no further XM region is available to spill into."
+            )
+        segments, _ = self._layout(run, name_pos, register_count)
+        next_name_addr = run[next_pos]
+        return (
+            run[name_pos + 1],
+            segments,
+            next_name_addr,
+            self._find_region(next_name_addr),
+        )
 
     @staticmethod
     def _build_header(
@@ -948,12 +978,11 @@ class ExtendedMemory(MemoryRegion):
         false "duplicate", aborting the rebuild partway through with
         several already-wiped, not-yet-rebuilt files gone for good.
         """
-        name_addr, region_index, _ = self._next_slot()
+        name_addr, _, _ = self._next_slot()
         register_length = len(data_registers)
-        segments, next_name_addr, ending_region = self._allocate_segments(
-            name_addr, region_index, register_length
+        header_addr, segments, next_name_addr, ending_region = (
+            self._allocate_segments(name_addr, register_length)
         )
-        header_addr = name_addr - 1
 
         self.set_register(name_addr, Register(data=name_bytes))
         self.set_register(
@@ -970,16 +999,16 @@ class ExtendedMemory(MemoryRegion):
                 self.set_register(addr, data_registers[i])
                 i += 1
 
-        # Terminate the directory with a fresh EOM sentinel, if there's
-        # still room for one below what we just wrote.
-        if next_name_addr > self._xm_regions[ending_region][0]:
-            self.set_register(next_name_addr, eom_register())
+        # Terminate the directory with a fresh EOM sentinel
+        # (_allocate_segments() has made sure there is room for one).
+        self.set_register(next_name_addr, eom_register())
 
         self._update_region_pointers(ending_region)
 
         return XMFile(
             memory=self._memory,
             header_addr=header_addr,
+            name_addr=name_addr,
             file_type=file_type,
             name=Register(data=name_bytes).get_ascii(),
             name_bytes=name_bytes,

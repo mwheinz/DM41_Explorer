@@ -809,6 +809,11 @@ def test_declining_the_offer_aborts_the_load(dm41l_app):
         # Calls 18 functions a DM41L lacks: those warn at Send only -- the
         # user may mean to retype the step on the calculator.
         "xrom.d41",
+        # A file name on region 0's last register, its header at the top
+        # of region 1: an XM directory this app could not read once, and
+        # reported as "needs more memory" (GitHub issue #68).
+        "xm_file_cross.dm41",
+        "xm_file_cross_115.dm41",
     ],
 )
 def test_a_state_a_dm41l_can_hold_loads_without_an_offer(dm41l_app, state):
@@ -818,6 +823,27 @@ def test_a_state_a_dm41l_can_hold_loads_without_an_offer(dm41l_app, state):
     ask.assert_not_called()
     assert dm41l_app.mode is DeviceMode.DM41L
     assert dm41l_app.memory_source == DATA_DIR / state
+
+
+def test_an_unreadable_xm_directory_does_not_offer_dm41x_mode(dm41l_app, tmp_path):
+    """DM41X mode cannot read a broken directory either, so it is not
+    offered as the cure: the state opens as it is, as it would in DM41X
+    mode, and the XM Files tab says what is wrong (GitHub issue #68)."""
+    text = (DATA_DIR / "xm_file_cross.dm41").read_text()
+    broken = tmp_path / "broken.dm41"
+    # FILL2's header, at the top of region 1, no longer parses as one.
+    broken.write_text(text.replace("2ec  00000000000000  00000000000000  "
+                                   "00000000000000  2000000000007c",
+                                   "2ec  00000000000000  00000000000000  "
+                                   "00000000000000  ffffffffffffff"))
+    assert broken.read_text() != text
+
+    with _yes() as ask:
+        dm41l_app._load_state_into_buffer(str(broken))
+
+    ask.assert_not_called()
+    assert dm41l_app.mode is DeviceMode.DM41L
+    assert dm41l_app.memory_source == broken
 
 
 # -- Serial is gated by the mode ---------------------------------------------
