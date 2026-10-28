@@ -441,9 +441,12 @@ class Memory:
         start, end) -- both inclusive.
 
         The "xm" key appears once per XM region (two on a DM41L, three on a
-        DM41X), since those spans aren't contiguous with each other. On a
-        DM41X the 16 addresses 0x2F0-0x2FF between the second and third
-        regions belong to no span.
+        DM41X), since those spans aren't contiguous with each other. Each
+        later region's span starts at its pointer register (0x201, 0x301),
+        so the register below it -- 0x200, 0x300 -- belongs to no span, nor
+        do the DM41X's 0x2F0-0x2FF between its second and third regions.
+        Those registers are RAM the XM modules provide but nothing may use
+        (#65); display code shows an address in no span as "Inaccessible".
         """
         xm = self.extended_memory
         xm0_lo, xm0_hi = self._profile.xm_regions[0]
@@ -461,18 +464,17 @@ class Memory:
             spans.append(self.programs.span())
             spans.append(self.data_memory.span())
 
-        # Each later XM region's span starts one below its pointer register
-        # (e.g. 0x200 for the DM41L's second region) -- the register that
-        # would hold a pointer to a region the model doesn't have.
+        # Each later XM region starts at its pointer register. The register
+        # below it (0x200, 0x300) is inaccessible, so it gets no span (#65).
         for lo, hi in self._profile.xm_regions[1:]:
-            spans.append(RegionSpan(xm.key, xm.label, lo - 1, hi))
+            spans.append(RegionSpan(xm.key, xm.label, lo, hi))
         return spans
 
     def region_for(self, addr: int) -> Optional[RegionSpan]:
         """The RegionSpan containing `addr` (from regions()), or None if
-        `addr` falls outside every span this method returns (shouldn't
-        happen for any address in [0x000, profile.display_end] other than
-        the DM41X's 0x2F0-0x2FF gap, but this is a lookup, not a guarantee)."""
+        `addr` falls outside every span this method returns -- for an
+        address in [0x000, profile.display_end], only the inaccessible
+        registers 0x200 and 0x300 and the DM41X's 0x2F0-0x2FF (#65)."""
         for span in self.regions():
             if addr in span:
                 return span

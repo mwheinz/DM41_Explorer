@@ -98,9 +98,9 @@ class DeviceProfile:
 # modules. (The HP-41CX supports one Extended Functions module and up to 2
 # Extended Memory modules.)
 #
-# The DM41L has region 0 plus ONE Extended Memory module. Note that its
-# second region actually extends down to address 0x200, but that register is
-# never used on a DM41L and is always zero.
+# The DM41L has region 0 plus ONE Extended Memory module. The register just
+# below its second region's pointer (0x200) is RAM the module provides, but
+# it is undocumented and cannot be used, so it is not part of the region.
 #
 # Its XROMs are only those of the original HP-41CX modules (Extended
 # Functions/Memory and Time), its built-in library hp41cx.json; it cannot
@@ -112,7 +112,8 @@ DM41L = DeviceProfile(
     supports_serial=True,
 )
 
-# The DM41X adds a second Extended Memory module at 0x301-0x3EF -- confirmed
+# The DM41X adds a second Extended Memory module at 0x301-0x3EF (0x300 below
+# it is inaccessible, like 0x200 and 0x2F0-0x2FF) -- confirmed
 # against tests/data/dm41x_manyfiles.dm41, a real state whose files span all
 # three regions. Its XROMs are the CX set plus its own additions (X<I>Y, TRNG
 # and the DM41X module): its built-in library, dm41x-cx.json. The

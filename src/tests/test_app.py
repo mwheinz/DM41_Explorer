@@ -414,8 +414,11 @@ def test_hex_view_runs_to_the_end_of_the_profiles_map(app, profile, last):
     assert len(rows) == last + 1
     assert (rows[0][0], rows[-1][0]) == ("0x000", f"0x{last:03x}")
     assert rows[last][3] == "XM"
+    # The register below each later XM region's pointer is inaccessible (#65).
+    assert (rows[0x200][3], rows[0x201][3]) == ("Inaccessible", "XM")
     if profile is DM41X:
         assert rows[0x2F0][3] == "Inaccessible"  # the gap between XM #1 and #2
+        assert (rows[0x300][3], rows[0x301][3]) == ("Inaccessible", "XM")
     assert f"0x000-0x{last:03x} ({last + 1} registers)" in (
         app.hex_view_tab._header_label.cget("text")
     )

@@ -98,7 +98,8 @@ are interpreted differently:
 | Void Region | Registers do not exist / not used. | 0x10 | 0x3F |
 | Extended Memory #0 | File-oriented memory region | 0x40 | 0xBF |
 | Main Memory | Main memory consists of 319 registers that are subdivided into variable length sub-regions. | 0xC0 | 0x1FF |
-| Extended Memory #1 | File-oriented memory region. | 0x200 | 0x2EF |
+| Inaccessible | XM RAM that cannot be used (see `docs/extended_memory.md`). | 0x200 | 0x200 |
+| Extended Memory #1 | File-oriented memory region. | 0x201 | 0x2EF |
 
 An additional memory region may exist in actual HP41CV and HP41CX calculators
 if an additional Extended Memory module is installed, but this is not
@@ -178,4 +179,4 @@ This is explained further in `docs/program.md`.
 In an actual HP41 series calculator, extended memory may or may not be present.
 The DM41L emulates the presence of an "Extended Functions" module which
 occupies registers 0x040-0x0bf and a single "Extended Memory" module which
-occupies registers 0x200-0x2ef. This is explained further in `docs/extended_memory.md`
+occupies registers 0x201-0x2ef. This is explained further in `docs/extended_memory.md`

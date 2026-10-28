@@ -299,6 +299,9 @@ def test_regions_list_covers_the_whole_display_range_without_gaps():
     spans = memory.regions()
     for addr in range(0x000, 0x2F0):
         matches = [s for s in spans if addr in s]
+        if addr == 0x200:  # XM RAM nothing may use: the one gap (#65)
+            assert matches == [] and memory.region_for(addr) is None
+            continue
         assert len(matches) == 1, f"0x{addr:03x} matched {matches}"
         assert memory.region_for(addr).key == matches[0].key
 

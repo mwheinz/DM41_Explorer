@@ -33,8 +33,9 @@ from gui.tab_common import (
 # the memory's profile.display_end (0x2EF for a DM41L, 0x3EF for a DM41X).
 # Memory.regions() names Status Registers, an unused/"void" gap, Extended
 # Memory #0, Main Memory (itself split further, when a state with a sane
-# R00/.END. is loaded) and each later Extended Memory region. On a DM41X the
-# 16 addresses 0x2F0-0x2FF belong to no region and show as Inaccessible.
+# R00/.END. is loaded) and each later Extended Memory region. The registers
+# 0x200 and 0x300 and (on a DM41X) 0x2F0-0x2FF belong to no region and show
+# as Inaccessible (#65).
 DISPLAY_START = 0x000
 
 # One entry per region key Memory.regions() can report. `light`/`dark` are
@@ -67,8 +68,9 @@ _TREE_COLUMNS = [
 
 def _region_span_for(regions: list, addr: int):
     """The RegionSpan in `regions` (a Memory.regions() list) containing
-    `addr`, or None. `regions` covers the display range except a DM41X's
-    0x2F0-0x2FF gap (see Memory.regions()'s docstring); render() below
+    `addr`, or None. `regions` covers the display range except the
+    inaccessible registers 0x200, 0x300 and 0x2F0-0x2FF (see
+    Memory.regions()'s docstring); render() below
     shows an address that matches nothing as "Inaccessible" rather than
     crashing."""
     for span in regions:

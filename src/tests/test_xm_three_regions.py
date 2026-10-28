@@ -138,13 +138,13 @@ def test_build_region_pointer_keeps_both_ww_digits():
 def test_regions_lists_every_xm_span_for_the_dm41x():
     spans = _x_memory().regions()
     xm = [(s.start, s.end) for s in spans if s.key == "xm"]
-    assert xm == [(0x40, 0xBF), (0x200, 0x2EF), (0x300, 0x3EF)]
+    assert xm == [(0x40, 0xBF), (0x201, 0x2EF), (0x301, 0x3EF)]
 
 
 def test_regions_for_the_dm41l_is_unchanged():
     spans = Memory().regions()
     xm = [(s.start, s.end) for s in spans if s.key == "xm"]
-    assert xm == [(0x40, 0xBF), (0x200, 0x2EF)]
+    assert xm == [(0x40, 0xBF), (0x201, 0x2EF)]
 
 
 def test_region_for_finds_the_third_region_and_the_gap():
@@ -153,6 +153,15 @@ def test_region_for_finds_the_third_region_and_the_gap():
     assert memory.region_for(0x301).key == "xm"
     # 0x2F0-0x2FF belongs to no region on a DM41X.
     assert memory.region_for(0x2F8) is None
+
+
+@pytest.mark.parametrize(
+    "profile, addr",
+    [(DM41L, 0x200), (DM41X, 0x200), (DM41X, 0x300), (DM41X, 0x2F0), (DM41X, 0x2FF)],
+)
+def test_registers_below_a_pointer_and_in_the_gap_are_in_no_region(profile, addr):
+    # 0x200 and 0x300 are XM RAM that nothing may use, like 0x2F0-0x2FF (#65).
+    assert Memory(profile=profile).region_for(addr) is None
 
 
 # -- Writing ------------------------------------------------------------------

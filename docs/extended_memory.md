@@ -13,9 +13,10 @@ has to be copied into and out of primary memory first.
 The DM41L emulates the Extended Functions module and a single Extended Memory
 module as two separate memory regions. The first extended memory region
 occupies registers 0x040 to 0x0bf and the second extended memory region extends
-from 0x200 to 0x2ef. The first memory region reserves register 0x40 for system
-use, while the second reserves 0x200 and 0x201. In addition, a register is
-reserved for marking the end of used memory, leaving 362 registers worth of
+from 0x201 to 0x2ef. The first memory region reserves register 0x40 for system
+use, while the second reserves 0x201. (Register 0x200, just below the second
+region, is also XM RAM but cannot be used; see section 1.) In addition, a
+register is reserved for marking the end of used memory, leaving 362 registers worth of
 extended memory available to the user. Registers 0x2f0-0x2ff are
 "non-existant".
 
@@ -72,8 +73,11 @@ span all three):
 | 1 (Extended Memory) | 0x201 | 0x202-0x2ef | DM41L, DM41X |
 | 2 (Extended Memory) | 0x301 | 0x302-0x3ef | DM41X only |
 
-Registers 0x200 and 0x300 are "always zero?" and purpose unknown. The 16
-addresses 0x2f0-0x2ff are not part of any region.
+Registers 0x200, 0x2f0-0x2ff, 0x300 and 0x3f0-0x3ff are part of the RAM
+provided by the XM modules, but their contents are undocumented and they cannot
+be used. They are not part of any region: the Hex View shows 0x200, 0x300 and
+0x2f0-0x2ff as "Inaccessible" (0x3f0-0x3ff lie beyond its range), and
+`Memory.regions()` reports no span for them (issue #65).
 
 Every pointer register has the layout `000WWPPPNNNTTT` (14 hex digits, or
 `00000000000000` before any XM file has been created):
