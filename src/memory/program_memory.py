@@ -18,6 +18,7 @@ address in that register; offset 6 = the last/rightmost byte = the
 calculation below goes through them.
 """
 
+from dataclasses import dataclass
 from typing import Optional
 
 from .registers import Register, DM41MemoryError
@@ -42,6 +43,43 @@ from .program_chain import (
     encode_chain_marker,
     walk_chain,
 )
+
+
+@dataclass(frozen=True)
+class ImportPlan:
+    """What importing a file's programs would do to existing ones --
+    `ProgramMemory.plan_import()` (#72). Nothing here has been applied.
+
+    `replaced` lists the existing Programs (memory order) sharing a global
+    label name with something being imported; they are removed first.
+    `lost_labels` names their labels the import doesn't bring back.
+    `carried_keys` and `lost_keys` are their key-assigned ProgramLabels:
+    a carried key moves to the new label of the same name, a lost one has
+    no new label to go to."""
+
+    replaced: tuple = ()
+    lost_labels: tuple = ()
+    carried_keys: tuple = ()
+    lost_keys: tuple = ()
+
+
+def _incoming_label_names(programs: list) -> list:
+    """Every global label name in `programs` (instruction bytes, as
+    `split_programs()` returns them), in order. A forward scan, not the
+    chain: a compiled TXT program's labels are not chain-linked yet.
+    Raises ValueError if a name appears twice."""
+    names = []
+    for program in programs:
+        for marker in scan_global_markers_forward(program):
+            if not marker.is_label:
+                continue
+            if marker.name in names:
+                raise ValueError(
+                    f"Two programs in this file have a global label named "
+                    f"{marker.name!r} -- the calculator can't hold both."
+                )
+            names.append(marker.name)
+    return names
 
 
 class ProgramMemory(MemoryRegion):
@@ -456,22 +494,63 @@ class ProgramMemory(MemoryRegion):
         raises, including ValueError when two of `programs` share a global
         label name. All-or-nothing: if any program can't be imported, none
         are."""
-        # A forward scan, not the chain: a compiled TXT program's labels are
-        # not chain-linked yet, so `_check_no_duplicate_labels()` can't see a
-        # label imported from earlier in the same file.
-        seen = set()
-        for program in programs:
-            for marker in scan_global_markers_forward(program):
-                if not marker.is_label:
-                    continue
-                if marker.name in seen:
-                    raise ValueError(
-                        f"Two programs in this file have a global label named "
-                        f"{marker.name!r} -- the calculator can't hold both."
-                    )
-                seen.add(marker.name)
+        # Labels imported from earlier in the same file aren't chain-linked
+        # yet, so `_check_no_duplicate_labels()` can't see them.
+        _incoming_label_names(programs)
         with self._memory.transaction():
             return [self._splice_program(program) for program in programs]
+
+    def plan_import(self, programs: list) -> ImportPlan:
+        """Works out which existing programs importing `programs` (instruction
+        bytes, oldest first) would replace (#72), without changing anything.
+        A program is replaced when it shares any global label name with any
+        of `programs`; the Programs tab shows the result for the user to
+        confirm before `import_programs_replacing()` applies it.
+
+        Raises ValueError if two of `programs` share a label name."""
+        incoming = set(_incoming_label_names(programs))
+        replaced = [
+            program
+            for program in self.list_programs()
+            if any(label.name in incoming for label in program.labels)
+        ]
+        labels = [label for program in replaced for label in program.labels]
+        keyed = [label for label in labels if label.key_assignment]
+        return ImportPlan(
+            replaced=tuple(replaced),
+            lost_labels=tuple(lab.name for lab in labels if lab.name not in incoming),
+            carried_keys=tuple(lab for lab in keyed if lab.name in incoming),
+            lost_keys=tuple(lab for lab in keyed if lab.name not in incoming),
+        )
+
+    def import_programs_replacing(self, programs: list) -> list:
+        """The Programs tab's Import (#72): removes every program
+        `plan_import()` says `programs` replaces, imports `programs` as the
+        newest, repacks (which chain-links a compiled TXT program's labels),
+        and gives each carried-over key back to the new label of the same
+        name. The replacements end up newest, not where the old programs sat.
+
+        Returns the new Programs, oldest first. Raises what `plan_import()`,
+        `import_programs()` and `repack()` raise. All-or-nothing: if the
+        import fails -- not enough room, say -- the removed programs are put
+        back too (see Memory.transaction())."""
+        key_assignments_region = self._memory.key_assignments
+        with self._memory.transaction():
+            plan = self.plan_import(programs)
+            if plan.replaced:
+                self._remove_programs(plan.replaced)
+            for program in programs:
+                self._splice_program(program)
+            self.repack()
+            for label in plan.carried_keys:
+                try:
+                    key_number, shifted = key_assignments_region.key_number_for_byte(
+                        label.key_assignment
+                    )
+                except ValueError:
+                    continue  # didn't decode to a real key position
+                self.set_program_key_assignment(label.name, key_number, shifted)
+            return self.list_programs()[-len(programs) :]
 
     def _splice_program(self, instruction_bytes: bytes) -> Program:
         """import_program()'s body, run inside its transaction."""
@@ -497,7 +576,7 @@ class ProgramMemory(MemoryRegion):
                 "Could not find a valid END/label marker in this "
                 "program's own bytes -- it may be corrupt."
             )
-        self._check_no_duplicate_labels(chain_entries)
+        self._check_no_duplicate_labels(scan_global_markers_forward(instruction_bytes))
 
         data = bytearray(instruction_bytes)
 
@@ -558,13 +637,13 @@ class ProgramMemory(MemoryRegion):
             )
         return programs[-1]
 
-    def _check_no_duplicate_labels(self, chain_entries: list):
-        """Raises ValueError if any global label name found by
-        `walk_chain()` (in a program about to be imported) already exists
-        somewhere in this memory's own global chain -- see
-        `import_program()`'s step 3."""
+    def _check_no_duplicate_labels(self, markers: list):
+        """Raises ValueError if any global label name in `markers` (a forward
+        scan of a program about to be imported -- not its chain, which a
+        compiled TXT program hasn't linked yet) already exists somewhere in
+        this memory's own global chain -- see `import_program()`'s step 3."""
         existing_names = {p.name for p in self.list_global_chain() if p.is_named}
-        for entry in chain_entries:
+        for entry in markers:
             if entry.is_label and entry.name in existing_names:
                 raise ValueError(
                     f"A global label named {entry.name!r} already exists "
@@ -924,29 +1003,34 @@ class ProgramMemory(MemoryRegion):
         program's bytes fail get_program_bytes()'s cross-check), this Memory is
         left exactly as it was (see Memory.transaction())."""
         with self._memory.transaction():
-            self._remove_program(program)
+            self._remove_programs([program])
 
-    def _remove_program(self, program: Program):
-        """remove_program()'s body, run inside its transaction."""
+    def _remove_programs(self, to_remove: list):
+        """remove_program()'s body, run inside its transaction, for any
+        number of programs at once (import_programs_replacing() removes
+        several)."""
         key_assignments_region = self._memory.key_assignments
         programs = self.list_programs()
-        match = next(
-            (
-                p
-                for p in programs
-                if p.start_addr == program.start_addr
-                and p.start_offset == program.start_offset
-            ),
-            None,
-        )
-        if match is None:
-            raise ValueError(
-                "This program entry doesn't match the current program "
-                "list -- it may be stale (from a list_programs() call "
-                "taken before the state changed)."
+        matches = []
+        for program in to_remove:
+            match = next(
+                (
+                    p
+                    for p in programs
+                    if p.start_addr == program.start_addr
+                    and p.start_offset == program.start_offset
+                ),
+                None,
             )
+            if match is None:
+                raise ValueError(
+                    "This program entry doesn't match the current program "
+                    "list -- it may be stale (from a list_programs() call "
+                    "taken before the state changed)."
+                )
+            matches.append(match)
 
-        for label in match.labels:
+        for label in (label for match in matches for label in match.labels):
             if label.key_assignment:
                 try:
                     key_number, shifted = key_assignments_region.key_number_for_byte(
@@ -958,7 +1042,7 @@ class ProgramMemory(MemoryRegion):
 
         keep = []
         for p in programs:
-            if p is match:
+            if any(p is match for match in matches):
                 continue
             raw = self.get_program_bytes(p)
             key_assignments = {

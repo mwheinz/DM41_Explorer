@@ -35,13 +35,15 @@ PPC/TXT file is always spliced in as the newest program
 (ProgramMemory.import_program()), the one place it can go without the
 much riskier job of inserting into the middle of the chain (see that
 method's docstring for the splicing rules). Any key assignment in an
-imported label's header is cleared on the way in, and a duplicate global
-label name blocks the import outright. A TXT file is first compiled to
+imported label's header is cleared on the way in. An existing program
+that shares a global label name with the import is replaced, once the
+user confirms a warning listing what goes and which key assignments
+carry over to the new labels (#72). A TXT file is first compiled to
 instruction bytes (memory/program_files.py's `decode_program_txt()`,
 backed by memory/program_text.py); from there all four formats are
 handled identically. A file may hold several programs, each closed by
 its own END -- a whole application, say (#71); they are imported in
-file order, all or none (ProgramMemory.import_programs()).
+file order, all or none (ProgramMemory.import_programs_replacing()).
 
 Remove (GitHub issue #6) IS selection-driven, unlike Import: it deletes
 the selected row's program (one row only) (ProgramMemory.remove_program()) and closes up
@@ -58,6 +60,8 @@ from tkinter import filedialog, messagebox
 import customtkinter as ctk
 
 from memory import (
+    ImportPlan,
+    KeyAssignments,
     Memory,
     DM41MemoryError,
     encode_program_raw,
@@ -341,7 +345,8 @@ class ProgramTab(ctk.CTkFrame):
         whichever the chosen filename's extension picks --
         memory/program_files.py)
         and splices each program in it into program memory, in file order,
-        as the newest (ProgramMemory.import_programs(), #71). Not selection-driven -- there's no
+        as the newest (ProgramMemory.import_programs_replacing(), #71/#72),
+        after confirming any programs it replaces. Not selection-driven -- there's no
         "insert at this row" concept for an Import, only "add as the
         newest program" (see this module's own docstring)."""
         if self._memory is None:
@@ -384,33 +389,33 @@ class ProgramTab(ctk.CTkFrame):
             return
 
         try:
-            # One transaction: if repack() rejects the result, the import
-            # is undone too, matching the "Could Not Import" message.
-            with self._memory.transaction():
-                self._memory.programs.import_programs(programs)
-                self._memory.programs.repack()
+            plan = self._memory.programs.plan_import(programs)
         except (ValueError, DM41MemoryError) as e:
             logger.warning("Could not import program from %s: %s", path, e)
             messagebox.showerror("Could Not Import", str(e))
             return
+        if plan.replaced and not messagebox.askyesno(
+            "Replace Programs?", self._replace_warning(plan), icon="warning"
+        ):
+            logger.info("Import from %s cancelled at the replace warning", path)
+            return
 
-        # repack()'s own docstring: it rebuilds program memory from a
-        # forward opcode scan specifically so "a global label that's
-        # physically present but not currently chain-linked ... becomes
-        # visible again" -- exactly the case for a TXT import, since this
-        # project's own compiler (matching hp41uc's own, see
-        # memory/program_text.py's decode_program_txt() docstring) always
-        # emits zero/unlinked chain markers, and RAW/DAT read from an
-        # hp41uc-compiled file (e.g. tests/data/tower.raw) can carry the
-        # same thing over from that file. import_program()'s own return
-        # value, from before that repair runs, can therefore be stale --
-        # reporting "(unlabelled)" for a program repack() then correctly
-        # re-recognizes by name. Take the newest program from the
-        # freshly-rebuilt list instead for the log/success message
-        # below (import_program()'s own contract: always spliced in as
-        # the newest program, so the imported ones are always
-        # list_programs()'s last entries once repack() finishes).
-        imported = self._memory.programs.list_programs()[-len(programs) :]
+        try:
+            # One transaction (import_programs_replacing()): if anything is
+            # rejected, the removals are undone too, matching the "Could Not
+            # Import" message.
+            imported = self._memory.programs.import_programs_replacing(programs)
+        except (ValueError, DM41MemoryError) as e:
+            logger.warning("Could not import program from %s: %s", path, e)
+            messagebox.showerror("Could Not Import", str(e))
+            return
+        if plan.replaced:
+            logger.info(
+                "Replaced %s on import from %s",
+                "; ".join(p.names_label for p in plan.replaced),
+                path,
+            )
+
         summary = ", ".join(f"{p.names_label} ({p.length} bytes)" for p in imported)
 
         logger.info("Imported %s as %s from %s", summary, format_label, path)
@@ -423,7 +428,58 @@ class ProgramTab(ctk.CTkFrame):
                 f"{len(imported)} programs imported from {path} as the newest "
                 f"programs: {summary}."
             )
+        if plan.replaced:
+            replaced = "; ".join(p.names_label for p in plan.replaced)
+            message += f"\n\nReplaced: {replaced}."
         messagebox.showinfo("Imported", message)
+
+    @staticmethod
+    def _key_text(key_byte: int) -> str:
+        """A label's key the way the calculator writes it: "11" for the
+        top-left key, "-11" shifted. Raw hex for a byte that isn't a key."""
+        try:
+            key_number, shifted = KeyAssignments.key_number_for_byte(key_byte)
+        except ValueError:
+            return f"0x{key_byte:02x}"
+        return f"-{key_number}" if shifted else str(key_number)
+
+    @classmethod
+    def _replace_warning(cls, plan: ImportPlan) -> str:
+        """The confirmation text for an import that replaces existing
+        programs (#72): what is removed, which labels vanish, and which
+        key assignments carry over or are lost."""
+        lines = ["These programs share a global label with the import:", ""]
+        lines += [f"    {p.names_label} ({p.length_label})" for p in plan.replaced]
+        lines += ["", "They will be removed and replaced by the imported programs."]
+        if plan.lost_labels:
+            lines += [
+                "",
+                "These labels are not in the import and will be gone: "
+                + ", ".join(plan.lost_labels)
+                + ".",
+            ]
+        if plan.carried_keys:
+            lines += [
+                "",
+                "Key assignments carried over: "
+                + ", ".join(
+                    f"{lab.name} on {cls._key_text(lab.key_assignment)}"
+                    for lab in plan.carried_keys
+                )
+                + ".",
+            ]
+        if plan.lost_keys:
+            lines += [
+                "",
+                "Key assignments lost: "
+                + ", ".join(
+                    f"{lab.name} on {cls._key_text(lab.key_assignment)}"
+                    for lab in plan.lost_keys
+                )
+                + ".",
+            ]
+        lines += ["", "Replace them?"]
+        return "\n".join(lines)
 
     def _remove_selected(self):
         """Header-button version of Remove, acting on whatever row is

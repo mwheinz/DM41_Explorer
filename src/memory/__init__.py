@@ -80,7 +80,7 @@ from .regions import MemoryRegion, RegionSpan, VoidRegion, FreeSpace
 from .status_registers import StatusRegisters
 from .key_assignments import KeyAssignment, KeyAssignments
 from .alarms import Alarm, Alarms
-from .program_memory import ProgramMemory
+from .program_memory import ImportPlan, ProgramMemory
 from .data_memory import DataMemory
 from .xm_file import XMFile, XMHeader, ExtendedMemory, NAME_MIN_CHAR, NAME_MAX_CHAR
 from .program_info import ProgramInfo, ProgramLabel, Program
@@ -161,6 +161,7 @@ __all__ = [
     "Alarm",
     "Alarms",
     "ProgramMemory",
+    "ImportPlan",
     "DataMemory",
     "XMFile",
     "XMHeader",

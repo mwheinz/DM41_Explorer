@@ -1360,3 +1360,53 @@ def test_program_tab_remove_refuses_more_than_one_row(app):
     assert info.call_args.args[0] == "Select One Program"
     ask.assert_not_called()
     assert len(app.memory.programs.list_programs()) == 3
+
+
+# -- Programs tab: importing over programs with the same label (#72) ---------
+
+
+def _import_txt(app, tmp_path, text, *, answer=None):
+    """Runs the Programs tab's Import on a TXT file holding `text`, answering
+    the replace warning with `answer`. Returns the askyesno mock."""
+    path = tmp_path / "import.txt"
+    path.write_text(text)
+    app._load_state_into_buffer(str(DATA_DIR / "manyfiles.dm41"))
+    tab = app.program_tab
+    tab.render(app.memory)
+    with (
+        mock.patch(
+            "gui.program_tab.filedialog.askopenfilename", return_value=str(path)
+        ),
+        mock.patch("gui.program_tab.messagebox.askyesno", return_value=answer) as ask,
+        mock.patch("gui.program_tab.messagebox.showinfo"),
+    ):
+        tab._import_program()
+    return ask
+
+
+def test_program_tab_import_without_a_shared_label_asks_nothing(app, tmp_path):
+    ask = _import_txt(app, tmp_path, 'LBL "NEW"\nSIN\nEND\n')
+    ask.assert_not_called()
+    names = [p.names_label for p in app.memory.programs.list_programs()]
+    assert names == ["XMBCD", "XMALPHA", "PURXM", "NEW"]
+
+
+def test_program_tab_replace_warning_lists_the_program_and_its_key(app, tmp_path):
+    ask = _import_txt(app, tmp_path, 'LBL "XMALPHA"\nSIN\nEND\n', answer=False)
+    message = ask.call_args.args[1]
+    assert "XMALPHA (65 bytes)" in message
+    assert "Key assignments carried over: XMALPHA on 12." in message
+
+
+def test_program_tab_declining_the_replace_warning_changes_nothing(app, tmp_path):
+    _import_txt(app, tmp_path, 'LBL "XMALPHA"\nSIN\nEND\n', answer=False)
+    names = [p.names_label for p in app.memory.programs.list_programs()]
+    assert names == ["XMBCD", "XMALPHA", "PURXM"]
+    assert not app.memory.modified
+
+
+def test_program_tab_accepting_the_replace_warning_replaces(app, tmp_path):
+    _import_txt(app, tmp_path, 'LBL "XMALPHA"\nSIN\nEND\n', answer=True)
+    programs = app.memory.programs.list_programs()
+    assert [p.names_label for p in programs] == ["XMBCD", "PURXM", "XMALPHA"]
+    assert programs[-1].labels[0].key_assignment == 0x11
