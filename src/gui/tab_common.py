@@ -390,9 +390,9 @@ def highlight_selected_row(tree: ttk.Treeview) -> None:
     tag), so it doesn't matter which of those two agreeing sources wins.
     """
     clear_selected_row_tag(tree)
-    selection = tree.selection()
-    if selection:
-        tree.item(selection[0], tags=("selectedrow",))
+    # Every selected row: a tree in "extended" mode can have several.
+    for iid in tree.selection():
+        tree.item(iid, tags=("selectedrow",))
 
 
 def build_caption_label(master, text: str) -> ctk.CTkLabel:

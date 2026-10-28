@@ -3,7 +3,8 @@ Tests for program files that hold several programs, each closed by its own
 END -- a whole application, say (#71): decoding them
 (program_files.decode_program_raw()/decode_program_dat()/decode_program_txt()),
 cutting the result into programs (split_programs()), and importing them all
-at once (ProgramMemory.import_programs()).
+at once (ProgramMemory.import_programs()) -- plus the other direction,
+writing several programs into one file.
 
 There is no multi-program capture from another tool yet, so the files are
 built here from single programs the other tests already trust: APPTEST
@@ -24,6 +25,7 @@ from memory import (
     encode_program_dat,
     encode_program_ppc,
     encode_program_raw,
+    encode_program_txt,
     split_programs,
 )
 
@@ -162,3 +164,57 @@ def test_import_programs_is_all_or_nothing():
     with pytest.raises(ValueError, match="already exists"):
         memory.programs.import_programs([_xrom_bytes(), APPTEST_BYTES])
     assert memory.snapshot() == before
+
+
+# -- Exporting several programs to one file ---------------------------------
+
+
+def _manyfiles_programs():
+    """Every program in manyfiles.dm41 (XMBCD, XMALPHA, PURXM), as the
+    Programs tab's Export reads them."""
+    memory = Memory.from_file(DATA_DIR / "manyfiles.dm41")
+    return [
+        memory.programs.get_program_bytes(p) for p in memory.programs.list_programs()
+    ]
+
+
+@pytest.mark.parametrize(
+    "encode, decode",
+    [
+        (encode_program_raw, decode_program_raw),
+        (encode_program_dat, decode_program_dat),
+        (encode_program_ppc, decode_program_dat),
+        (encode_program_txt, decode_program_txt),
+    ],
+    ids=["raw", "dat", "ppc", "txt"],
+)
+def test_exported_programs_import_back_under_their_own_names(encode, decode):
+    programs = _manyfiles_programs()
+    file_bytes = encode(b"".join(programs))
+
+    memory = Memory.from_file(DATA_DIR / "empty.dm41")
+    with memory.transaction():
+        memory.programs.import_programs(split_programs(decode(file_bytes)))
+        memory.programs.repack()
+    listed = memory.programs.list_programs()
+    assert [p.names_label for p in listed] == ["XMBCD", "XMALPHA", "PURXM"]
+    # manyfiles.dm41 isn't packed, so compare against it packed the same way.
+    source = Memory.from_file(DATA_DIR / "manyfiles.dm41")
+    source.programs.repack()
+    assert [p.length for p in listed] == [
+        p.length for p in source.programs.list_programs()
+    ]
+
+
+def test_txt_export_of_several_programs_is_each_listing_in_turn():
+    programs = _manyfiles_programs()
+    listings = [encode_program_txt(p).decode() for p in programs]
+    assert encode_program_txt(b"".join(programs)).decode() == "\n".join(listings)
+
+
+def test_txt_export_ignores_a_raw_trailer_that_looks_like_an_end():
+    # A checksum byte of 0xC0-0xCD followed by zero padding scans as an END.
+    trailer = bytes([0xC5]) + bytes(255)
+    assert encode_program_txt(APPTEST_BYTES + trailer) == encode_program_txt(
+        APPTEST_BYTES
+    )

@@ -1301,3 +1301,62 @@ def test_save_as_has_a_shift_shortcut(app, key):
 
     save_as.assert_called_once()
     save.assert_not_called()
+
+
+# -- Programs tab: exporting several programs to one file (#71) -------------
+
+
+def test_program_tab_exports_the_selected_programs_oldest_first(app, tmp_path):
+    from memory import decode_program_raw, split_programs
+
+    app._load_state_into_buffer(str(DATA_DIR / "manyfiles.dm41"))
+    tab = app.program_tab
+    tab.render(app.memory)
+    programs = app.memory.programs.list_programs()  # XMBCD, XMALPHA, PURXM
+    tab._tree.selection_set(("2", "0"))  # clicked newest first
+    app.update()
+
+    out = tmp_path / "two.raw"
+    with (
+        mock.patch(
+            "gui.program_tab.filedialog.asksaveasfilename", return_value=str(out)
+        ) as ask,
+        mock.patch("gui.program_tab.messagebox.showinfo") as info,
+    ):
+        tab._export_selected()
+
+    assert ask.call_args.kwargs["initialfile"] == "XMBCD.raw"
+    assert split_programs(decode_program_raw(out.read_bytes())) == [
+        app.memory.programs.get_program_bytes(programs[0]),
+        app.memory.programs.get_program_bytes(programs[2]),
+    ]
+    assert "2 programs (XMBCD, PURXM)" in info.call_args.args[1]
+
+
+def test_program_tab_highlights_every_selected_row(app):
+    app._load_state_into_buffer(str(DATA_DIR / "manyfiles.dm41"))
+    tab = app.program_tab
+    tab.render(app.memory)
+    tab._tree.selection_set(("0", "2"))
+    tab._on_tree_selected()
+
+    tags = [tab._tree.item(iid, "tags") for iid in tab._tree.get_children()]
+    assert "selectedrow" in tags[0] and "selectedrow" in tags[2]
+    assert "selectedrow" not in tags[1]
+
+
+def test_program_tab_remove_refuses_more_than_one_row(app):
+    app._load_state_into_buffer(str(DATA_DIR / "manyfiles.dm41"))
+    tab = app.program_tab
+    tab.render(app.memory)
+    tab._tree.selection_set(("0", "1"))
+
+    with (
+        mock.patch("gui.program_tab.messagebox.showinfo") as info,
+        mock.patch("gui.program_tab.messagebox.askyesno") as ask,
+    ):
+        tab._remove_selected()
+
+    assert info.call_args.args[0] == "Select One Program"
+    ask.assert_not_called()
+    assert len(app.memory.programs.list_programs()) == 3

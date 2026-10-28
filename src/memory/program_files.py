@@ -6,7 +6,8 @@ seen in PPC Calculator Journal program listings), and TXT (a plain-text
 HP-41 keystroke listing -- see memory/program_text.py).
 
 `encode_program_[raw, dat, ppc, txt]()` convert a program's instruction
-bytes into a file's own bytes.
+bytes into a file's own bytes. Several programs' bytes back to back, each
+ending with its own END, make one file holding them all.
 
 `decode_program_[raw, dat, txt]()` are the reverse direction -- read a
 RAW/DAT/TXT file's own bytes, and recover its instruction bytes. A file
@@ -242,8 +243,26 @@ def encode_program_txt(data: bytes) -> bytes:
     expects -- see that module's docstring). Not an hp41uc file format of
     its own the way RAW/DAT are, but hp41uc-style text either way -- see
     memory/program_text.py.
+
+    Several programs back to back become one listing each, separated by
+    a blank line -- program_text.encode_program_txt() itself stops at the
+    first END. Bytes after the last END (a RAW trailer, say) are ignored,
+    as they are for a single program.
     """
-    return _encode_program_txt(data).encode("utf-8")
+    listings = []
+    pos = 0
+    # Stop at a RAW-style trailer -- one checksum byte, then only zeros --
+    # which would otherwise scan as an END when the checksum is 0xC0-0xCD.
+    while pos < len(data) and any(data[pos + 1 :]):
+        length = find_program_end(data[pos:])
+        if length is None:
+            break
+        listings.append(_encode_program_txt(data[pos : pos + length]))
+        pos += length
+    if not listings:
+        # No END at all: let the decompiler report what it can.
+        listings.append(_encode_program_txt(data))
+    return "\n".join(listings).encode("utf-8")
 
 
 def _decode_txt_bytes(data: bytes) -> str:

@@ -15,10 +15,12 @@ its own at all -- the permanent `.END.` sentinel can close it out instead.
 
 Uses a native ttk.Treeview rather than one CustomTkinter widget per row,
 like gui/data_registers_tab.py and gui/xm_files_tab.py, for speed with
-many rows. There's no double-click-to-edit here -- but a selected row can
-be exported to a standalone HP-41 program file (RAW, DAT, PPC, or TXT
-format -- see memory/program_files.py), so there is one selection-driven
-action button, "Export...".
+many rows. There's no double-click-to-edit here -- but the selected
+rows can be exported to a standalone HP-41 program file (RAW, DAT, PPC,
+or TXT format -- see memory/program_files.py), so there is one
+selection-driven action button, "Export...". Several rows can be
+selected (Shift/Cmd/Ctrl-click); they go into one file, oldest first,
+the way a multi-program file is read back on Import (#71).
 
 Export uses ProgramMemory.get_program_bytes() (memory/program_memory.py) -- the exact
 bytes CAT 1 would report for that program, from its own first instruction
@@ -42,7 +44,7 @@ its own END -- a whole application, say (#71); they are imported in
 file order, all or none (ProgramMemory.import_programs()).
 
 Remove (GitHub issue #6) IS selection-driven, unlike Import: it deletes
-the selected row's program (ProgramMemory.remove_program()) and closes up
+the selected row's program (one row only) (ProgramMemory.remove_program()) and closes up
 the gap it leaves, so every other program stays contiguous -- this works
 for any program, not just the newest.
 Any key assignment(s) the removed program's own label(s) held are cleared
@@ -134,7 +136,9 @@ class ProgramTab(ctk.CTkFrame):
             "have zero or more global labels as identifiers.",
         )
 
-        _, self._tree = build_tab_treeview(self, _TREE_COLUMNS, style=_TREE_STYLE)
+        _, self._tree = build_tab_treeview(
+            self, _TREE_COLUMNS, style=_TREE_STYLE, selectmode="extended"
+        )
 
         self._tree.bind("<<TreeviewSelect>>", self._on_tree_selected)
 
@@ -151,8 +155,7 @@ class ProgramTab(ctk.CTkFrame):
         """Gives the selected row a visible highlight, the same way (and
         for the same reason) as gui/tab_common.py's
         `highlight_selected_row()` docstring (GitHub issue #22) explains.
-        Purely cosmetic here (this tab has no selection-driven action),
-        kept for visual consistency with the other two tables."""
+        Purely cosmetic: it marks the rows Export/Remove act on."""
         highlight_selected_row(self._tree)
 
     def render(self, memory: Memory):
@@ -204,20 +207,19 @@ class ProgramTab(ctk.CTkFrame):
             return program.labels[0].key_assignment_text
         return ", ".join(f"{label.key_assignment_text}" for label in program.labels)
 
-    def _selected_program(self):
-        """The Program for the currently-selected row, or None if
-        nothing (or something that's since gone stale, e.g. after a
-        reload) is selected."""
-        selection = self._tree.selection()
-        if not selection:
-            return None
-        try:
-            pos = int(selection[0])
-        except ValueError:
-            return None
-        if pos < 0 or pos >= len(self._programs):
-            return None
-        return self._programs[pos]
+    def _selected_programs(self) -> list:
+        """The Programs for the selected rows, in memory order (oldest
+        first) whatever order they were clicked in. Rows that have since
+        gone stale (e.g. after a reload) are left out."""
+        positions = set()
+        for iid in self._tree.selection():
+            try:
+                pos = int(iid)
+            except ValueError:
+                continue
+            if 0 <= pos < len(self._programs):
+                positions.add(pos)
+        return [self._programs[pos] for pos in sorted(positions)]
 
     _EXPORT_FORMATS = {
         ".raw": ("RAW", encode_program_raw),
@@ -227,9 +229,9 @@ class ProgramTab(ctk.CTkFrame):
     }
 
     def _export_selected(self):
-        """Exports the selected row's own program bytes
-        (ProgramMemory.get_program_bytes() -- this module's docstring) as a
-        standalone HP-41 program file, in whichever of RAW/DAT (hp41uc's
+        """Exports the selected rows' own program bytes
+        (ProgramMemory.get_program_bytes() -- this module's docstring),
+        oldest first, as one standalone HP-41 program file, in whichever of RAW/DAT (hp41uc's
         own formats), PPC (not an hp41uc format), or TXT (a plain-text
         keystroke listing, memory/program_text.py -- also not an hp41uc
         *file* format of its own, but hp41uc-style text either way; see
@@ -242,26 +244,32 @@ class ProgramTab(ctk.CTkFrame):
             )
             return
 
-        program = self._selected_program()
-        if program is None:
+        programs = self._selected_programs()
+        if not programs:
             messagebox.showinfo("No Selection", "Select a program row first.")
             return
 
-        try:
-            instruction_bytes = self._memory.programs.get_program_bytes(program)
-        except (ValueError, DM41MemoryError) as e:
-            logger.warning(
-                "Could not read program bytes for %r: %s", program.names_label, e
-            )
-            messagebox.showerror("Could Not Export", str(e))
-            return
+        chunks = []
+        for program in programs:
+            try:
+                chunks.append(self._memory.programs.get_program_bytes(program))
+            except (ValueError, DM41MemoryError) as e:
+                logger.warning(
+                    "Could not read program bytes for %r: %s", program.names_label, e
+                )
+                messagebox.showerror("Could Not Export", str(e))
+                return
+        instruction_bytes = b"".join(chunks)
 
-        first_label = program.labels[0].name if program.is_named else None
+        labels = [self._export_label(program) for program in programs]
         program_label = (
-            first_label.strip()
-            if first_label
-            else f"unlabelled program @ {program.address_label}"
+            labels[0]
+            if len(labels) == 1
+            else f"{len(labels)} programs ({', '.join(labels)})"
         )
+        # The file is named after the oldest selected program.
+        program = programs[0]
+        first_label = program.labels[0].name if program.is_named else None
         default_stub = (
             first_label.strip()
             if first_label
@@ -309,6 +317,13 @@ class ProgramTab(ctk.CTkFrame):
             f"{program_label} ({len(instruction_bytes)} bytes) "
             f"written as {format_label} to {path}",
         )
+
+    @staticmethod
+    def _export_label(program) -> str:
+        """How the Export log and messages name `program`."""
+        if program.is_named:
+            return program.labels[0].name.strip()
+        return f"unlabelled program @ {program.address_label}"
 
     def _notify_change(self):
         if self._on_change:
@@ -423,11 +438,16 @@ class ProgramTab(ctk.CTkFrame):
             )
             return
 
-        program = self._selected_program()
-        if program is None:
+        programs = self._selected_programs()
+        if not programs:
             messagebox.showinfo("No Selection", "Select a program row first.")
             return
-        self._remove_program(program)
+        if len(programs) > 1:
+            messagebox.showinfo(
+                "Select One Program", "Select a single program row to remove."
+            )
+            return
+        self._remove_program(programs[0])
 
     def _remove_program(self, program):
         """Confirms and removes `program` (ProgramMemory.remove_program()) --
