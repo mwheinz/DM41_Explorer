@@ -128,7 +128,9 @@ The programs tab shows a list of the apps currently loaded into the program
 memory portion of the loaded state file. From this view you can export and
 remove loaded programs, and import new ones. Programs can be imported or
 exported in RAW, TXT, or DAT format. DM41 Explorer also supports "PPC" format
-which is the same as DAT format but with line breaks.
+which is the same as DAT format but with line breaks. A file to import can hold
+several programs, each ending with its own END; they are all imported, in the
+order they appear in the file.
 
 ### Key Assignments Tab
 

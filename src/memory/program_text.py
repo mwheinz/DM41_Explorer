@@ -1183,8 +1183,10 @@ def decode_program_txt(text: str) -> bytes:
     """
     Compiles a plain-text keystroke listing (as produced by
     `encode_program_txt()`, or an hp41uc/community-authored `.txt` file
-    such as `src/tests/data/tower.txt` itself) back into one program's
-    raw instruction bytes, ready for `ProgramMemory.import_program()`.
+    such as `src/tests/data/tower.txt` itself) back into raw instruction
+    bytes, ready for `ProgramMemory.import_program()`. A listing may hold
+    several programs, each closed by its own END (#71); they come back
+    one after another -- program_files.split_programs() separates them.
     Packing is a separate, user-invoked operation (Memory.pack()) and is
     never this function's job.
 
@@ -1230,22 +1232,20 @@ def decode_program_txt(text: str) -> bytes:
     Raises ValueError -- with the 1-based line number and a description
     of the problem -- for a line that doesn't parse as any recognized
     instruction, an operand that doesn't fit its field width, an XROM
-    module/function number out of range, or a missing/misplaced terminating
-    END. Never silently drops or guesses at malformed input.
+    module/function number out of range, or a listing whose last program
+    has no terminating END. Never silently drops or guesses at malformed
+    input.
     """
     out = bytearray()
     last_was_number = False
-    end_seen = False
+    # Where the newest END finished, and the line the program after it
+    # started on -- None until there is one.
+    end_at = None
+    unterminated_lineno = None
 
     for lineno, raw_line in enumerate(text.splitlines(), start=1):
-        if end_seen:
-            stripped_after_end = raw_line.strip()
-            if stripped_after_end and not stripped_after_end.startswith((";", "#")):
-                raise ValueError(
-                    f"line {lineno}: unexpected content after program's "
-                    f"terminating END: {raw_line!r}"
-                )
-            continue
+        if end_at == len(out):
+            unterminated_lineno = lineno
 
         stripped = raw_line.strip()
         unknown_match = _UNKNOWN_OPCODE_RE.match(stripped)
@@ -1288,8 +1288,13 @@ def decode_program_txt(text: str) -> bytes:
         out.extend(instr_bytes)
         last_was_number = False
         if is_end:
-            end_seen = True
+            end_at = len(out)
 
-    if not end_seen:
+    if end_at is None:
         raise ValueError("program text has no terminating END line")
+    if end_at != len(out):
+        raise ValueError(
+            f"line {unterminated_lineno}: the program starting here has no "
+            "terminating END line"
+        )
     return bytes(out)

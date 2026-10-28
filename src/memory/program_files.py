@@ -9,11 +9,16 @@ HP-41 keystroke listing -- see memory/program_text.py).
 bytes into a file's own bytes.
 
 `decode_program_[raw, dat, txt]()` are the reverse direction -- read a
-RAW/DAT/TXT file's own bytes, and recover a program's instruction bytes.
+RAW/DAT/TXT file's own bytes, and recover its instruction bytes. A file
+can hold several programs, each closed by its own END (#71), so what
+comes back may be more than one program; `split_programs()` cuts it into
+one byte string per program.
 (There's no `decode_program_ppc()` of its own: PPC is just word-wrapped
 DAT, and `decode_program_dat()` already strips whitespace before decoding,
 so it reads a PPC file directly -- see that function's own docstring.)
 """
+
+from typing import List, Optional
 
 from .opcode_scan import find_program_end
 from .program_text import encode_program_txt as _encode_program_txt
@@ -70,19 +75,46 @@ def encode_program_dat(data: bytes) -> bytes:
     return header + body + trailer
 
 
+def _raw_code_length(data: bytes) -> Optional[int]:
+    """Where a RAW file's compiled code ends and its checksum trailer
+    begins. The code is one or more programs back to back (#71), each
+    closed by its own END, so this steps `find_program_end()` from one
+    END to the next until what follows is a valid trailer: the byte-sum
+    checksum of everything before it, then nothing but zero padding.
+
+    If no END is followed by a valid trailer, this returns where the last
+    END found ends, so the caller reports that trailer's own problem.
+    Returns None if `data` holds no END at all."""
+    code_length = None
+    pos = 0
+    while True:
+        length = find_program_end(data[pos:])
+        if length is None:
+            return code_length
+        pos += length
+        code_length = pos
+        if (
+            pos < len(data)
+            and data[pos] == _checksum(data[:pos])
+            and not any(data[pos + 1 :])
+        ):
+            return code_length
+
+
 def decode_program_raw(data: bytes) -> bytes:
     """
-    Recovers a program's instruction bytes from an HP41 RAW file
-    (`encode_program_raw()`'s own format). RAW carries no length header
-    of its own, so this uses `find_program_end()` -- the same forward
-    opcode scan `ProgramMemory.get_program_bytes()` uses -- to find where the
-    compiled code ends and the checksum trailer begins, then verifies
-    that checksum byte.
+    Recovers the instruction bytes of every program in an HP41 RAW file
+    (`encode_program_raw()`'s own format), back to back. RAW carries no
+    length header of its own, so this uses `find_program_end()` -- the
+    same forward opcode scan `ProgramMemory.get_program_bytes()` uses --
+    to find where the compiled code ends and the checksum trailer begins
+    (see `_raw_code_length()`), then verifies that checksum byte. The
+    checksum covers all of the file's programs together.
 
     Raises DM41MemoryError if no terminating END is found, if there's no
     checksum byte after it, or if the checksum doesn't match.
     """
-    length = find_program_end(data)
+    length = _raw_code_length(data)
     if length is None:
         raise DM41MemoryError(
             "Could not find a terminating END in this RAW file's compiled code."
@@ -126,9 +158,11 @@ def _parse_strict_hex(data: bytes) -> int:
 
 def decode_program_dat(data: bytes) -> bytes:
     """
-    Recovers a program's instruction bytes from an HP41 DAT (or a "PPC" file
+    Recovers the instruction bytes from an HP41 DAT (or a "PPC" file
     (DAT that has newlines in it...) Reads the header, decodes that many
     ASCII-hex-encoded bytes, and verifies the trailing 2-hex-digit checksum.
+    The header's length covers every program in the file, so the result
+    may hold several programs (#71) -- see `split_programs()`.
 
     Raises DM41MemoryError if `data` is too short for its own declared
     length, contains non-hex-digit data, or the checksum doesn't match.
@@ -230,8 +264,9 @@ def _decode_txt_bytes(data: bytes) -> str:
 
 def decode_program_txt(data: bytes) -> bytes:
     """
-    Recovers a program's instruction bytes from a TXT file's own raw
-    bytes -- the reverse of `encode_program_txt()` above. Decodes `data`
+    Recovers the instruction bytes of every program in a TXT file's own
+    raw bytes, back to back (#71) -- the reverse of `encode_program_txt()`
+    above. Decodes `data`
     to text (see `_decode_txt_bytes()` below), then compiles it via
     memory/program_text.py's own `decode_program_txt()` (str -> bytes;
     see that function's own docstring for the full compile-time rules
@@ -248,3 +283,34 @@ def decode_program_txt(data: bytes) -> bytes:
         return _decode_program_txt(text)
     except ValueError as e:
         raise DM41MemoryError(str(e)) from e
+
+
+def split_programs(data: bytes) -> List[bytes]:
+    """
+    Cuts the instruction bytes a `decode_program_*()` function returns
+    into one byte string per program, each ending with its own END --
+    the order they appear in the file, which is the order to import them
+    in. A file holding a whole application often has several programs
+    (#71).
+
+    Raises DM41MemoryError if `data` holds no END at all, or if anything
+    other than zero bytes follows the last END (a final program with no
+    END of its own). Trailing zero bytes are dropped: on the calculator
+    they are only NULL padding.
+    """
+    programs = []
+    pos = 0
+    while True:
+        length = find_program_end(data[pos:])
+        if length is None:
+            break
+        programs.append(data[pos : pos + length])
+        pos += length
+    if not programs:
+        raise DM41MemoryError("Could not find a terminating END in this file.")
+    if any(data[pos:]):
+        raise DM41MemoryError(
+            f"The last {len(data) - pos} bytes of this file follow its last END "
+            "-- the final program has no END of its own."
+        )
+    return programs

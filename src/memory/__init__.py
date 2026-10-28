@@ -93,6 +93,7 @@ from .program_files import (
     decode_program_raw,
     decode_program_dat,
     decode_program_txt,
+    split_programs,
 )
 from .program_chain import (
     ChainMarker,
@@ -178,6 +179,7 @@ __all__ = [
     "decode_program_dat",
     "encode_program_txt",
     "decode_program_txt",
+    "split_programs",
     "ChainMarker",
     "walk_chain",
     "decode_chain_marker",

@@ -446,6 +446,33 @@ class ProgramMemory(MemoryRegion):
         with self._memory.transaction():
             return self._splice_program(instruction_bytes)
 
+    def import_programs(self, programs: list) -> list:
+        """Imports several programs, oldest first, as `import_program()` would
+        one at a time -- e.g. the programs `program_files.split_programs()`
+        finds in one file (#71). Each becomes the newest in turn, so they end
+        up in memory in the order given.
+
+        Returns the new Programs in that order. Raises what `import_program()`
+        raises, including ValueError when two of `programs` share a global
+        label name. All-or-nothing: if any program can't be imported, none
+        are."""
+        # A forward scan, not the chain: a compiled TXT program's labels are
+        # not chain-linked yet, so `_check_no_duplicate_labels()` can't see a
+        # label imported from earlier in the same file.
+        seen = set()
+        for program in programs:
+            for marker in scan_global_markers_forward(program):
+                if not marker.is_label:
+                    continue
+                if marker.name in seen:
+                    raise ValueError(
+                        f"Two programs in this file have a global label named "
+                        f"{marker.name!r} -- the calculator can't hold both."
+                    )
+                seen.add(marker.name)
+        with self._memory.transaction():
+            return [self._splice_program(program) for program in programs]
+
     def _splice_program(self, instruction_bytes: bytes) -> Program:
         """import_program()'s body, run inside its transaction."""
         status = self._memory.status_registers

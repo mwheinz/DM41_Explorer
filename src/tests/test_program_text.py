@@ -443,7 +443,7 @@ def test_bytes_decompile_to_a_listing(raw, listing):
 COMPILE_ERRORS = [
     ('LBL "T"\nSIN\n', "no terminating END"),
     ('LBL "T"\nNOTAREALINSTRUCTION\nEND\n', "unrecognized instruction"),
-    ('LBL "T"\nEND\nSIN\n', "after program's terminating END"),
+    ('LBL "T"\nEND\nSIN\n', "line 3: the program starting here has no terminating"),
     ('LBL "T"\n"unterminated\nEND\n', "unterminated"),
     ('LBL "T"\nXROM 32,00\nEND\n', "out of range"),
     ('LBL "T"\nXROM 25,64\nEND\n', "out of range"),

@@ -37,7 +37,9 @@ imported label's header is cleared on the way in, and a duplicate global
 label name blocks the import outright. A TXT file is first compiled to
 instruction bytes (memory/program_files.py's `decode_program_txt()`,
 backed by memory/program_text.py); from there all four formats are
-handled identically.
+handled identically. A file may hold several programs, each closed by
+its own END -- a whole application, say (#71); they are imported in
+file order, all or none (ProgramMemory.import_programs()).
 
 Remove (GitHub issue #6) IS selection-driven, unlike Import: it deletes
 the selected row's program (ProgramMemory.remove_program()) and closes up
@@ -63,6 +65,7 @@ from memory import (
     decode_program_raw,
     decode_program_dat,
     decode_program_txt,
+    split_programs,
 )
 from gui.tab_common import (
     DANGER_BUTTON_KWARGS,
@@ -322,8 +325,8 @@ class ProgramTab(ctk.CTkFrame):
         """Reads a standalone HP-41 program file (RAW, DAT, PPC, or TXT,
         whichever the chosen filename's extension picks --
         memory/program_files.py)
-        and splices it into program memory as the newest program
-        (ProgramMemory.import_program()). Not selection-driven -- there's no
+        and splices each program in it into program memory, in file order,
+        as the newest (ProgramMemory.import_programs(), #71). Not selection-driven -- there's no
         "insert at this row" concept for an Import, only "add as the
         newest program" (see this module's own docstring)."""
         if self._memory is None:
@@ -357,7 +360,7 @@ class ProgramTab(ctk.CTkFrame):
 
         try:
             file_bytes = Path(path).read_bytes()
-            instruction_bytes = decoder(file_bytes)
+            programs = split_programs(decoder(file_bytes))
         except (OSError, DM41MemoryError) as e:
             logger.warning(
                 "Could not read %s program file %s: %s", format_label, path, e
@@ -369,7 +372,7 @@ class ProgramTab(ctk.CTkFrame):
             # One transaction: if repack() rejects the result, the import
             # is undone too, matching the "Could Not Import" message.
             with self._memory.transaction():
-                self._memory.programs.import_program(instruction_bytes)
+                self._memory.programs.import_programs(programs)
                 self._memory.programs.repack()
         except (ValueError, DM41MemoryError) as e:
             logger.warning("Could not import program from %s: %s", path, e)
@@ -390,24 +393,22 @@ class ProgramTab(ctk.CTkFrame):
         # re-recognizes by name. Take the newest program from the
         # freshly-rebuilt list instead for the log/success message
         # below (import_program()'s own contract: always spliced in as
-        # the newest program, so it's always list_programs()'s last
-        # entry once repack() finishes).
-        imported = self._memory.programs.list_programs()[-1]
+        # the newest program, so the imported ones are always
+        # list_programs()'s last entries once repack() finishes).
+        imported = self._memory.programs.list_programs()[-len(programs) :]
+        summary = ", ".join(f"{p.names_label} ({p.length} bytes)" for p in imported)
 
-        logger.info(
-            "Imported program %r (%d bytes) as %s from %s",
-            imported.names_label,
-            imported.length,
-            format_label,
-            path,
-        )
+        logger.info("Imported %s as %s from %s", summary, format_label, path)
         self._notify_change()
         self.render(self._memory)
-        messagebox.showinfo(
-            "Imported",
-            f"{imported.names_label} ({imported.length} bytes) "
-            f"imported from {path} as the newest program.",
-        )
+        if len(imported) == 1:
+            message = f"{summary} imported from {path} as the newest program."
+        else:
+            message = (
+                f"{len(imported)} programs imported from {path} as the newest "
+                f"programs: {summary}."
+            )
+        messagebox.showinfo("Imported", message)
 
     def _remove_selected(self):
         """Header-button version of Remove, acting on whatever row is
