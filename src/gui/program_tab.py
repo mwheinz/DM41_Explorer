@@ -74,6 +74,8 @@ from memory import (
     decode_program_txt,
     split_programs,
 )
+from gui.fonts import font_spec
+from gui.window_geometry import scaled_width
 from gui.tab_common import (
     DANGER_BUTTON_KWARGS,
     fit_columns,
@@ -93,6 +95,11 @@ logger = logging.getLogger(__name__)
 # be the "Treeview"/"XMFiles.Treeview" style names the other two
 # Treeview-based tabs use.
 _TREE_STYLE = "Programs.Treeview"
+
+# Widths at the default font size (#75): the Labels column never shrinks
+# below the minimum, and the Key ASNs column never grows past the maximum.
+_LABELS_MIN_WIDTH = 200
+_KEY_ASN_MAX_WIDTH = 300
 
 _TREE_COLUMNS = [
     ("labels", "Labels", 220, True),
@@ -149,6 +156,11 @@ class ProgramTab(ctk.CTkFrame):
         )
 
         self._tree.bind("<<TreeviewSelect>>", self._on_tree_selected)
+        # The Labels column takes the leftover width but never collapses (#75).
+        self._tree.column(
+            "labels",
+            minwidth=scaled_width(_LABELS_MIN_WIDTH, font_spec("mono").size),
+        )
 
     def refresh_theme(self):
         """Re-applies theme-dependent ttk styling/colors after
@@ -201,6 +213,12 @@ class ProgramTab(ctk.CTkFrame):
                 tags=("oddrow",) if pos % 2 else (),
             )
         fit_columns(self._tree, _TREE_COLUMNS)
+        # Even with unassigned labels left blank, a long list of
+        # assignments must not push the Labels column out of sight (#75).
+        font_size = font_spec("mono").size
+        cap = scaled_width(_KEY_ASN_MAX_WIDTH, font_size)
+        if int(self._tree.column("key_assignment", "width")) > cap:
+            self._tree.column("key_assignment", width=cap)
 
     @staticmethod
     def _key_assignment_text(program) -> str:
@@ -209,11 +227,17 @@ class ProgramTab(ctk.CTkFrame):
         # with one label shows its assignment plainly; one with several
         # (tests/data/twolabels.dm41) shows each label's own status,
         # since each label's header holds an independent key byte.
-        if not program.labels:
-            return ""
+        # A label with no assignment shows nothing (#75): a program can have
+        # hundreds of labels, nearly all unassigned. With several labels
+        # the name goes in front of each key so it's clear whose it is.
+        assigned = [
+            label for label in program.labels if label.key_assignment_text != "N/A"
+        ]
         if len(program.labels) == 1:
-            return program.labels[0].key_assignment_text
-        return ", ".join(f"{label.key_assignment_text}" for label in program.labels)
+            return assigned[0].key_assignment_text if assigned else ""
+        return ", ".join(
+            f"{label.name} {label.key_assignment_text}" for label in assigned
+        )
 
     def _selected_programs(self) -> list:
         """The Programs for the selected rows, in memory order (oldest
