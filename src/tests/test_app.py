@@ -1333,6 +1333,54 @@ def test_program_tab_exports_the_selected_programs_oldest_first(app, tmp_path):
     assert "2 programs (XMBCD, PURXM)" in info.call_args.args[1]
 
 
+def _export_first_program(app, path):
+    """Exports manyfiles.dm41's first program (XMBCD) to `path`; returns
+    the program's bytes and the "Exported" message."""
+    app._load_state_into_buffer(str(DATA_DIR / "manyfiles.dm41"))
+    tab = app.program_tab
+    tab.render(app.memory)
+    tab._tree.selection_set(("0",))
+    app.update()
+    with (
+        mock.patch(
+            "gui.program_tab.filedialog.asksaveasfilename", return_value=str(path)
+        ),
+        mock.patch("gui.program_tab.messagebox.showinfo") as info,
+    ):
+        tab._export_selected()
+    program = app.memory.programs.list_programs()[0]
+    return app.memory.programs.get_program_bytes(program), info.call_args.args[1]
+
+
+def test_program_tab_raw_export_has_a_checksum_by_default(app, tmp_path):
+    from memory import encode_program_raw
+
+    out = tmp_path / "XMBCD.raw"
+    code, message = _export_first_program(app, out)
+    assert out.read_bytes() == encode_program_raw(code)
+    assert len(out.read_bytes()) % 256 == 0
+    assert "written as RAW to" in message
+
+
+def test_program_tab_raw_export_follows_the_no_checksum_preference(app, tmp_path):
+    # V41 and hp41uc's /k write RAW files with no checksum trailer (#74).
+    app.config_store.raw_checksum = False
+    out = tmp_path / "XMBCD.raw"
+    code, message = _export_first_program(app, out)
+    assert out.read_bytes() == code
+    assert "written as RAW (no checksum) to" in message
+
+
+def test_preferences_save_the_raw_checksum_choice(app, prefs_file):
+    with mock.patch.object(app, "_on_preferences_saved"):
+        dialog = app.show_preferences()
+        assert dialog._raw_checksum_var.get() is True
+        dialog._raw_checksum_var.set(False)
+        dialog._on_save()
+    assert app.config_store.raw_checksum is False
+    assert json.loads(prefs_file.read_text())["raw_checksum"] is False
+
+
 def test_program_tab_highlights_every_selected_row(app):
     app._load_state_into_buffer(str(DATA_DIR / "manyfiles.dm41"))
     tab = app.program_tab

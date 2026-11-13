@@ -14,6 +14,9 @@ correctly.
 * alarmtest*.dm41: different examples of alarms.
 * badalarms.dm41: a malformed alarms file created by an attempt to delete an
   alarm.
+* decibel.raw: A small program ("dB+"/"dB-") from the RAW directory of the
+  V41 emulator's distribution. Like most of those files it ends right at its
+  END, with no checksum trailer (#74).
 * delfl-xm.dm41: 6x-xm.dm41 with one file deleted.
 * empty.dm41: A memory state of a DM41L in the MEMORY LOST condition.
 * empty-128.dm41: A memory state of a blank DM41L that has had the number of
@@ -25,6 +28,8 @@ correctly.
 * goodalarms.dm41: The alarms file badalarms was derived from.
 * helloworld.dm41: A small memory state containing a single XM ASCII file
   containing two records: "HELLO" and "WORLD".
+* ini.raw: A program ("INI" and helpers) from the same V41 distribution, one
+  of the few there with hp41uc's checksum byte and zero padding to 256 bytes.
 * keyassigns.dm41: Sample key assignments, containing only built-in functions.
 * lander*dm41: a sample application in packed and unpacked forms.
 * manyfiles.dm41: Contains several XM files and programs, including a mix of

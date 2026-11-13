@@ -101,6 +101,10 @@ class ProjectConfig:
         # The mode's built-in library is implied, not stored (GitHub issue
         # #53).
         "xrom_libraries": {},
+        # True = exported RAW files end with hp41uc's checksum byte and zero
+        # padding; False = the compiled code alone, like hp41uc's /k
+        # option and V41's RAW files (#74). Import accepts either.
+        "raw_checksum": True,
     }
 
     # File > Open Recent is capped at this many entries -- oldest
@@ -205,6 +209,20 @@ class ProjectConfig:
     @high_contrast.setter
     def high_contrast(self, value):
         self._prefs["high_contrast"] = bool(value)
+
+    @property
+    def raw_checksum(self) -> bool:
+        """Whether exported RAW files get a checksum trailer (#74). A
+        hand-edited value that is not a JSON true/false reads as the
+        default (on)."""
+        value = self._prefs["raw_checksum"]
+        if isinstance(value, bool):
+            return value
+        return self.DEFAULT_PREFS["raw_checksum"]
+
+    @raw_checksum.setter
+    def raw_checksum(self, value):
+        self._prefs["raw_checksum"] = bool(value)
 
     @property
     def window_size(self):

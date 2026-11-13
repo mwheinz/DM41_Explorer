@@ -33,7 +33,7 @@ def _checksum(data: bytes) -> int:
     return sum(data) % 256
 
 
-def encode_program_raw(data: bytes) -> bytes:
+def encode_program_raw(data: bytes, checksum: bool = True) -> bytes:
     """
     RAW format: (Source/hp41uc.c's `/r` help text):
     `[compiled code] + [1-byte checksum] + [trailer]`, where the trailer
@@ -41,10 +41,15 @@ def encode_program_raw(data: bytes) -> bytes:
     (hp41uc's write_raw_checksum(), bufsize=256) -- if `data` is already
     an exact multiple of 256 bytes, a full extra 256-byte block is
     appended (checksum byte + 255 zero bytes), matching hp41uc exactly.
+
+    With `checksum=False` the file is the compiled code alone, with no
+    checksum byte or padding -- hp41uc's `/k` option, and the form of the
+    RAW files shipped with V41 (#74).
     """
-    checksum = _checksum(data)
+    if not checksum:
+        return bytes(data)
     pad_len = 256 - (len(data) % 256)
-    trailer = bytes([checksum]) + bytes(pad_len - 1)
+    trailer = bytes([_checksum(data)]) + bytes(pad_len - 1)
     return data + trailer
 
 
@@ -84,8 +89,9 @@ def _raw_code_length(data: bytes) -> Optional[int]:
     checksum of everything before it, then nothing but zero padding.
 
     If no END is followed by a valid trailer, this returns where the last
-    END found ends, so the caller reports that trailer's own problem.
-    Returns None if `data` holds no END at all."""
+    END found ends -- the end of `data` for a file with no trailer at all
+    (#74), otherwise a bad trailer the caller reports. Returns None if
+    `data` holds no END at all."""
     code_length = None
     pos = 0
     while True:
@@ -112,16 +118,21 @@ def decode_program_raw(data: bytes) -> bytes:
     (see `_raw_code_length()`), then verifies that checksum byte. The
     checksum covers all of the file's programs together.
 
-    Raises DM41MemoryError if no terminating END is found, if there's no
-    checksum byte after it, or if the checksum doesn't match.
+    The trailer is optional (#74): hp41uc leaves it out under `/k`, and
+    the RAW files shipped with V41 have none. A file whose code runs right
+    to its last byte has no checksum to verify, and is accepted as is --
+    the DM41X does the same.
+
+    Raises DM41MemoryError if no terminating END is found, or if bytes
+    follow the last END that aren't a valid checksum trailer.
     """
     length = _raw_code_length(data)
     if length is None:
         raise DM41MemoryError(
             "Could not find a terminating END in this RAW file's compiled code."
         )
-    if length >= len(data):
-        raise DM41MemoryError("RAW file has no checksum byte after its compiled code.")
+    if length == len(data):
+        return data
     instruction_bytes = data[:length]
     checksum = data[length]
     expected = _checksum(instruction_bytes)

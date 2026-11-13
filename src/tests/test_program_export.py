@@ -188,6 +188,49 @@ def test_decode_program_raw_rejects_corrupt_checksum():
         decode_program_raw(bytes(data))
 
 
+# -- RAW files without a checksum trailer (#74) --------------------------
+#
+# decibel.raw and ini.raw both come from the RAW directory of the V41
+# emulator's distribution: decibel.raw ends right at its END, like 459 of
+# its 466 files, while ini.raw carries hp41uc's checksum-and-padding
+# trailer.
+
+
+def test_decode_program_raw_accepts_v41_file_without_checksum():
+    data = (DATA_DIR / "decibel.raw").read_bytes()
+    instruction_bytes = decode_program_raw(data)
+    assert instruction_bytes == data
+    assert len(instruction_bytes) == 53
+    listing = encode_program_txt(instruction_bytes).decode("utf-8")
+    assert listing.startswith('LBL "dB+"')
+    assert 'LBL "dB-"' in listing
+
+
+def test_decode_program_raw_reads_v41_file_with_checksum():
+    data = (DATA_DIR / "ini.raw").read_bytes()
+    instruction_bytes = decode_program_raw(data)
+    assert len(instruction_bytes) == 128
+    assert encode_program_raw(instruction_bytes) == data
+
+
+def test_decode_program_raw_accepts_own_output_without_trailer():
+    assert decode_program_raw(APPTEST_BYTES) == APPTEST_BYTES
+
+
+def test_encode_program_raw_without_checksum_is_the_code_alone():
+    data = (DATA_DIR / "decibel.raw").read_bytes()
+    instruction_bytes = decode_program_raw(data)
+    assert encode_program_raw(instruction_bytes, checksum=False) == data
+    assert decode_program_raw(encode_program_raw(APPTEST_BYTES, checksum=False)) == (
+        APPTEST_BYTES
+    )
+
+
+def test_decode_program_raw_rejects_junk_after_end():
+    with pytest.raises(DM41MemoryError, match="checksum mismatch"):
+        decode_program_raw(APPTEST_BYTES + b"\x01\x02")
+
+
 def test_decode_program_dat_rejects_corrupt_checksum():
     data = bytearray(encode_program_dat(APPTEST_BYTES))
     data[-1] ^= 0x0F  # perturb one checksum hex digit

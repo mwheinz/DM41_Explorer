@@ -67,9 +67,10 @@ def test_raw_file_with_several_programs_rejects_corrupt_checksum():
         decode_program_raw(bytes(data))
 
 
-def test_raw_file_with_several_programs_rejects_missing_checksum():
-    with pytest.raises(DM41MemoryError, match="no checksum byte"):
-        decode_program_raw(APPTEST_BYTES + _xrom_bytes())
+def test_raw_file_with_several_programs_needs_no_checksum():
+    # V41's RAW files carry no checksum trailer (#74).
+    programs = [APPTEST_BYTES, _xrom_bytes()]
+    assert split_programs(decode_program_raw(b"".join(programs))) == programs
 
 
 def test_dat_and_ppc_files_with_several_programs_split_back_into_them():

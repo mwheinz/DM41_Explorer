@@ -54,6 +54,7 @@ as part of the removal (see remove_program()'s own docstring); the
 confirmation dialog says so up front rather than only after the fact.
 """
 
+import functools
 import logging
 from pathlib import Path
 from tkinter import filedialog, messagebox
@@ -110,6 +111,9 @@ class ProgramTab(ctk.CTkFrame):
         self._memory: Memory = None
         self._programs: list = []
         self._on_change = on_change
+        # Whether a RAW export gets a checksum trailer (#74). The app
+        # points this at its Preferences setting; read at each export.
+        self.raw_checksum_enabled = lambda: True
 
         header, self._header_label = build_tab_header(self)
         ctk.CTkButton(
@@ -298,6 +302,9 @@ class ProgramTab(ctk.CTkFrame):
         format_label, encoder = self._EXPORT_FORMATS.get(
             extension, self._EXPORT_FORMATS[".raw"]
         )
+        if encoder is encode_program_raw and not self.raw_checksum_enabled():
+            format_label = "RAW (no checksum)"
+            encoder = functools.partial(encode_program_raw, checksum=False)
 
         try:
             file_bytes = encoder(instruction_bytes)

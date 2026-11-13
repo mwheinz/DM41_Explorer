@@ -690,6 +690,7 @@ class DM41ExplorerApp(ctk.CTk):
             setattr(self, spec.attr, tab)
             self._tabs[spec.name] = tab
         self._tabs_dirty = {name: True for name in self._tabs}
+        self.program_tab.raw_checksum_enabled = lambda: self.config_store.raw_checksum
 
     def _build_menus(self):
         """Builds the application's menu bar. Every basic function lives

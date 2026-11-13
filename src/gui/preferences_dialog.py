@@ -226,6 +226,21 @@ class PreferencesDialog(ctk.CTkToplevel):
             command=self._pick_log_directory,
         ).pack(side="left", padx=(8, 0))
 
+        self._raw_checksum_var = ctk.BooleanVar(value=self._config.raw_checksum)
+        ctk.CTkCheckBox(
+            tab,
+            text="Write a checksum in exported RAW files",
+            variable=self._raw_checksum_var,
+        ).pack(anchor="w", padx=8, pady=(16, 0))
+        ctk.CTkLabel(
+            tab,
+            text="Turn off for tools that expect the program code alone,\n"
+            "like V41's RAW files or hp41uc's /k option.",
+            justify="left",
+            text_color=SECONDARY_TEXT,
+            font=font_for("small"),
+        ).pack(anchor="w", padx=8, pady=(4, 0))
+
     def _on_mode_chosen(self, value):
         """Keeps the hint under the selector in step with it. Nothing is
         applied here: the mode only changes when Save is clicked, and then
@@ -459,6 +474,7 @@ class PreferencesDialog(ctk.CTkToplevel):
         self._config.appearance_mode = self._appearance_var.get()
         self._config.color_theme = self._color_theme_var.get()
         self._config.high_contrast = self._high_contrast_var.get()
+        self._config.raw_checksum = self._raw_checksum_var.get()
         for role, (family, size, bold) in self._chosen_font_roles().items():
             self._config.set_font_role(role, family, size, bold)
         self._config.log_directory = log_dir_str

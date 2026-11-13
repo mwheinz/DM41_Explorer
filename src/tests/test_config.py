@@ -149,6 +149,32 @@ def test_a_hand_edited_high_contrast_value_reads_as_the_default(prefs_file, junk
     assert config.high_contrast is True
 
 
+# -- The RAW export checksum (#74) ------------------------------------------
+
+
+def test_raw_checksum_defaults_to_on(prefs_file):
+    assert ProjectConfig().raw_checksum is True
+
+
+def test_raw_checksum_round_trips_through_the_file(prefs_file):
+    config = ProjectConfig()
+    config.raw_checksum = False
+    config.save()
+    assert json.loads(prefs_file.read_text())["raw_checksum"] is False
+
+    reloaded = ProjectConfig()
+    reloaded.load()
+    assert reloaded.raw_checksum is False
+
+
+@pytest.mark.parametrize("junk", ["false", 0, None, "no"])
+def test_a_hand_edited_raw_checksum_value_reads_as_the_default(prefs_file, junk):
+    prefs_file.write_text(json.dumps({"raw_checksum": junk}))
+    config = ProjectConfig()
+    config.load()
+    assert config.raw_checksum is True
+
+
 # -- The DM41L/DM41X mode (docs/dm41x_explorer_plan.md phase 6) -----------
 
 
