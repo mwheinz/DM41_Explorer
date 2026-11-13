@@ -17,9 +17,9 @@ serial console or USB disk interface.
   text, or raw hex.
 - **XM Files** — list, add, edit, and remove files stored in extended memory
   (Data, ASCII, and Program types).
-- **Key Assignments** - view, add, edit, and remove user key assignments,
+- **Key Assignments** — view, add, edit, and remove user key assignments,
   including any XROM function, by name or by its module and function
-  numbers.
+  numbers, and save a printable PDF diagram of the keyboard.
 - **XROM libraries** — names for the functions of the DM41X's application
   pacs (Math, Stat, Advantage, PPC and the rest) and of any other ROM you add
   as a `.mod` file or an hp41uc XROM list (Tools > XROM Libraries).
@@ -142,7 +142,7 @@ Shift- or Cmd/Ctrl-click to select their rows before choosing Export.
 
 ![Key Assigns - DM41L layout](resources/screenshots/key_assigns_dm41l.png)
 
-![Key Assigns - DM41X layout](resources/screenshots/key_assigns_hp41.png)
+![Key Assigns - DM41X layout](resources/screenshots/key_assigns_dm41x.png)
 
 The Key Assignments tab allows you to view and edit the user key assignments in
 the loaded state. It has two sub-tabs: the first shows the keys in the DM41L
@@ -165,11 +165,12 @@ edit that key's current assignment. You can choose:
 
 ![Key assignment dialog, XROM tab](resources/screenshots/key_assign_xrom.png)
 
-**Save PDF...** (or Cmd/Ctrl+E) saves a printable diagram of the keyboard,
-titled with the state's name, with every assignment on its key: shifted assignments on a gold strip across
-the top of the key, unshifted ones below. Global programs are marked with ▸,
-and an assignment whose key flag is clear (as after `LKAOFF`) has a dashed
-outline. A list of all the assignments follows on a second page.
+**Save PDF…** (or Cmd/Ctrl+E) saves a printable diagram of the keyboard,
+titled with the state's name, with every assignment on its key: shifted
+assignments on a gold strip across the top of the key, unshifted ones below.
+Global programs are marked with ▸, and an assignment whose key flag is clear
+(as after `LKAOFF`) has a dashed outline. A list of all the assignments
+follows on a second page.
 
 ### XROM Libraries
 
@@ -236,9 +237,10 @@ macOS uses `Cmd` for the same shortcuts.
 | Export... | Ctrl+E | Cmd+E |
 | Import... | Ctrl+I | Cmd+I |
 
-Export and Import act on whichever tab is currently active, and only take
-effect on the Data Registers, XM Files, and Programs tabs — elsewhere they're
-a no-op. On the Key Assignments tab, Export is Save PDF.
+Export and Import act on whichever tab is currently active. Export works on
+the Data Registers, XM Files, Programs, and Key Assignments tabs (where it is
+Save PDF…), and Import on the Data Registers, XM Files, and Programs tabs;
+elsewhere they do nothing.
 
 The five Connect-menu shortcuts (Connect / Reconnect, Disconnect, Set
 Calculator Time, Get State, Send State) work in **DM41L mode** only. A DM41X

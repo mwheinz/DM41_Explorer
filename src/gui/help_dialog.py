@@ -62,6 +62,14 @@ _SECTIONS = [
             ("Import...", f"{_ACC}+I"),
         ],
     ),
+    (
+        # The same Cmd/Ctrl+E, forwarded to the Key Assignments tab's own
+        # header button (issue #76). It has no Import.
+        "Key Assignments tab",
+        [
+            ("Save PDF...", f"{_ACC}+E"),
+        ],
+    ),
 ]
 
 DIALOG_WIDTH = 460

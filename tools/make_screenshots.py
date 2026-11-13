@@ -56,7 +56,7 @@ SHOTS = {
     "flags_view": ("dm41x_manyfiles.dm41", "Flags", DM41X_MODE, {}),
     "program_view": ("dm41x_manyfiles.dm41", "Programs", DM41X_MODE, {}),
     "key_assigns_dm41l": ("keyassigns.dm41", "Key Assignments", DM41L_MODE, {}),
-    "key_assigns_hp41": ("keyassigns.dm41", "Key Assignments", DM41X_MODE, {}),
+    "key_assigns_dm41x": ("keyassigns.dm41", "Key Assignments", DM41X_MODE, {}),
     "registers_view": ("dm41x_manyfiles.dm41", "Data Registers", DM41X_MODE, {}),
     "xm_files": ("dm41x_manyfiles.dm41", "XM Files", DM41X_MODE, {}),
     "hex_view": ("dm41x_manyfiles.dm41", "Hex View", DM41X_MODE, {"first_row": 0x178}),
