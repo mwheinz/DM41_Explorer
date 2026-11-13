@@ -247,3 +247,26 @@ LOG. The list labels each name that two functions share with where it
 comes from (`LOG  (HP-41 function)`, `SOLVE  (Math Pac, XROM 01,09)`),
 and `XROM "NAME"` picks an XROM function by name. Whichever way a
 function is named, the key stores its bytes.
+
+The layout tables, and the lookup of what each key does (register
+first, then global label, as in "The Lookup Algorithm"), are in
+`memory/keyboard.py`, shared by the tab and the PDF diagram below.
+
+### The PDF keyboard diagram
+
+The tab's **Save PDF...** button (GitHub issue #76) writes the same
+keyboard as a printable PDF (`memory/keyboard_pdf.py`, built with
+reportlab): the DM41X portrait and the DM41L, whose rows are ten keys
+long, landscape. The page is titled with the state's name (its file
+name without the extension), with the model, the date and the number
+of assignments below in smaller print. Each assignable key shows its shifted assignment on a
+gold strip across its top and its unshifted one below; a global
+program is marked with a small triangle (the tab's ▸) and an
+assignment whose key flag is clear has a dashed outline (the tab's ⚠).
+A list of every assignment follows on a page of its own (more pages if
+it needs them), keys in order, a shifted key
+written negative (`-11`) as the calculator writes it.
+
+Only the PDF standard fonts are used, so nothing is embedded:
+Helvetica, plus Symbol for the FOCAL glyphs Helvetica lacks (Σ, ↑, ≠,
+and ∡ as ∠). Any other character prints as its hp41uc trigraph.

@@ -46,6 +46,10 @@ Modules, by area (each module's docstring has the details):
     mnemonic_doc.py      the generated mnemonic reference
     trigraphs.py         the FOCAL character set's non-ASCII symbols
     xrom_library.py      XROM library files: loading, priority, conflicts
+
+  Keyboard
+    keyboard.py          the DM41L/DM41X keyboard layouts, what each key does
+    keyboard_pdf.py      the key assignments as a PDF keyboard diagram
 """
 
 from .registers import (

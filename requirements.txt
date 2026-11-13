@@ -5,3 +5,7 @@ customtkinter==6.0.0
 darkdetect==0.8.0
 packaging==26.3
 pyserial==3.5
+# The PDF keyboard diagram (issue #76), and its dependencies.
+reportlab==5.1.0
+charset-normalizer==3.5.2
+pillow==12.3.0

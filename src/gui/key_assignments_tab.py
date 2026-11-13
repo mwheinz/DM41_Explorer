@@ -12,7 +12,8 @@ gui/key_assignment_edit_dialog.py's "Program" tab).
 **One keyboard at a time.** Both models assign the same 34 keys, but
 their physical keyboards lay them out differently (see
 docs/key_assignments.md, "Keyboard layouts"), so there are two layout
-tables below. Only the grid for the model the app is working as is drawn
+tables, in memory/keyboard.py (shared with the PDF keyboard diagram,
+issue #76). Only the grid for the model the app is working as is drawn
 (docs/dm41x_explorer_plan.md phase 6).
 
 The layout follows the rendered state's own `profile`, which is the
@@ -31,7 +32,8 @@ first when deciding what to display, matching that real priority in case
 a state imported from elsewhere is in an inconsistent state.
 
 Import/export of key assignments is still out of scope -- see
-docs/key_assignments.md sec 6 items 1-2.
+docs/key_assignments.md sec 6 items 1-2. The header's "Save PDF..."
+button prints the keyboard with its assignments (issue #76).
 
 Unlike every other tab's render(), this one does NOT destroy and rebuild
 its widgets on every call. The grid always has the same 34*2 = 68 buttons
@@ -43,11 +45,22 @@ render() just updates its buttons' text and colors with configure().
 """
 
 import logging
-from dataclasses import dataclass
+from pathlib import Path
+from tkinter import filedialog, messagebox
 
 import customtkinter as ctk
 
 from memory import Memory
+from memory.keyboard import (  # noqa: F401 -- re-exported for the tests
+    DM41L_LAYOUT,
+    DM41X_LAYOUT,
+    GRID_COLUMNS,
+    CellPlacement,
+    layout_for_profile,
+    layout_placements,
+    resolve_key,
+)
+from memory.keyboard_pdf import write_key_assignments_pdf
 from memory.mnemonics import assignable_display_names
 from gui.fonts import font_for
 from gui.contrast import SECONDARY_TEXT
@@ -63,54 +76,9 @@ from gui.window_geometry import scaled_row_height
 
 logger = logging.getLogger(__name__)
 
-# Physical keyboard layouts (docs/key_assignments.md sec 6 item 4): each
-# row is a list of cells, where an int is an assignable key number (`MN`
-# notation, sec 2) and a str is a non-assignable physical key's label
-# (empty string for a genuinely blank/spare position). Both layouts cover
-# the same 34 assignable keys -- see the docs section for why they're laid
-# out differently (the DM41L's actual compact keyboard relocates several
-# keys relative to the classic HP-41's row layout).
-#
-# The ENTER key (41) has only one MxN position but is a double-size key on
-# both keyboards, so it is listed in two neighbouring positions: side by
-# side in a row (the DM41X's double-width key) or one above the other in
-# the same position of two rows (the DM41L's double-height key). Repeating
-# an assignable key number like this makes it ONE key that spans those
-# positions -- see layout_placements().
-DM41X_LAYOUT = [
-    [11, 12, 13, 14, 15, "ON"],
-    [21, 22, 23, 24, 25, "USR"],
-    ["SHIFT", 32, 33, 34, 35, "ALPHA"],
-    [41, 41, 42, 43, "DSP", 44],
-    [51, 52, 53, 54, "⬆︎"],
-    [61, 62, 63, 64, "⬇︎"],
-    [71, 72, 73, 74, "PGM"],
-    [81, 82, 83, "CST", 84],
-]
-
-DM41L_LAYOUT = [
-    [11, 12, 13, 14, 15, 42, 51, 52, 53, 54],
-    [21, 22, 23, 24, 25, 43, 61, 62, 63, 64],
-    ["USR", "PGM", 32, 35, 44, 41, 71, 72, 73, 74],
-    ["ON", "SHIFT", "ALPHA", 33, 34, 41, 81, 82, 83, 84],
-]
-
-# Which physical layout each model's grid uses, by profile name. A
-# profile whose name is missing here falls back to the DM41X's classic
-# HP-41 arrangement, which is the one every other model derives from.
-LAYOUT_BY_PROFILE = {
-    "DM41L": DM41L_LAYOUT,
-    "DM41X": DM41X_LAYOUT,
-}
-FALLBACK_LAYOUT = DM41X_LAYOUT
-
-
-def layout_for_profile(profile):
-    """The keyboard layout table to draw for `profile`."""
-    if profile is None:
-        return FALLBACK_LAYOUT
-    return LAYOUT_BY_PROFILE.get(profile.name, FALLBACK_LAYOUT)
-
+# The layout tables, layout_placements() and the GRID_COLUMNS-wide grid
+# they place keys on live in memory/keyboard.py, which the PDF keyboard
+# diagram (memory/keyboard_pdf.py, issue #76) shares.
 
 UNASSIGNED_TEXT = SECONDARY_TEXT
 UNASSIGNED_FG = ("gray85", "gray24")
@@ -186,13 +154,6 @@ KEY_TEXT_PREFIXES = "⇧"
 # a button asked to be narrower than its text ends up this much wider).
 BUTTON_TEXT_PADDING = 14
 
-# A physical keyboard row is drawn on a grid of this many columns, and each
-# of the row's keys spans an equal share of them: 6-key rows (5 columns
-# per key) and 5-key rows (6 columns per key) therefore come out the same
-# total width, the way the DM41X's 5-key section is spaced more widely
-# than its 6-key section. 30 is the least common multiple of every row
-# length in both layouts (5, 6 and 10).
-GRID_COLUMNS = 30
 # Horizontal gap between neighbouring keys, each side.
 CELL_PADX = 1
 # A key cell's border is drawn on the cell itself, and the children of a
@@ -203,64 +164,6 @@ KEY_NUMBER_PADY = 2
 # What a key's cell adds around its buttons: the padding each button is
 # packed with (padx=2, both sides).
 KEY_CELL_MARGIN = 2 * 2
-
-
-@dataclass
-class CellPlacement:
-    """Where one key (or fixed physical-key label) goes on a layout's
-    GRID_COLUMNS-wide grid. `cell` is an assignable key number (int) or a
-    label (str)."""
-
-    cell: object
-    row: int
-    column: int
-    columnspan: int
-    rowspan: int = 1
-
-
-def layout_placements(layout) -> list:
-    """Turns a layout (DM41X_LAYOUT/DM41L_LAYOUT) into the CellPlacements
-    to draw. Every position in a row is GRID_COLUMNS // len(row) grid
-    columns wide, and a key number that is repeated in neighbouring
-    positions of a row, or in the same position of neighbouring rows
-    (same-length rows only), is merged into one key spanning them all --
-    the double-size ENTER key (see the layout comment above). Labels are
-    never merged."""
-    placements = []
-    owners = {}  # (row, position) -> the CellPlacement covering that position
-    for row_index, row in enumerate(layout):
-        unit = GRID_COLUMNS // len(row)
-        above_row = row_index - 1
-        comparable_above = above_row >= 0 and len(layout[above_row]) == len(row)
-        position = 0
-        while position < len(row):
-            cell = row[position]
-            width = 1
-            above = None
-            if isinstance(cell, int):
-                while position + width < len(row) and row[position + width] == cell:
-                    width += 1
-                if comparable_above:
-                    candidate = owners.get((above_row, position))
-                    if (
-                        candidate is not None
-                        and candidate.cell == cell
-                        and candidate.column == position * unit
-                        and candidate.columnspan == width * unit
-                    ):
-                        above = candidate
-            if above is not None:
-                above.rowspan += 1
-                placement = above
-            else:
-                placement = CellPlacement(
-                    cell, row_index, position * unit, width * unit
-                )
-                placements.append(placement)
-            for covered in range(position, position + width):
-                owners[(row_index, covered)] = placement
-            position += width
-    return placements
 
 
 def _function_names() -> list:
@@ -324,6 +227,11 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         # of buttons like any other. (It was a list of two while both
         # grids were drawn at once -- one button per grid.)
         self._key_buttons = {}
+        # The open state's file, for the PDF's title and default file
+        # name (None when it has none, e.g. read from a calculator).
+        # The application replaces this, as it does ProgramTab's
+        # raw_checksum_enabled.
+        self.source_path = lambda: None
 
         # Fonts and sizes for the keys, from the ui and small font roles
         # (issues #41, #61); see KEY_MIN_CHARS.
@@ -334,7 +242,14 @@ class KeyAssignmentsTab(ctk.CTkFrame):
         font_size = ctk.ThemeManager.theme["CTkFont"]["size"]
         self._key_height = scaled_row_height(font_size, KEY_BUTTON_BASE_HEIGHT)
 
-        _, self._header_label = build_tab_header(self)
+        _, self._header_label = build_tab_header(
+            self,
+            button_kwargs={
+                "text": "Save PDF...",
+                "width": 110,
+                "command": self._save_pdf,
+            },
+        )
 
         self._caption = build_caption_label(
             self,
@@ -342,8 +257,8 @@ class KeyAssignmentsTab(ctk.CTkFrame):
             "reassign, or delete it -- a built-in/peripheral function "
             "or a global program (marked ▸). An assignment marked ⚠ has "
             "its key flag clear, so the calculator treats the key as "
-            "unassigned, as after LKAOFF. Import/export of key "
-            "assignments isn't handled here yet.",
+            "unassigned, as after LKAOFF. Save PDF... prints this "
+            "keyboard with its assignments.",
         )
 
         # One scrolling frame holding one grid: the keyboard of the model
@@ -526,18 +441,10 @@ class KeyAssignmentsTab(ctk.CTkFrame):
     # -- Refresh (every render) ----------------------------------------------
 
     def _resolve_key(self, key_number: int, shifted: bool):
-        """Returns (assignment, program) for key_number/shifted --
-        `assignment` is get_key_assignment()'s dict or None, `program` is
-        get_program_for_key()'s ProgramInfo or None. Only one is ever
-        non-None for a state this tab itself wrote (memory.py's
-        set_key_assignment()/set_program_key_assignment() enforce mutual
-        exclusion on save), but the Key Assignment Register lookup is
-        still checked first -- matching the real priority order (docs sec
-        4.7) -- in case a state from elsewhere has both."""
-        assignment = self._memory.key_assignments.get_assignment(key_number, shifted)
-        if assignment:
-            return assignment, None
-        return None, self._memory.programs.get_program_for_key(key_number, shifted)
+        """(assignment, program) for key_number/shifted -- see
+        memory.keyboard.resolve_key(), which checks the Key Assignment
+        Registers first, as the calculator does."""
+        return resolve_key(self._memory, key_number, shifted)
 
     def _refresh_buttons(self):
         flag_clear = set(self._memory.key_assignments.flag_clear_assignments())
@@ -563,6 +470,36 @@ class KeyAssignmentsTab(ctk.CTkFrame):
                 text_color = UNASSIGNED_TEXT
             btn.configure(text=text, fg_color=fg_color, text_color=text_color)
         self._equalize_columns(self._grid_frame)
+
+    # -- PDF keyboard diagram (issue #76) -------------------------------------
+
+    def _save_pdf(self):
+        """Asks where to save, then writes the PDF keyboard diagram of the
+        open state's key assignments (memory/keyboard_pdf.py)."""
+        if self._memory is None:
+            messagebox.showwarning(
+                "No Key Assignments", "Load or start a memory buffer first."
+            )
+            return
+        source = self.source_path()
+        stem = Path(source).stem if source else self._memory.profile.name
+        path = filedialog.asksaveasfilename(
+            initialfile=f"{stem}-keys.pdf",
+            defaultextension=".pdf",
+            filetypes=[("PDF files", "*.pdf"), ("All files", "*.*")],
+        )
+        if not path:
+            return
+        try:
+            write_key_assignments_pdf(
+                self._memory, path, name=Path(source).stem if source else ""
+            )
+        except (OSError, ValueError) as e:
+            logger.error("Could not save the key assignment PDF to %s: %s", path, e)
+            messagebox.showerror("Could Not Save PDF", str(e))
+            return
+        logger.info("Saved the key assignment PDF to %s", path)
+        messagebox.showinfo("Saved", f"Key assignments saved to {path}")
 
     # -- Editing ------------------------------------------------------------
 

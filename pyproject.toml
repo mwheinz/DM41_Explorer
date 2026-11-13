@@ -16,6 +16,7 @@ requires-python = ">=3.10"
 dependencies = [
     "customtkinter",
     "pyserial",
+    "reportlab",
 ]
 # The version comes from the latest git tag (vYYYY.MM.DD), as `git
 # describe` does for the About box (see src/build.sh).

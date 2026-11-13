@@ -288,3 +288,48 @@ def test_assigning_a_marked_key_clears_the_mark(tab):
 
     assert _button_text(tab, 11, False) == "COS"
     assert _button_text(tab, 12, True) == "⚠⇧▸BBB"
+
+
+# -- Save PDF... (issue #76) ----------------------------------------------------
+
+
+def test_save_pdf_writes_the_keyboard_diagram(tab, tmp_path):
+    from unittest import mock
+
+    memory = Memory.from_file(DATA_DIR / "manyfiles.dm41")
+    tab.render(memory)
+    tab.source_path = lambda: DATA_DIR / "manyfiles.dm41"
+    out = tmp_path / "keys.pdf"
+    with (
+        mock.patch(
+            "gui.key_assignments_tab.filedialog.asksaveasfilename",
+            return_value=str(out),
+        ) as ask,
+        mock.patch("gui.key_assignments_tab.messagebox.showinfo"),
+    ):
+        tab._save_pdf()
+
+    assert ask.call_args.kwargs["initialfile"] == "manyfiles-keys.pdf"
+    assert out.read_bytes().startswith(b"%PDF-")
+
+
+def test_save_pdf_cancelled_writes_nothing(tab, tmp_path):
+    from unittest import mock
+
+    tab.render(Memory.from_file(DATA_DIR / "manyfiles.dm41"))
+    with mock.patch(
+        "gui.key_assignments_tab.filedialog.asksaveasfilename", return_value=""
+    ):
+        tab._save_pdf()
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_save_pdf_without_a_file_names_it_after_the_model(tab):
+    from unittest import mock
+
+    tab.render(Memory(profile=DM41X))
+    with mock.patch(
+        "gui.key_assignments_tab.filedialog.asksaveasfilename", return_value=""
+    ) as ask:
+        tab._save_pdf()
+    assert ask.call_args.kwargs["initialfile"] == "DM41X-keys.pdf"

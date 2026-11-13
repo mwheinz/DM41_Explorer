@@ -103,7 +103,12 @@ TABS = (
         export_method="_export_selected",
         import_method="_import_program",
     ),
-    TabSpec("Key Assignments", "key_assignments_tab", KeyAssignmentsTab),
+    TabSpec(
+        "Key Assignments",
+        "key_assignments_tab",
+        KeyAssignmentsTab,
+        export_method="_save_pdf",
+    ),
     TabSpec("Alarms", "alarms_tab", AlarmsTab),
     TabSpec(
         "Data Registers",
@@ -691,6 +696,7 @@ class DM41ExplorerApp(ctk.CTk):
             self._tabs[spec.name] = tab
         self._tabs_dirty = {name: True for name in self._tabs}
         self.program_tab.raw_checksum_enabled = lambda: self.config_store.raw_checksum
+        self.key_assignments_tab.source_path = lambda: self.memory_source
 
     def _build_menus(self):
         """Builds the application's menu bar. Every basic function lives
@@ -866,7 +872,8 @@ class DM41ExplorerApp(ctk.CTk):
         self.bind("<F5>", lambda e: self._render_tabs())
 
         # Export.../Import... are tab-scoped header buttons (Data
-        # Registers, XM Files, Programs), not menu items, so their
+        # Registers, XM Files, Programs; Cmd/Ctrl+E is Save PDF... on Key
+        # Assignments), not menu items, so their
         # shortcuts are bound globally here and forward to whichever tab
         # is active -- see _dispatch_tab_action().
         self.bind(f"<{acc}-e>", lambda e: self._export_current_tab())
