@@ -6,30 +6,29 @@ serial console or USB disk interface.
 
 ## Features
 
-- **Overview** — A quick summary view of the contents of the DM41L/X's memory,
-  including the stack & alpha registers, main memory, and extended memory. Also
-  shows the current values of R00, .END., ΣREG, and a memory-usage summary at a
-  glance.
+- **Live or offline** — connect directly to a DM41L over USB serial, or work
+  offline from a saved `.dm41` or `.d41` state file (File > Open State / Save
+  State, with the last ten files under File > Open Recent).
+- **Overview** — a quick summary of the DM41L/X's memory, including the stack
+  and alpha registers, main memory, and extended memory. Also shows the
+  current values of R00, .END., ΣREG, and a memory-usage summary at a glance.
 - **Flags** — all 56 status flags, named and editable.
 - **Programs** — list, import, export, and remove programs from the
   calculator's memory.
-- **Data Registers** — browse and edit the user memory registers as numbers,
-  text, or raw hex.
-- **XM Files** — list, add, edit, and remove files stored in extended memory
-  (Data, ASCII, and Program types).
 - **Key Assignments** — view, add, edit, and remove user key assignments,
   including any XROM function, by name or by its module and function
   numbers, and save a printable PDF diagram of the keyboard.
 - **Alarms** — list, add, edit, and remove the calculator's alarms (message,
   control, and conditional), with past-due alarms marked.
+- **Data Registers** — browse and edit the user memory registers as numbers,
+  text, or raw hex.
+- **XM Files** — list, add, edit, and remove files stored in extended memory
+  (Data, ASCII, and Program types).
+- **Hex View** — a full, color-coded map of the entire memory space (status
+  registers, extended memory, program memory, data memory, and unused space).
 - **XROM libraries** — names for the functions of the DM41X's application
   pacs (Math, Stat, Advantage, PPC and the rest) and of any other ROM you add
   as a `.mod` file or an hp41uc XROM list (Tools > XROM Libraries).
-- Connect directly to a DM41L over USB serial, or work entirely offline from a
-  saved `.dm41` or `.d41` state file (File > Open State / Save State, with the
-  last ten files under File > Open Recent).
-- **Hex View** — a full, color-coded map of the entire memory space (status
-  registers, extended memory, program memory, data memory, and unused space).
 - **Pack Memory** (Tools menu) — reclaims unused registers the way the
   calculator's PACK does.
 - **FOCAL Mnemonics Reference** (Help menu) — every instruction name that
@@ -44,34 +43,30 @@ serial console or USB disk interface.
 
 ## Using DM41_Explorer
 
-DM41_Explorer supports two modes of operation: Serially connected (for the
-DM41L) or disk-based (for the DM41X or for editing saved state files). 
+DM41_Explorer works in one of two ways: connected over USB serial (for the
+DM41L), or disk-based (for the DM41X, or for editing saved state files).
 
-## Connecting to a DM41L
+### Connecting to a DM41L
 
 A serial connection is necessary only for data transfer to or from the DM41L.
 To configure the device for connectivity, power the calculator off and then
 press and release the “ON” and “C” keys simultaneously to enable the serial
-console. 
+console.
 
 Once the calculator is set to SERIAL CONSOLE mode and a USB connection is
 established with your computer, make sure DM41_Explorer is in **DM41L mode**
 (Preferences → General → Calculator model; the status bar shows the current
 one), then choose “Connect / Reconnect…” from the “Connect” menu (Ctrl+K or
-Cmd+K on macOS). A dialog box resembling the
-following will be displayed:
+Cmd+K on macOS). A dialog box resembling the following will be displayed:
 
 ![Connection](resources/screenshots/connection.png)
 
-Choose the appropriate serial port and press the Connect button. Upon
-connection, the calculator’s memory is retrieved—provided no state has been
-previously loaded or modified—and displayed in the Overview tab.  
+Choose the appropriate serial port and press the Connect button. If no state
+has been opened or changed, DM41_Explorer then reads the calculator's memory
+and shows it in the Overview tab. To read it again later, choose “Get State
+from DM41L” from the Connect menu.
 
-When connecting to the DM41L, DM41_Explorer loads the current memory contents
-if no state has been opened or altered. To reload a state from the calculator
-at a later time, use the Connect menu.
-
-#### Which serial port do I use? 
+#### Which serial port do I use?
 
 If you are unsure which serial port to select, follow these steps to identify
 the correct one:
@@ -86,8 +81,7 @@ the correct one:
 Once a successful connection is established, DM41_Explorer will automatically
 save and preselect this port for future sessions.
 
-
-## Working in Disk-Based Mode
+### Working in Disk-Based Mode
 
 The DM41X uses a disk-based USB interface and supports the storage of multiple
 state files. To generate a state file on the DM41X, press SETUP, select “File,”
@@ -110,12 +104,14 @@ and choose “Load DM41 State File.”
 Additionally, the “File” menu may be used to load and save state files from
 other directories on your computer.
 
+## The Tabs
+
 ### Overview Tab
 
 ![Overview](resources/screenshots/overview.png)
 
-The Overview tab shows a quick summary of either the state of the currently
-loaded memory state. It is almost entirely read-only, except for the address of
+The Overview tab shows a quick summary of the loaded memory state. It is
+almost entirely read-only, except for the address of
 the R00 register, which you can adjust if you want to experiment with synthetic
 programming.
 
@@ -123,7 +119,7 @@ programming.
 
 ![Flags](resources/screenshots/flags_view.png)
 
-A complete list of the all the user and system flags and their current values.
+A complete list of all the user and system flags and their current values.
 Some of the flags are available for use by HP41 applications, some control
 system behavior, and others pertain to peripherals and will have no effect on
 the DM41L. Some flags are automatically reset each time the calculator is
@@ -133,16 +129,16 @@ turned on.
 
 ![Programs](resources/screenshots/program_view.png) 
 
-The programs tab shows a list of the apps currently loaded into the program
+The Programs tab lists the programs currently loaded into the program
 memory portion of the loaded state file. From this view you can export and
 remove loaded programs, and import new ones. Programs can be imported or
-exported in RAW, TXT, or DAT format. DM41 Explorer also supports "PPC" format
+exported in RAW, TXT, or DAT format. DM41_Explorer also supports "PPC" format
 which is the same as DAT format but with line breaks. RAW files are read with
 or without hp41uc's checksum trailer; exported RAW files have one unless you
 turn it off in Preferences → General. A file to import can hold
 several programs, each ending with its own END; they are all imported, in the
 order they appear in the file. If an imported program has the same global
-label as one already in memory, DM41 Explorer lists what would be replaced and
+label as one already in memory, DM41_Explorer lists what would be replaced and
 asks first; the old program is removed, and its key assignments move to the
 new program's labels of the same name. To export several programs into one file,
 Shift- or Cmd/Ctrl-click to select their rows before choosing Export.
@@ -181,23 +177,6 @@ assignments on a gold strip across the top of the key, unshifted ones below.
 Global programs are marked with ▸, and an assignment whose key flag is clear
 (as after `LKAOFF`) has a dashed outline. A list of all the assignments
 follows on a second page.
-
-### XROM Libraries
-
-![XROM Libraries](resources/screenshots/xrom_libraries.png)
-
-An XROM instruction stores only a module and function number; its name
-comes from the ROM it calls. DM41_Explorer knows the built-in ROMs of each
-model, and **Tools > XROM Libraries** lets you turn on names for others:
-the 20 application pacs on the DM41X's disk and the Thermal Printer come
-with DM41_Explorer, and **Add…** imports any other ROM from a `.mod` file,
-an hp41uc XROM list or a library file. Tick the libraries you use and put
-them in the order of the calculator's ROM pages. A conflict panel shows
-where they clash, for instance two pacs that share an XROM number. Each
-mode keeps its own list.
-
-See [docs/xrom_libraries.md](docs/xrom_libraries.md) for how names are
-looked up, what the conflict messages mean and the library file format.
 
 ### Alarms Tab
 
@@ -261,8 +240,9 @@ register. Select a register with the mouse, then click on the desired action.
 
 The XM Files view is organized similarly to the Data Registers view, and allows
 you to import, export, and alter files in Extended Memory. Unlike the Data
-Registers view, XM Files does limit you to either BCD or ASCII data, and
-Program files cannot be altered at this time.
+Registers view, there is no raw hex entry: a Data file holds numbers and an
+ASCII file holds text. Program files can be viewed and removed, but not
+created or edited.
 
 ### Hex View Tab
 
@@ -271,17 +251,36 @@ Program files cannot be altered at this time.
 The Hex view shows the raw contents of calculator memory, color-coded by the
 region. It is useful for studying how HP41 memory is organized.
 
-### Tools and Help Menus
+## Tools and Help Menus
 
 - **Tools > Pack Memory…** packs program memory, key assignments, and alarms
   the way the calculator's PACK does, and reports how many registers it
   reclaimed. Packing before an import makes the most room available.
-- **Tools > XROM Libraries…** — see [XROM Libraries](#xrom-libraries).
+- **Tools > XROM Libraries…** — see [XROM Libraries](#xrom-libraries)
+  below.
 - **Help > FOCAL Mnemonics Reference** lists every instruction's name, the
   other spellings that importing a TXT program and the key assignment dialog
   accept, and the character-substitution and trigraph tables. It can stay
   open while you work.
-- **Help > Keyboard Shortcuts** lists the shortcuts below.
+- **Help > Keyboard Shortcuts** lists the [keyboard
+  shortcuts](#keyboard-shortcuts).
+
+### XROM Libraries
+
+![XROM Libraries](resources/screenshots/xrom_libraries.png)
+
+An XROM instruction stores only a module and function number; its name
+comes from the ROM it calls. DM41_Explorer knows the built-in ROMs of each
+model, and **Tools > XROM Libraries** lets you turn on names for others:
+the 20 application pacs on the DM41X's disk and the Thermal Printer come
+with DM41_Explorer, and **Add…** imports any other ROM from a `.mod` file,
+an hp41uc XROM list or a library file. Tick the libraries you use and put
+them in the order of the calculator's ROM pages. A conflict panel shows
+where they clash, for instance two pacs that share an XROM number. Each
+mode keeps its own list.
+
+See [docs/xrom_libraries.md](docs/xrom_libraries.md) for how names are
+looked up, what the conflict messages mean and the library file format.
 
 ## Keyboard Shortcuts
 
@@ -413,9 +412,11 @@ read.
 
 ## Documentation
 
-There are many markdown files in the [`docs`](https://github.com/mwheinz/DM41_Explorer/tree/main/docs) directory. These represent my
-research notes from developing this project. Hopefully they will be useful to
-you if you are curious about the internals of the HP41 and the DM41L/X emulator.
+There are many markdown files in the
+[`docs`](https://github.com/mwheinz/DM41_Explorer/tree/main/docs) directory.
+These represent my research notes from developing this project. Hopefully
+they will be useful to you if you are curious about the internals of the HP41
+and the DM41L/X emulator.
 [`docs/xrom_libraries.md`](docs/xrom_libraries.md) is the user's guide to XROM
 libraries, including the file format for writing your own.
 
@@ -425,7 +426,7 @@ reverse-engineering DM41L memory states. Other sources include *A Programmer's
 Handbook* by Poul Kaarup, *HP-41 Advanced Programming Tips* by Alan McCornack &
 Keith Jarett, and *Synthetic Programming Made Easy* by Keith Jarett. Other
 information came from conducting experiments and studying the resulting memory
-states
+states.
 
 ## Running from source
 
