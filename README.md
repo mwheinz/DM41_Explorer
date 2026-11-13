@@ -20,19 +20,27 @@ serial console or USB disk interface.
 - **Key Assignments** — view, add, edit, and remove user key assignments,
   including any XROM function, by name or by its module and function
   numbers, and save a printable PDF diagram of the keyboard.
+- **Alarms** — list, add, edit, and remove the calculator's alarms (message,
+  control, and conditional), with past-due alarms marked.
 - **XROM libraries** — names for the functions of the DM41X's application
   pacs (Math, Stat, Advantage, PPC and the rest) and of any other ROM you add
   as a `.mod` file or an hp41uc XROM list (Tools > XROM Libraries).
 - Connect directly to a DM41L over USB serial, or work entirely offline from a
-  saved `.dm41` state file (File > Open / Save State).
+  saved `.dm41` or `.d41` state file (File > Open State / Save State, with the
+  last ten files under File > Open Recent).
 - **Hex View** — a full, color-coded map of the entire memory space (status
   registers, extended memory, program memory, data memory, and unused space).
+- **Pack Memory** (Tools menu) — reclaims unused registers the way the
+  calculator's PACK does.
+- **FOCAL Mnemonics Reference** (Help menu) — every instruction name that
+  importing a TXT program and the key assignment dialog accept, with the
+  trigraph tables.
 
 ## Requirements
 
-- Python 3.10 or later (developed and tested with 3.12).
+- Python 3.10 or later (tested with 3.12 and 3.14).
 - A DM41L connected over USB, if you want to talk to real hardware —
-  otherwise you only need a `.dm41` state file to explore.
+  otherwise you only need a `.dm41` or `.d41` state file to explore.
 
 ## Using DM41_Explorer
 
@@ -90,9 +98,10 @@ Once a state file is stored on the device, connect the DM41X to your computer,
 press CST, and select “USB Disk” from the calculator menu; the unit will appear
 as a removable drive.  
 
-To load a state file into DM41_Explorer, select “Load State” from the “File”
-menu. To transfer a state file back to the calculator, use the “Save State”
-command. Eject the disk from the computer when you are finished.
+To load a state file into DM41_Explorer, select “Open State…” from the “File”
+menu; “Open Recent” lists the last ten state files you opened or saved. To
+transfer a state file back to the calculator, use the “Save State” command.
+Eject the disk from the computer when you are finished.
 
 The DM41X can store multiple state files. To load a particular state file onto
 the calculator, eject the device from the computer, press SETUP, select “File,”
@@ -145,10 +154,11 @@ Shift- or Cmd/Ctrl-click to select their rows before choosing Export.
 ![Key Assigns - DM41X layout](resources/screenshots/key_assigns_dm41x.png)
 
 The Key Assignments tab allows you to view and edit the user key assignments in
-the loaded state. It has two sub-tabs: the first shows the keys in the DM41L
-layout, and the second in the DM41X layout. Both show the same assignments, so
-an edit made on either one appears on the other. Clicking on a key will let you
-edit that key's current assignment. You can choose:
+the loaded state. It shows the keyboard of the model DM41_Explorer is working
+as (see [Calculator model](#calculator-model)): the DM41L's four rows of ten
+keys in DM41L mode, the classic HP-41 keyboard in DM41X mode. Each key has a
+button for its unshifted assignment and one for its shifted assignment;
+clicking either lets you edit it. You can choose:
 
 - **Function:** a built-in function, or one from an active [XROM
   library](#xrom-libraries), by picking it or typing its name. A typed name
@@ -189,6 +199,53 @@ mode keeps its own list.
 See [docs/xrom_libraries.md](docs/xrom_libraries.md) for how names are
 looked up, what the conflict messages mean and the library file format.
 
+### Alarms Tab
+
+![Alarms](resources/screenshots/alarms_view.png)
+
+The Alarms tab lists the alarms in the loaded state in the order they will go
+off, with each one's trigger time, repeat interval, type, and message or
+program label. An alarm marked past due in the Status column won't go off by
+itself until it is reactivated on the calculator (see the HP-41CX Owner's
+Manual).
+
+An alarm is one of three types:
+
+- **Message:** shows a message of up to 24 characters.
+- **Control:** runs the program at a global label of up to 22 characters. With
+  no label, it resumes the program from its current line.
+- **Conditional:** like Control, but runs the program only if the calculator
+  is off when the alarm goes off.
+
+#### Adding an alarm
+
+![Add Alarm dialog](resources/screenshots/alarm_add.png)
+
+Click **Add Alarm** and fill in:
+
+- **Trigger date** as YYYY-MM-DD and **trigger time** as 24-hour HH:MM:SS.
+- **Type**, then the **message** or **global label** it asks for. These use
+  the calculator's character set: it has no lowercase letters above `e`, so
+  use uppercase, or a trigraph such as `\nnn` for a special character (see
+  [docs/trigraphs.md](docs/trigraphs.md)).
+- **Repeats**, if the alarm should go off again, with the interval in days,
+  hours, minutes, and seconds.
+- **Past due**, to store the alarm already past due.
+
+Click **Save**. The alarm takes its place in the list by trigger time. If it
+can't be stored, for instance because memory is full or the message is too
+long, DM41_Explorer says why and leaves the alarms as they were. The same
+applies when you edit an alarm.
+
+#### Editing and removing an alarm
+
+![Edit Alarm dialog](resources/screenshots/alarm_edit.png)
+
+Select an alarm and click **Edit**, or double-click it, to open the same
+dialog filled in with that alarm's settings. Change what you need and click
+**Save**. To delete an alarm, select it and click **Remove**; DM41_Explorer
+asks you to confirm first.
+
 ### Data Registers Tab
 
 ![Data Registers](resources/screenshots/registers_view.png)
@@ -213,6 +270,18 @@ Program files cannot be altered at this time.
 
 The Hex view shows the raw contents of calculator memory, color-coded by the
 region. It is useful for studying how HP41 memory is organized.
+
+### Tools and Help Menus
+
+- **Tools > Pack Memory…** packs program memory, key assignments, and alarms
+  the way the calculator's PACK does, and reports how many registers it
+  reclaimed. Packing before an import makes the most room available.
+- **Tools > XROM Libraries…** — see [XROM Libraries](#xrom-libraries).
+- **Help > FOCAL Mnemonics Reference** lists every instruction's name, the
+  other spellings that importing a TXT program and the key assignment dialog
+  accept, and the character-substitution and trigraph tables. It can stay
+  open while you work.
+- **Help > Keyboard Shortcuts** lists the shortcuts below.
 
 ## Keyboard Shortcuts
 
@@ -247,6 +316,70 @@ Calculator Time, Get State, Send State) work in **DM41L mode** only. A DM41X
 has no serial console, so in DM41X mode those menu items are greyed out and
 the shortcuts say so rather than doing anything — see “Calculator model”
 below.
+
+## Preferences
+
+Open Preferences from the File menu on Windows and Linux, or from the
+DM41_Explorer application menu on macOS (Ctrl+, or Cmd+,). Settings are
+grouped in four tabs, and nothing changes until you click **Save**. They are
+kept in `.dm41_explorer.json` in your home folder.
+
+### General
+
+![Preferences, General tab](resources/screenshots/prefs_general.png)
+
+- **Calculator model:** DM41L or DM41X; see [Calculator
+  model](#calculator-model). Changing it starts a new, empty memory state, so
+  DM41_Explorer asks you to confirm first. If you decline, the other settings
+  are still saved.
+- **Log level** and **Log file directory:** how much DM41_Explorer records in
+  its log file, `dm41_explorer.log`, and where that file goes. Attach the log
+  to a bug report. The default level, INFO, is enough for most problems;
+  DEBUG records much more.
+- **Write a checksum in exported RAW files:** on by default. Turn it off for
+  tools that expect the program bytes alone, such as V41 or hp41uc's `/k`
+  option.
+
+### Appearance
+
+![Preferences, Appearance tab](resources/screenshots/prefs_appearance.png)
+
+- **Appearance mode:** System (follows your computer's light or dark
+  setting), Light, or Dark.
+- **Color theme:** the color of buttons and other controls: blue, dark-blue,
+  gold, or green.
+- **Higher-contrast colors:** on by default; adjusts the theme's colors so
+  text is easier to read.
+
+The appearance mode changes as soon as you save. The color theme and contrast
+take effect the next time you start DM41_Explorer.
+
+### Fonts
+
+![Preferences, Fonts tab](resources/screenshots/prefs_fonts.png)
+
+DM41_Explorer uses four fonts: **Application** for labels, buttons, and
+tables; **Small text** for captions and hints; **Headings**; and **Monospace**
+for addresses, register contents, and other fixed-width text. For each one you
+can choose a family (click the button to pick from a list; Monospace lists
+only fixed-width fonts), a size, and bold. The sample under each row shows how
+it will look. **System Default** and **Default** use your platform's usual
+font and size, and **Restore Defaults** sets every row back to them. Font
+changes take effect the next time you start DM41_Explorer.
+
+### Connection
+
+![Preferences, Connection tab](resources/screenshots/prefs_connection.png)
+
+These settings matter only for a DM41L connected over USB serial.
+
+- **Default serial port:** the port Connect offers first. DM41_Explorer also
+  remembers the last port that connected successfully. **Rescan Ports**
+  refreshes the list after you plug the calculator in.
+- **Baud rate:** leave this at 38400, the only speed the DM41L supports.
+- **Calculator console timeout (minutes):** DM41_Explorer sets the
+  calculator's serial console timeout to this (its `ct` command) each time it
+  connects.
 
 ## Calculator model
 

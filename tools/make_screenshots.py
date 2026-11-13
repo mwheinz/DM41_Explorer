@@ -60,6 +60,11 @@ SHOTS = {
     "registers_view": ("dm41x_manyfiles.dm41", "Data Registers", DM41X_MODE, {}),
     "xm_files": ("dm41x_manyfiles.dm41", "XM Files", DM41X_MODE, {}),
     "hex_view": ("dm41x_manyfiles.dm41", "Hex View", DM41X_MODE, {"first_row": 0x178}),
+    "alarms_view": ("alarmtest3.dm41", "Alarms", DM41X_MODE, {}),
+    # The alarm dialog over the Alarms tab: adding a control alarm
+    # (ALARM_ADD_SAMPLE), and editing the repeating DAILY ALARM.
+    "alarm_add": ("alarmtest3.dm41", "Alarms", DM41X_MODE, {}),
+    "alarm_edit": ("alarmtest3.dm41", "Alarms", DM41X_MODE, {}),
     # The empty buffer plus the port dialog, so DM41L mode: a DM41X has
     # no serial console and the Connect action refuses outright.
     "connection": (None, "Overview", DM41L_MODE, {}),
@@ -67,6 +72,11 @@ SHOTS = {
     # arranged (XROM_SAMPLE) so the list and the conflict panel show
     # something.
     "xrom_libraries": ("dm41x_manyfiles.dm41", "Overview", DM41X_MODE, {}),
+    # Preferences, one picture per tab, over the Overview.
+    "prefs_general": ("dm41x_manyfiles.dm41", "Overview", DM41X_MODE, {}),
+    "prefs_appearance": ("dm41x_manyfiles.dm41", "Overview", DM41X_MODE, {}),
+    "prefs_fonts": ("dm41x_manyfiles.dm41", "Overview", DM41X_MODE, {}),
+    "prefs_connection": ("dm41x_manyfiles.dm41", "Overview", DM41X_MODE, {}),
     # The key-assignment dialog's XROM tab (issue #49), on ABSP.
     "key_assign_xrom": ("keyassigns.dm41", "Key Assignments", DM41X_MODE, {}),
 }
@@ -75,6 +85,32 @@ SHOTS = {
 # Applications Pac and the Math Pac on, Advantage off. Standard's LOG and
 # Math's SOLVE give the conflict panel its notices.
 XROM_SAMPLE = [("standard", True), ("math", True), ("advantage", False)]
+
+# The Preferences tab each "prefs_*" picture shows.
+PREFS_TABS = {
+    "prefs_general": "General",
+    "prefs_appearance": "Appearance",
+    "prefs_fonts": "Fonts",
+    "prefs_connection": "Connection",
+}
+
+# What the "alarm_add" picture has typed into the Add Alarm dialog: a
+# control alarm, which runs a program, at a fixed time (the dialog would
+# otherwise show the moment the picture was taken).
+ALARM_ADD_SAMPLE = {
+    "date": "2026-12-01",
+    "time": "08:00:00",
+    "type": "Control (runs a program)",
+    "label": "REPORT",
+}
+# The alarm the "alarm_edit" picture opens: alarmtest3.dm41's daily one,
+# so the dialog shows a repeat interval.
+ALARM_EDIT_TEXT = "DAILY ALARM"
+
+
+def find_dialog(app, cls):
+    """The open `cls` dialog among `app`'s toplevel windows."""
+    return next(w for w in app.winfo_children() if isinstance(w, cls))
 
 
 def settle(app, seconds=0.6):
@@ -260,6 +296,58 @@ def main():
                 settle(app, 1.2)
                 grab(app, args.out / f"{name}.png")
                 dialog.destroy()
+            elif name in PREFS_TABS:
+                import customtkinter as ctk
+
+                dialog = app.show_preferences()
+                [tabs] = [
+                    w for w in dialog.winfo_children() if isinstance(w, ctk.CTkTabview)
+                ]
+                tabs.set(PREFS_TABS[name])
+                app.lift()
+                dialog.lift()
+                dialog.focus_force()
+                settle(app, 1.2)
+                grab(app, args.out / f"{name}.png")
+                dialog.grab_release()
+                dialog.destroy()
+                app.lift()
+            elif name in ("alarm_add", "alarm_edit"):
+                from gui.alarm_edit_dialog import AlarmEditDialog
+
+                tab = app.alarms_tab
+                if name == "alarm_add":
+                    tab._add_alarm()
+                    dialog = find_dialog(tab, AlarmEditDialog)
+                    sample = ALARM_ADD_SAMPLE
+                    dialog._date_var.set(sample["date"])
+                    dialog._time_var.set(sample["time"])
+                    dialog._type_var.set(sample["type"])
+                    dialog._on_type_changed(sample["type"])
+                    dialog._text_var.set(sample["label"])
+                else:
+                    # Select the row first, as a user would, so the
+                    # table behind the dialog shows which alarm it is.
+                    [row] = [
+                        alarm.start_addr
+                        for alarm in app.memory.alarms.list_alarms()
+                        if alarm.text == ALARM_EDIT_TEXT
+                    ]
+                    tab._tree.selection_set(str(row))
+                    tab._tree.see(str(row))
+                    settle(app)
+                    tab._edit_selected()
+                    dialog = find_dialog(tab, AlarmEditDialog)
+                # Closing the previous modal dialog can leave macOS showing
+                # another application in front; bring this one back.
+                app.lift()
+                dialog.lift()
+                dialog.focus_force()
+                settle(app, 1.2)
+                grab(app, args.out / f"{name}.png")
+                dialog.grab_release()
+                dialog.destroy()
+                app.lift()
             elif name == "connection":
                 from gui.port_dialog import PortSelectionDialog
 
