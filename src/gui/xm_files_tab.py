@@ -122,7 +122,7 @@ class XMFilesTab(ctk.CTkFrame):
             "Each row indicates a separate XM file. "
             "Files are listed in the order they occur in extended memory. "
             "Data and ASCII files can be imported, exported, or edited "
-            "right in DM41 Explorer but Program files cannot be altered "
+            "right in DM41_Explorer, but Program files cannot be altered "
             "at this time.",
         )
         _, self._tree = build_tab_treeview(self, _TREE_COLUMNS, style=_TREE_STYLE)
