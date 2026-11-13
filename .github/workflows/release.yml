@@ -116,7 +116,9 @@ jobs:
           # resource forks / code-signing metadata, so the .app has to be
           # its own ditto call.
           ditto -c -k --sequesterRsrc --keepParent "DM41_Explorer.app" "../../DM41_Explorer-${{ github.ref_name }}-macos.zip"
-          zip -r "../../DM41_Explorer-${{ github.ref_name }}-macos.zip" README.md LICENSE
+          # The README with the screenshots and docs it links to (see
+          # build.sh's copy_docs).
+          zip -r "../../DM41_Explorer-${{ github.ref_name }}-macos.zip" README.md LICENSE resources docs
           cd ../..
           shasum -a 256 "DM41_Explorer-${{ github.ref_name }}-macos.zip" > "DM41_Explorer-${{ github.ref_name }}-macos.zip.sha256"
 
