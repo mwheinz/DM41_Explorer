@@ -40,6 +40,11 @@ LOG_LEVELS = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 # tests/test_preferences_themes.py checks each one is really there.
 COLOR_THEMES = ["blue", "dark-blue", "gold", "green"]
 
+# The Connection tab's console timeout choices, in minutes. 10 is the
+# default (config.py), so it has to be one of them, or a new install
+# shows a value that can't be chosen again once changed.
+CONSOLE_TIMEOUTS = ["1", "2", "3", "4", "5", "10"]
+
 FONT_DEFAULT_LABEL = "System Default"
 FONT_SIZE_DEFAULT_LABEL = "Default"
 FONT_SIZES = ["8", "9", "10", "11", "12", "13", "14", "16", "18", "20", "24"]
@@ -159,12 +164,16 @@ class PreferencesDialog(ctk.CTkToplevel):
         ctk.CTkLabel(tab, text="Calculator console timeout (minutes):").pack(
             anchor="w", padx=8, pady=(16, 4)
         )
-        self._timeout_var = ctk.StringVar(
-            value=str(self._config.console_timeout_minutes)
-        )
+        current_timeout = str(self._config.console_timeout_minutes)
+        self._timeout_var = ctk.StringVar(value=current_timeout)
+        timeouts = list(CONSOLE_TIMEOUTS)
+        if current_timeout not in timeouts:
+            # e.g. a value typed into the preferences file: kept on offer,
+            # so opening and saving the dialog doesn't lose it.
+            timeouts.append(current_timeout)
         ctk.CTkOptionMenu(
             tab,
-            values=["1", "2", "3", "4", "5"],
+            values=timeouts,
             variable=self._timeout_var,
         ).pack(anchor="w", padx=8, fill="x")
 
