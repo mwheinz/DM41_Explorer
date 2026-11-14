@@ -193,13 +193,15 @@ def use_mode(app, app_module, mode):
     # The question is asked in the app's own wide dialog since GitHub
     # issue #55 (ask_yes_no); the discard prompt before it is still a
     # native message box.
-    original = app_module.messagebox.askyesno, app_module.ask_yes_no
+    from gui import device_mode
+
+    original = app_module.messagebox.askyesno, device_mode.ask_yes_no
     app_module.messagebox.askyesno = lambda *args, **kwargs: True
-    app_module.ask_yes_no = lambda *args, **kwargs: True
+    device_mode.ask_yes_no = lambda *args, **kwargs: True
     try:
-        app.set_mode(mode, persist=True)
+        app.mode_switcher.set_mode(mode, persist=True)
     finally:
-        app_module.messagebox.askyesno, app_module.ask_yes_no = original
+        app_module.messagebox.askyesno, device_mode.ask_yes_no = original
 
 
 def main():

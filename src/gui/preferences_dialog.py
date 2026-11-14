@@ -10,7 +10,7 @@ The mode is the odd one out: every other setting here is written straight
 to the config when Save is clicked, but changing mode erases the open
 memory state, so it needs a confirmation this dialog is the wrong place
 for. It is reported to the caller through `on_saved(requested_mode=...)`
-instead, and the application decides (see gui/app.py's set_mode()). The
+instead, and the application decides (see gui/device_mode.py's set_mode()). The
 value shown is therefore always the *saved* mode, never a session-only
 override from an auto-switch on load -- the status bar is where that is
 shown.

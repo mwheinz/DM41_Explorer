@@ -38,7 +38,7 @@ def no_unexpected_questions(monkeypatch):
     """ask_yes_no() opens a real dialog and waits for a click, which would
     hang the run. A test that expects the question patches it itself,
     inside this one, in the module that asks it."""
-    for module in ("gui.app", "gui.connection"):
+    for module in ("gui.device_mode", "gui.connection"):
         monkeypatch.setattr(
             f"{module}.ask_yes_no",
             mock.Mock(side_effect=AssertionError("unexpected ask_yes_no() question")),
@@ -80,7 +80,7 @@ def _reset(app):
         dialog.destroy()
     app._preferences_dialog = None
     app.menus.set_serial_enabled(app.mode.supports_serial)
-    app._refresh_mode_indicator()
+    app.refresh_mode_indicator()
     app.tabview.set("Overview")
     app.replace_memory(Memory(profile=app.profile))
     app.set_status(app.idle_status())
@@ -651,7 +651,7 @@ def _answer(value):
     #55). Yields the ask_yes_no mock, whose call is the mode question."""
     with (
         mock.patch("gui.app.messagebox.askyesno", return_value=value),
-        mock.patch("gui.app.ask_yes_no", return_value=value) as ask,
+        mock.patch("gui.device_mode.ask_yes_no", return_value=value) as ask,
     ):
         yield ask
 
@@ -686,7 +686,7 @@ def test_switching_mode_starts_an_empty_state(app_in_mode, start, target, state)
     assert app.memory_source is not None
 
     with _yes():
-        assert app.set_mode(DeviceMode(target), persist=True) is True
+        assert app.mode_switcher.set_mode(DeviceMode(target), persist=True) is True
 
     assert app.mode is DeviceMode(target)
     assert app.memory.profile is DeviceMode(target).profile
@@ -699,7 +699,7 @@ def test_switching_to_the_same_mode_does_nothing(app):
     source = app.memory_source
 
     with mock.patch("gui.app.messagebox.askyesno") as ask:
-        assert app.set_mode(DeviceMode.DM41X, persist=True) is True
+        assert app.mode_switcher.set_mode(DeviceMode.DM41X, persist=True) is True
 
     ask.assert_not_called(), "no confirmation for a no-op"
     assert app.memory_source == source, "the open state is untouched"
@@ -710,7 +710,7 @@ def test_declining_the_switch_confirmation_changes_nothing(app):
     source = app.memory_source
 
     with _no():
-        assert app.set_mode(DeviceMode.DM41L, persist=True) is False
+        assert app.mode_switcher.set_mode(DeviceMode.DM41L, persist=True) is False
 
     assert app.mode is DeviceMode.DM41X
     assert app.memory_source == source
@@ -726,7 +726,7 @@ def test_the_discard_guard_runs_before_the_switch_confirmation(app):
     assert app.memory.modified
 
     with mock.patch("gui.app.messagebox.askyesno", return_value=False) as ask:
-        assert app.set_mode(DeviceMode.DM41L, persist=True) is False
+        assert app.mode_switcher.set_mode(DeviceMode.DM41L, persist=True) is False
 
     assert ask.call_count == 1, "stopped at the discard guard"
     assert "Discard unsaved changes" in ask.call_args.args[1]
@@ -735,7 +735,7 @@ def test_the_discard_guard_runs_before_the_switch_confirmation(app):
 
 def test_the_switch_confirmation_names_the_consequence(app):
     with _no() as ask:
-        app.set_mode(DeviceMode.DM41L, persist=True)
+        app.mode_switcher.set_mode(DeviceMode.DM41L, persist=True)
 
     parent, title, message = ask.call_args.args
     assert (parent, title) == (app, "Switch Mode")
@@ -749,14 +749,14 @@ def test_switching_mode_persists_only_when_asked(app, prefs_file):
     assert app._mode_label.cget("text") == "DM41X mode"
 
     with _yes():
-        app.set_mode(DeviceMode.DM41L, persist=True)
+        app.mode_switcher.set_mode(DeviceMode.DM41L, persist=True)
     assert json.loads(prefs_file.read_text())["mode"] == "DM41L"
     assert app.config_store.mode is DeviceMode.DM41L
     assert not app.mode_is_temporary
     assert app._mode_label.cget("text") == "DM41L mode"
 
     with _yes():
-        app.set_mode(DeviceMode.DM41X, persist=False)
+        app.mode_switcher.set_mode(DeviceMode.DM41X, persist=False)
     assert json.loads(prefs_file.read_text())["mode"] == "DM41L", "not written"
     assert app.mode is DeviceMode.DM41X
     assert app.mode_is_temporary
@@ -874,11 +874,11 @@ def test_the_connect_menu_follows_the_mode(app):
     assert set(_connect_entries(app)) == {"disabled"}
 
     with _yes():
-        app.set_mode(DeviceMode.DM41L, persist=True)
+        app.mode_switcher.set_mode(DeviceMode.DM41L, persist=True)
     assert set(_connect_entries(app)) == {"normal"}
 
     with _yes():
-        app.set_mode(DeviceMode.DM41X, persist=True)
+        app.mode_switcher.set_mode(DeviceMode.DM41X, persist=True)
     assert set(_connect_entries(app)) == {"disabled"}
 
 
@@ -914,7 +914,9 @@ def test_switching_mode_while_connected_warns_and_disconnects_only_on_yes(
         mock.patch.object(dm41l_app.connection, "disconnect") as disconnect,
         _answer(confirm) as ask,
     ):
-        assert dm41l_app.set_mode(DeviceMode.DM41X, persist=True) is confirm
+        assert (
+            dm41l_app.mode_switcher.set_mode(DeviceMode.DM41X, persist=True) is confirm
+        )
 
     assert "serial connection will be closed" in ask.call_args.args[2]
     assert disconnect.called is confirm
@@ -975,7 +977,7 @@ def test_switching_to_dm41x_leaves_no_stale_not_connected(dm41l_app):
     assert dm41l_app._status_label.cget("text") == "Not connected"
 
     with _yes():
-        dm41l_app.set_mode(DeviceMode.DM41X, persist=True)
+        dm41l_app.mode_switcher.set_mode(DeviceMode.DM41X, persist=True)
 
     text = dm41l_app._status_label.cget("text")
     assert "Not connected" not in text
@@ -1201,7 +1203,7 @@ def test_each_mode_has_its_own_arrangement(
     _xrom_prefs(tmp_path, monkeypatch, DM41X=["math"], DM41L=["stat"])
     _reset(_shared_app)
     with _yes():
-        _shared_app.set_mode(DeviceMode.DM41L, persist=False)
+        _shared_app.mode_switcher.set_mode(DeviceMode.DM41L, persist=False)
     assert _active_ids(_shared_app) == ["hp41cx", "stat"]
     with pytest.raises(ValueError):
         resolve("SOLVE")

@@ -20,7 +20,7 @@ from gui import fonts
 from gui.fonts import font_for
 from gui.connection import Connection
 from gui.contrast import SECONDARY_TEXT, WARNING_TEXT, improve_theme_contrast
-from gui.dialog_common import ask_yes_no
+from gui.device_mode import ModeSwitcher
 from gui.menus import MenuBar
 from gui.screens import screen_rectangles
 from gui.tools_actions import XromLibraries
@@ -255,10 +255,11 @@ class DM41ExplorerApp(ctk.CTk):
         # The effective DM41L/DM41X mode: which calculator the app is
         # working as. It starts from the saved preference, and an
         # auto-switch on load can move it for this session only without
-        # writing the preference back (see _offer_mode_switch_for_load).
+        # writing the preference back (see ModeSwitcher.offer_switch_for_load).
         # Everything that needs a memory map asks self.profile, never the
         # config and never the connection.
         self.mode = self.config_store.mode
+        self.mode_switcher = ModeSwitcher(self)
         # The XROM libraries arranged for that mode, before anything shows
         # an instruction name (GitHub issue #53).
         self.xrom_libraries = XromLibraries(self)
@@ -335,106 +336,8 @@ class DM41ExplorerApp(ctk.CTk):
         absence of a connection the app would refuse to make anyway."""
         return "Not connected" if self.mode.supports_serial else ""
 
-    def _refresh_mode_indicator(self):
+    def refresh_mode_indicator(self):
         self._mode_label.configure(text=self._mode_status_text())
-
-    def set_mode(self, mode, *, persist: bool, reason: str = None) -> bool:
-        """Changes the effective mode, erasing the open state.
-
-        Changing mode starts a new, empty state on the new mode's profile:
-        a Memory fixes its profile when it is built, and
-        rebuilding one through to_string()/from_string() to keep the
-        contents would be a silent partial conversion in the narrowing
-        direction. Moving a state between models is done by exporting the
-        programs and data wanted and re-importing them.
-
-        The sequence, which `reason` only adds a leading sentence to:
-          1. the usual discard guard, if the buffer is modified;
-          2. a confirmation naming the consequence, which also names the
-             disconnect when a serial connection is open;
-          3. the disconnect, then the switch and the empty buffer.
-
-        `persist` writes the new mode to the preferences file. An
-        auto-switch on load passes False, so it lasts for this session
-        only. Returns whether the mode was changed; False means the user
-        cancelled at some step, and neither the mode nor the open state
-        was touched."""
-        if mode is self.mode:
-            return True
-
-        if not self.confirm_discard(f"switch to {mode.value} mode"):
-            return False
-
-        lines = []
-        if reason:
-            lines.append(reason)
-        lines.append(
-            f"Switching to {mode.value} mode starts a new, empty memory "
-            "state. Anything still in the current one is discarded."
-        )
-        connected = self.connection.serial.is_connected
-        if connected:
-            lines.append("The serial connection will be closed.")
-        lines.append(
-            "To move programs or data between models, export them before "
-            "switching and import them afterwards."
-        )
-        lines.append(f"Switch to {mode.value} mode?")
-        # Wider than messagebox.askyesno(), for the list of findings an
-        # auto-switch's `reason` carries (GitHub issue #55).
-        if not ask_yes_no(self, "Switch Mode", "\n\n".join(lines)):
-            return False
-
-        if connected:
-            self.connection.disconnect()
-
-        previous = self.mode
-        self.mode = mode
-        # Each mode has its own built-in library and its own arrangement.
-        self.xrom_libraries.apply()
-        if persist:
-            self.config_store.mode = mode
-            self.persist_config("the DM41L/DM41X mode")
-        logger.info(
-            "Mode changed from %s to %s (%s)",
-            previous.value,
-            mode.value,
-            "saved" if persist else "this session only",
-        )
-
-        self.menus.set_serial_enabled(self.mode.supports_serial)
-        self._refresh_mode_indicator()
-        self.replace_memory(Memory(profile=self.profile))
-        self.set_status(
-            f"Switched to {mode.value} mode; started a new, empty memory state."
-        )
-        return True
-
-    def _offer_mode_switch_for_load(self, path, findings) -> bool:
-        """Offers DM41X mode for a state that will not fit the current one,
-        and returns whether the caller should go on to load it.
-
-        The offer is deliberately session-only: someone who owns one
-        calculator will rarely want the other mode permanently, so
-        accepting does not write the preference. Declining aborts the load
-        and leaves both the mode and the open state alone."""
-        target = DeviceMode.DM41X
-        logger.info(
-            "%s does not fit %s mode: %s",
-            path,
-            self.mode.value,
-            "; ".join(str(finding) for finding in findings),
-        )
-        # The findings are for the log, above: to decide whether to switch,
-        # the user only needs to know the state is too big (issue #60).
-        reason = (
-            f"{Path(path).name} needs more memory than a {self.mode.value} has."
-            f"\n\n{target.value} mode can open it."
-        )
-        if not self.set_mode(target, persist=False, reason=reason):
-            self.set_status(f"Did not load {Path(path).name}: needs DM41X mode.")
-            return False
-        return True
 
     # -- Window size ------------------------------------------------------
 
@@ -800,7 +703,7 @@ class DM41ExplorerApp(ctk.CTk):
 
         A state is opened with the current mode's profile. If it does not
         fit that model, the user is offered DM41X mode instead
-        (_offer_mode_switch_for_load); declining leaves the open state
+        (ModeSwitcher.offer_switch_for_load); declining leaves the open state
         alone, so nothing is assigned here until that is settled."""
         try:
             # Parsed into a local first: the state only replaces the open
@@ -825,7 +728,7 @@ class DM41ExplorerApp(ctk.CTk):
                 "; ".join(str(finding) for finding in findings),
             )
         elif findings:
-            if not self._offer_mode_switch_for_load(path, findings):
+            if not self.mode_switcher.offer_switch_for_load(path, findings):
                 return
             # The mode moved, so the state has to be re-read under the new
             # profile: the one just parsed still carries the old memory map.
@@ -919,22 +822,12 @@ class DM41ExplorerApp(ctk.CTk):
     def _on_preferences_saved(self, requested_mode=None):
         """Re-applies everything the dialog may have changed.
 
-        `requested_mode` is the mode the user chose there, which the dialog
-        deliberately does NOT write to the config itself: changing mode
-        erases the open state, so it has to go through set_mode()'s
-        confirmation, and a cancelled switch must leave the saved
-        preference as it was. The dialog's other settings are already
-        saved by the time this runs, so cancelling the switch keeps those
-        and only the mode change is dropped."""
-        if requested_mode is not None and requested_mode is not self.mode:
-            self.set_mode(requested_mode, persist=True)
-        elif requested_mode is not None and self.mode_is_temporary:
-            # The dialog's value matches the mode already in force, so the
-            # user has confirmed this session's override as the saved
-            # setting. Nothing to erase; just stop calling it temporary.
-            self.config_store.mode = requested_mode
-            self.persist_config("the DM41L/DM41X mode")
-            self._refresh_mode_indicator()
+        `requested_mode` is the mode the user chose there, which goes
+        through ModeSwitcher.apply_preference() and its confirmation. The
+        dialog's other settings are already saved by the time this runs,
+        so cancelling the switch keeps those and only the mode change is
+        dropped."""
+        self.mode_switcher.apply_preference(requested_mode)
 
         ctk.set_appearance_mode(self.config_store.appearance_mode)
         _setup_logging(self.config_store)
