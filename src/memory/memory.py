@@ -257,9 +257,9 @@ class Memory:
 
         # Section III: Special Registers
         # These appear to be representations of the HP41's CPU registers. Note
-        # that right now the DM41_Explorer never alters their values.
-        # TODO: Consider just making these constants based on their values in
-        # a state taken in memory lost state.
+        # that right now the DM41_Explorer never alters their values: a loaded
+        # state keeps its own, and a new Memory starts with "Memory Lost"
+        # values (#79).
         if self._special_registers:
             # These need to be emitted in the same order they first appeared.
             A = self._special_registers["A"].get_hex()
