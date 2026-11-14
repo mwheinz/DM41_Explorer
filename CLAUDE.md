@@ -73,8 +73,11 @@ its issue ("Part of #61.", "Fifth step of #61."). Wrap at ~72 columns.
   functions.
 - `engine/` -- serial console protocol (`SerialManager`, `CommandEngine`,
   command classes). `tools/fake_dm41_device.py` fakes a device on a pty.
-- `gui/` -- CustomTkinter app; `app.py` is the entry point, one module per
-  tab/dialog. All fonts come from the roles in `gui/fonts.py`
+- `gui/` -- CustomTkinter app; `app.py` is the entry point and main
+  window, one module per tab/dialog. The window's helpers each have their
+  own module (#77): `connection.py` (serial, Connect menu), `menus.py`,
+  `device_mode.py` (mode switching), `state_files.py` (open/save),
+  `tools_actions.py` (Pack, XROM libraries) and `window_state.py`. All fonts come from the roles in `gui/fonts.py`
   (`font_for(role)`); `test_no_hardcoded_fonts.py` fails on any literal
   family/size/`CTkFont(...)` elsewhere in `gui/`.
 - `config.py` -- preferences file; writes go through

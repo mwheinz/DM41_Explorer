@@ -1,9 +1,9 @@
 """
 Window sizing rules for the main window (GitHub issue #42, item 3).
 
-Pure functions, no Tk, so the rules are unit-testable headless. gui/app.py
-feeds them the facts only a live window knows (what its widgets need, how
-big the screen is) and applies the answer.
+Pure functions, no Tk, so the rules are unit-testable headless.
+gui/window_state.py feeds them the facts only a live window knows (what its
+widgets need, how big the screen is) and applies the answer.
 
 The three rules:
 

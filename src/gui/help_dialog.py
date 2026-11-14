@@ -3,10 +3,10 @@ Modal, read-only dialog listing the application's keyboard shortcuts --
 Help > Keyboard Shortcuts.
 
 The shortcuts below are plain copies of the accelerator strings
-`gui/app.py`'s `_build_menus()`/`_bind_keys()` already define; there's no
-single shared source of truth for them (menus, key bindings, and this
-dialog are three separate places), so if a shortcut is ever added,
-changed, or removed in `app.py`, update _SECTIONS below to match.
+`gui/menus.py`'s `MenuBar` already defines; there's no single shared
+source of truth for them (menus, key bindings, and this dialog are three
+separate places), so if a shortcut is ever added, changed, or removed in
+`menus.py`, update _SECTIONS below to match.
 """
 
 import platform
@@ -54,8 +54,8 @@ _SECTIONS = [
     (
         # Export/Import aren't menu items at all -- they're header buttons
         # on the Data Registers/XM Files/Programs tabs -- but the shortcuts
-        # are real and global (see _bind_keys()'s GitHub issue #7 comment
-        # in app.py), so they belong here too.
+        # are real and global (see MenuBar.bind_shortcuts() in menus.py),
+        # so they belong here too.
         "Data Registers / XM Files / Programs tabs",
         [
             ("Export...", f"{_ACC}+E"),
