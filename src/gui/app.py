@@ -14,10 +14,6 @@ from typing import NamedTuple, Optional
 import customtkinter as ctk
 
 from memory import DeviceMode, Memory, evaluate_mode_switch
-from memory.mnemonics import set_active_libraries
-from memory.xrom_import import user_library_paths
-from memory.xrom_library import WARNING as XROM_WARNING
-from memory.xrom_library import active_set, find_conflicts, load_libraries
 
 from config import ProjectConfig
 from gui import fonts
@@ -27,6 +23,7 @@ from gui.contrast import SECONDARY_TEXT, WARNING_TEXT, improve_theme_contrast
 from gui.dialog_common import ask_yes_no
 from gui.menus import MenuBar
 from gui.screens import screen_rectangles
+from gui.tools_actions import XromLibraries
 from gui.window_geometry import (
     geometry_string,
     initial_window_size,
@@ -36,7 +33,6 @@ from gui.window_geometry import (
     restored_position,
 )
 from gui.preferences_dialog import PreferencesDialog
-from gui.xrom_libraries_dialog import XromLibrariesDialog
 from gui.help_dialog import KeyboardShortcutsDialog
 from gui.mnemonics_reference_dialog import MnemonicsReferenceDialog
 from gui.overview_tab import OverviewTab
@@ -265,7 +261,8 @@ class DM41ExplorerApp(ctk.CTk):
         self.mode = self.config_store.mode
         # The XROM libraries arranged for that mode, before anything shows
         # an instruction name (GitHub issue #53).
-        xrom_errors = self._apply_xrom_libraries()
+        self.xrom_libraries = XromLibraries(self)
+        xrom_errors = self.xrom_libraries.apply()
 
         self.connection = Connection(self)
         self.memory = Memory(profile=self.profile)
@@ -394,7 +391,7 @@ class DM41ExplorerApp(ctk.CTk):
         previous = self.mode
         self.mode = mode
         # Each mode has its own built-in library and its own arrangement.
-        self._apply_xrom_libraries()
+        self.xrom_libraries.apply()
         if persist:
             self.config_store.mode = mode
             self.persist_config("the DM41L/DM41X mode")
@@ -613,7 +610,7 @@ class DM41ExplorerApp(ctk.CTk):
         self._tabs = {}
         for spec in TABS:
             self.tabview.add(spec.name)
-            kwargs = {"on_change": self._on_memory_changed} if spec.editable else {}
+            kwargs = {"on_change": self.on_memory_changed} if spec.editable else {}
             tab = spec.cls(self.tabview.tab(spec.name), **kwargs)
             tab.pack(fill="both", expand=True)
             setattr(self, spec.attr, tab)
@@ -672,7 +669,7 @@ class DM41ExplorerApp(ctk.CTk):
     def set_calc_time_text(self, text: str):
         self._calc_time_label.configure(text=text)
 
-    def _on_memory_changed(self):
+    def on_memory_changed(self):
         self.memory.mark_modified()
         self._modified_label.configure(text="* Modified")
         # The tab that made this edit already re-rendered itself (each
@@ -741,46 +738,6 @@ class DM41ExplorerApp(ctk.CTk):
             return
         self.replace_memory(Memory(profile=self.profile))
         self.set_status("Started a new, empty memory buffer.")
-
-    # -- Tools menu actions --------------------------------------------------
-
-    def pack_memory(self):
-        """Tools > Pack Memory: repacks Key Assignments/Alarms and program
-        memory the way a real PACK does (see Memory.pack()), reporting the
-        registers reclaimed and any programs whose global labels became
-        visible. Useful before an Import, to make the most free space
-        available. It lives in the Tools menu rather than on the Programs
-        tab because it also changes Key Assignments and Alarms."""
-        before_count = len(self.memory.programs.list_programs())
-        try:
-            freed = self.memory.pack()
-        except Exception as e:
-            logger.warning("Could not pack memory: %s", e)
-            messagebox.showerror("Could Not Pack Memory", str(e))
-            return
-        recovered = len(self.memory.programs.list_programs()) - before_count
-        logger.info(
-            "Packed memory: %d register(s) reclaimed, %d program(s) recovered",
-            freed,
-            recovered,
-        )
-        self._on_memory_changed()
-        self.render_tabs()
-        if freed > 0 or recovered > 0:
-            summary = f"{freed} register(s) reclaimed"
-            if recovered > 0:
-                summary += (
-                    f", {recovered} program(s) recovered -- their global "
-                    "labels are now visible and can be assigned to a key"
-                )
-            self.set_status(f"Packed memory -- {summary}.")
-            messagebox.showinfo("Pack Memory", f"Packed memory: {summary}.")
-        else:
-            self.set_status("Packed memory -- already fully packed.")
-            messagebox.showinfo(
-                "Pack Memory",
-                "Memory is already fully packed -- nothing to reclaim.",
-            )
 
     def save_state_to_file(self):
         if self.memory_source is None:
@@ -937,65 +894,6 @@ class DM41ExplorerApp(ctk.CTk):
         )
         return self._preferences_dialog
 
-    # -- XROM libraries (GitHub issue #53) ------------------------------------
-
-    def _apply_xrom_libraries(self):
-        """Makes the XROM libraries arranged for the current mode active:
-        reads the shipped and the user's library files, works out the
-        active set (the mode's built-in library, then the enabled ones in
-        order) and rebuilds the instruction-name registry with it. Returns
-        the files that couldn't be loaded, which are logged; the manager
-        lists them."""
-        paths = user_library_paths(self.config_store.xrom_directory)
-        libraries, errors = load_libraries(user_paths=paths)
-        for error in errors:
-            logger.warning("XROM library not loaded: %s", error)
-        self.xrom_active = active_set(
-            libraries,
-            self.mode.value,
-            self.config_store.enabled_xrom_library_ids(self.mode),
-        )
-        if self.xrom_active.missing:
-            logger.warning(
-                "Enabled XROM libraries not found: %s",
-                ", ".join(self.xrom_active.missing),
-            )
-        set_active_libraries(self.xrom_active.libraries)
-        reference = getattr(self, "_mnemonics_reference", None)
-        if reference is not None and reference.winfo_exists():
-            reference.refresh_rows()
-        return errors
-
-    def show_xrom_libraries(self):
-        return XromLibrariesDialog(
-            self, self.config_store, self.mode, on_saved=self._on_xrom_libraries_saved
-        )
-
-    def _on_xrom_libraries_saved(self, entries):
-        """Saves the manager's arrangement for the current mode, applies it
-        and redraws the tabs, so names follow at once. If the active set
-        changed and its libraries clash on an XROM number, says so once."""
-        before = [library.id for library in self.xrom_active.libraries]
-        self.config_store.set_xrom_library_entries(self.mode, entries)
-        self.persist_config("the XROM libraries")
-        self._apply_xrom_libraries()
-        self.render_tabs()
-        active = self.xrom_active.libraries
-        plugins = [library for library in active if not library.builtin_on]
-        self.set_status(
-            f"XROM libraries: {len(plugins)} plug-in "
-            f"{'library' if len(plugins) == 1 else 'libraries'} active."
-        )
-        if [library.id for library in active] == before:
-            return
-        warnings = [f for f in find_conflicts(active) if f.level == XROM_WARNING]
-        if warnings:
-            messagebox.showwarning(
-                "XROM Libraries",
-                "\n\n".join(str(warning) for warning in warnings),
-                parent=self,
-            )
-
     def show_keyboard_shortcuts(self):
         KeyboardShortcutsDialog(self)
 
@@ -1010,6 +908,13 @@ class DM41ExplorerApp(ctk.CTk):
             return dialog
         self._mnemonics_reference = MnemonicsReferenceDialog(self)
         return self._mnemonics_reference
+
+    def refresh_mnemonics_reference(self):
+        """Brings the open mnemonics reference, if any, up to date with the
+        instruction names, e.g. after the XROM libraries changed."""
+        reference = getattr(self, "_mnemonics_reference", None)
+        if reference is not None and reference.winfo_exists():
+            reference.refresh_rows()
 
     def _on_preferences_saved(self, requested_mode=None):
         """Re-applies everything the dialog may have changed.

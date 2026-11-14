@@ -263,8 +263,8 @@ def main():
                 settle(app)
             if name == "xrom_libraries":
                 app.config_store.set_xrom_library_entries(mode, XROM_SAMPLE)
-                app._apply_xrom_libraries()
-                dialog = app.show_xrom_libraries()
+                app.xrom_libraries.apply()
+                dialog = app.xrom_libraries.show_manager()
                 dialog.geometry(
                     "+%d+%d" % (app.winfo_rootx() + 230, app.winfo_rooty() + 40)
                 )
@@ -272,7 +272,7 @@ def main():
                 grab(app, args.out / f"{name}.png")
                 dialog.destroy()
                 app.config_store.set_xrom_library_entries(mode, [])
-                app._apply_xrom_libraries()
+                app.xrom_libraries.apply()
             elif name == "key_assign_xrom":
                 from gui.key_assignment_edit_dialog import KeyAssignmentEditDialog
 

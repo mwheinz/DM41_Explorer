@@ -63,7 +63,7 @@ def _reset(app):
     app.config_store = ProjectConfig()
     app.config_store.load()
     app.mode = app.config_store.mode
-    app._apply_xrom_libraries()
+    app.xrom_libraries.apply()
     app.connection.serial.is_connected = False
     app.connection.serial.serial_inst = None
     app.connection.serial.__dict__.pop("profile", None)  # a test may override it
@@ -205,7 +205,7 @@ def test_a_tab_edit_marks_the_state_modified_and_guards_it(app):
     must set the modified flag, so the "Discard unsaved changes?" guard
     then protects the edit."""
     assert app.memory.modified is False
-    app._on_memory_changed()
+    app.on_memory_changed()
     assert app.memory.modified is True
 
     with mock.patch("gui.app.messagebox.askyesno", return_value=False) as ask:
@@ -722,7 +722,7 @@ def test_the_discard_guard_runs_before_the_switch_confirmation(app):
     declining it stops the switch before the mode question is even
     asked."""
     app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
-    app._on_memory_changed()
+    app.on_memory_changed()
     assert app.memory.modified
 
     with mock.patch("gui.app.messagebox.askyesno", return_value=False) as ask:
@@ -1177,7 +1177,7 @@ def _xrom_prefs(tmp_path, monkeypatch, **arrangement):
 
 
 def _active_ids(app):
-    return [library.id for library in app.xrom_active.libraries]
+    return [library.id for library in app.xrom_libraries.active.libraries]
 
 
 def test_the_saved_arrangement_is_active_at_start(
@@ -1211,7 +1211,7 @@ def test_saving_from_the_manager_applies_and_persists(
     app, prefs_file, builtin_xroms_after
 ):
     with mock.patch("gui.app.messagebox.showwarning") as warn:
-        app._on_xrom_libraries_saved([("math", True), ("stat", False)])
+        app.xrom_libraries._on_saved([("math", True), ("stat", False)])
 
     warn.assert_not_called()
     assert _active_ids(app) == ["dm41x-cx", "math"]
@@ -1224,8 +1224,8 @@ def test_saving_from_the_manager_applies_and_persists(
 def test_a_number_clash_is_shown_once_after_a_change(app, builtin_xroms_after):
     entries = [("aviation", True), ("clinical", True)]
     with mock.patch("gui.app.messagebox.showwarning") as warn:
-        app._on_xrom_libraries_saved(entries)
-        app._on_xrom_libraries_saved(entries)  # nothing changed this time
+        app.xrom_libraries._on_saved(entries)
+        app.xrom_libraries._on_saved(entries)  # nothing changed this time
     warn.assert_called_once()
     assert "both use XROM 19" in warn.call_args.args[1]
 
@@ -1243,7 +1243,7 @@ def test_the_tools_menu_opens_the_manager(app):
     labels = _menu_labels(app, "Tools")
     assert "XROM Libraries..." not in _menu_labels(app, "File")
     assert "XROM Libraries..." in labels
-    dialog = app.show_xrom_libraries()
+    dialog = app.xrom_libraries.show_manager()
     assert dialog.winfo_exists()
     dialog.destroy()
 
@@ -1252,7 +1252,7 @@ def test_a_library_file_that_cannot_load_is_reported(app, prefs_file):
     folder = ProjectConfig().xrom_directory
     folder.mkdir(parents=True)
     (folder / "broken.json").write_text("{not json")
-    errors = app._apply_xrom_libraries()
+    errors = app.xrom_libraries.apply()
     assert len(errors) == 1
     assert str(errors[0]).startswith("broken.json: not valid JSON (line 1")
     assert _active_ids(app) == ["dm41x-cx"]

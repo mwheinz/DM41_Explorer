@@ -12,6 +12,8 @@ wires them up.
 import logging
 from tkinter import Menu
 
+from gui.tools_actions import pack_memory
+
 logger = logging.getLogger(__name__)
 
 # File > Open Recent: long paths are shortened by keeping the tail
@@ -163,12 +165,12 @@ class MenuBar:
         tools_menu = Menu(menubar, tearoff=0)
         tools_menu.add_command(
             label="Pack Memory...",
-            command=app.pack_memory,
+            command=lambda: pack_memory(app),
             underline=0,
         )
         tools_menu.add_command(
             label="XROM Libraries...",
-            command=app.show_xrom_libraries,
+            command=app.xrom_libraries.show_manager,
             underline=0,
         )
         menubar.add_cascade(label="Tools", menu=tools_menu)
