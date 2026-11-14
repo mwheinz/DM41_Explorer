@@ -252,7 +252,7 @@ def main():
                 app.connection._on_state_received(app_module.Memory().to_string())
                 app.set_status("Not connected")
             else:
-                app._load_state_into_buffer(str(scratch / state))
+                app.state_files.load(str(scratch / state))
             app.tabview.set(tab)
             app._on_tab_changed()
             # Long enough for the whole tab to be drawn before a dialog

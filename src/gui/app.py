@@ -8,12 +8,12 @@ import logging.handlers
 import sys
 from pathlib import Path
 import platform
-from tkinter import filedialog, messagebox
+from tkinter import messagebox
 from typing import NamedTuple, Optional
 
 import customtkinter as ctk
 
-from memory import DeviceMode, Memory, evaluate_mode_switch
+from memory import Memory
 
 from config import ProjectConfig
 from gui import fonts
@@ -23,6 +23,7 @@ from gui.contrast import SECONDARY_TEXT, WARNING_TEXT, improve_theme_contrast
 from gui.device_mode import ModeSwitcher
 from gui.menus import MenuBar
 from gui.screens import screen_rectangles
+from gui.state_files import StateFiles
 from gui.tools_actions import XromLibraries
 from gui.window_geometry import (
     geometry_string,
@@ -204,22 +205,6 @@ def _apply_color_theme(name):
         ctk.set_default_color_theme(default)
 
 
-# A DM41L `.dm41` state and a DM41X `.d41` state file are the same text format.
-STATE_EXTENSIONS = (".dm41", ".d41")
-
-# What Save As offers for a buffer that has no file of its own yet. The text
-# format is identical either way; this only picks the extension the user's
-# own calculator writes, so a new state lands with the name they expect.
-DEFAULT_EXTENSION_BY_MODE = {
-    DeviceMode.DM41L: ".dm41",
-    DeviceMode.DM41X: ".d41",
-}
-STATE_FILETYPES = [
-    ("DM41 memory state", ("*.dm41", "*.d41")),
-    ("All files", "*.*"),
-]
-
-
 class DM41ExplorerApp(ctk.CTk):
     """Main application window."""
 
@@ -268,6 +253,7 @@ class DM41ExplorerApp(ctk.CTk):
         self.connection = Connection(self)
         self.memory = Memory(profile=self.profile)
         self.memory_source = None
+        self.state_files = StateFiles(self)
 
         self._build_layout()
         self._apply_window_size()
@@ -288,7 +274,9 @@ class DM41ExplorerApp(ctk.CTk):
             # Tk exposes it as a registered command rather than a normal
             # event binding; see main()/_handle_startup_file_arg below for
             # the non-macOS (sys.argv-based) half of double-click support.
-            self.createcommand("::tk::mac::OpenDocument", self._on_mac_open_document)
+            self.createcommand(
+                "::tk::mac::OpenDocument", self.state_files.open_documents
+            )
             # Cmd+Q and the application menu's own "Quit DM41_Explorer"
             # call this command, whose Tk default does not go through the
             # WM_DELETE_WINDOW handler: without this they would skip the
@@ -634,150 +622,12 @@ class DM41ExplorerApp(ctk.CTk):
         )
         self._source_label.configure(text=text)
 
-    # -- File menu actions --------------------------------------------------
-
-    def new_memory_buffer(self):
-        if not self.confirm_discard("start a new buffer"):
-            return
-        self.replace_memory(Memory(profile=self.profile))
-        self.set_status("Started a new, empty memory buffer.")
-
-    def save_state_to_file(self):
-        if self.memory_source is None:
-            self.save_state_as()
-            return
-        if not messagebox.askyesno(
-            "Overwrite File", f"Overwrite {self.memory_source} with your changes?"
-        ):
-            return
-        self._write_state(self.memory_source)
-
-    def save_state_as(self):
-        # A file keeps its own extension: the text format is the same. A
-        # buffer with no file of its own gets the extension the current
-        # mode's calculator writes (.dm41 for a DM41L, .d41 for a DM41X).
-        extension = (
-            self.memory_source.suffix
-            if self.memory_source and self.memory_source.suffix in STATE_EXTENSIONS
-            else DEFAULT_EXTENSION_BY_MODE[self.mode]
-        )
-        path = filedialog.asksaveasfilename(
-            defaultextension=extension,
-            filetypes=STATE_FILETYPES,
-        )
-        if not path:
-            return
-        self._write_state(path)
-
-    def _write_state(self, path):
-        """Writes the buffer to `path`, which then becomes its file. Shared
-        by Save and Save As; any confirmation is the caller's."""
-        try:
-            self.memory.to_file(path)
-        except Exception as e:
-            logger.exception("Could not save state to %s", path)
-            messagebox.showerror("Error", f"Could not save state: {e}")
-            return
-        logger.info("State saved to %s", path)
+    def show_saved_as(self, path):
+        """Makes `path` the open buffer's file once the buffer has been
+        written there, and shows it as saved."""
         self.memory_source = Path(path)
         self._modified_label.configure(text="")
         self._update_source_label()
-        self.menus.remember_recent_file(path)
-        messagebox.showinfo("Saved", f"Memory state written to {path}")
-
-    def load_state_from_file(self):
-        if not self.confirm_discard("load a different state"):
-            return
-        path = filedialog.askopenfilename(filetypes=STATE_FILETYPES)
-        if not path:
-            return
-        self._load_state_into_buffer(path)
-
-    def _load_state_into_buffer(self, path):
-        """Reads `path` into self.memory and refreshes the UI to match.
-        This is the actual load step shared by every way of opening a state
-        (File > Open..., a startup file argument, and double-clicking a
-        .dm41 file) -- callers are responsible for checking `self.memory.modified`
-        and confirming with the user first, since the right prompt (or
-        whether to prompt at all) differs by caller.
-
-        A state is opened with the current mode's profile. If it does not
-        fit that model, the user is offered DM41X mode instead
-        (ModeSwitcher.offer_switch_for_load); declining leaves the open state
-        alone, so nothing is assigned here until that is settled."""
-        try:
-            # Parsed into a local first: the state only replaces the open
-            # buffer once it is known to fit the mode (or the user has
-            # agreed to switch), so a declined offer is a true no-op.
-            loaded = Memory.from_file(path, profile=self.profile)
-        except Exception as e:
-            logger.exception("Could not load state from %s", path)
-            messagebox.showerror("Error", f"Could not load state: {e}")
-            return
-
-        findings = evaluate_mode_switch(loaded, self.profile)
-        if findings and evaluate_mode_switch(loaded, DeviceMode.DM41X.profile):
-            # It does not fit DM41X mode either -- an XM directory that
-            # cannot be read in any mode -- so offering that mode as the
-            # cure would be wrong (GitHub issue #68). It opens as it is,
-            # as it would in DM41X mode, and the XM Files tab says why
-            # the directory cannot be listed.
-            logger.warning(
-                "%s has problems no mode fixes: %s",
-                path,
-                "; ".join(str(finding) for finding in findings),
-            )
-        elif findings:
-            if not self.mode_switcher.offer_switch_for_load(path, findings):
-                return
-            # The mode moved, so the state has to be re-read under the new
-            # profile: the one just parsed still carries the old memory map.
-            try:
-                loaded = Memory.from_file(path, profile=self.profile)
-            except Exception as e:
-                logger.exception("Could not load state from %s", path)
-                messagebox.showerror("Error", f"Could not load state: {e}")
-                return
-
-        self.replace_memory(loaded, source=path)
-        self.set_status(f"Loaded state from {Path(path).name}")
-        logger.info("State loaded from %s (%s mode)", path, self.mode.value)
-        self.menus.remember_recent_file(path)
-
-    def open_state_file(self, path):
-        """Opens `path` as the app's current state, prompting to discard
-        unsaved changes first if needed (same prompt File > Open... uses).
-
-        Public entry point for anything that hands the app a file path
-        directly, bypassing the File > Open... dialog: a startup file
-        argument (double-clicking a .dm41 file on Windows/Linux, or
-        launching fresh via double-click on macOS -- see
-        `_handle_startup_file_arg`/main() below) and the macOS "Open
-        Document" AppleEvent for double-clicking a .dm41 file while the
-        app is already running (see `_on_mac_open_document` below)."""
-        if not Path(path).exists():
-            logger.warning("Could not find file: %s", path)
-            messagebox.showerror("Error", f"Could not find file: {path}")
-            self.menus.forget_recent_file(path)
-            return
-        if not self.confirm_discard("load a different state"):
-            return
-        self._load_state_into_buffer(path)
-
-    def _on_mac_open_document(self, *paths):
-        """Handles macOS's "Open Document" AppleEvent -- what Finder sends
-        for double-clicking a .dm41 file, whether that launches the app
-        fresh or the app is already running. Tk surfaces this as a
-        registered command (wired in __init__) rather than a normal
-        widget-level event or sys.argv, per
-        https://www.tcl.tk/man/tcl/TkCmd/tk_mac.html."""
-        if not paths:
-            return
-        # Finder can in principle hand over more than one path at once
-        # (e.g. multi-selecting files and choosing Open); this app only
-        # has one buffer, so just open the last one -- "last one wins" is
-        # the least surprising choice for a single-document app.
-        self.open_state_file(paths[-1])
 
     def show_preferences(self):
         """Opens Preferences, or raises the one already open -- the menu
@@ -865,7 +715,7 @@ def _handle_startup_file_arg(app):
     the Windows/Linux half of "double-click a .dm41 file to open it": file
     associations on those platforms launch the app with the file's path as
     an argument. macOS instead delivers this via an "Open Document"
-    AppleEvent (see `DM41ExplorerApp._on_mac_open_document`), which
+    AppleEvent (see `StateFiles.open_documents`), which
     doesn't go through sys.argv at all, but this also covers running the
     app directly from a shell with a file argument on any platform.
 
@@ -874,7 +724,7 @@ def _handle_startup_file_arg(app):
     parse -- a stray flag shouldn't be treated as a file to open.
     """
     if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
-        app.open_state_file(sys.argv[1])
+        app.state_files.open(sys.argv[1])
 
 
 def main():

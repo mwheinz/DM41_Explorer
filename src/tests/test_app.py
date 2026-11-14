@@ -143,7 +143,7 @@ def dm41l_app(_shared_app, dm41l_prefs):
         lambda app: app.connection._on_state_received(
             Memory().to_string()
         ),  # Get State
-        lambda app: app.new_memory_buffer(),
+        lambda app: app.state_files.new_buffer(),
     ],
     ids=["calculator state", "new buffer"],
 )
@@ -153,15 +153,15 @@ def test_save_after_replacing_a_loaded_file_asks_for_a_new_name(app, tmp_path, r
     path = tmp_path / "x.dm41"
     Memory().to_file(path)
     original = path.read_bytes()
-    app._load_state_into_buffer(str(path))
+    app.state_files.load(str(path))
     assert app.memory_source == path
 
     with _yes():
         replace(app)
     assert app.memory_source is None
 
-    with mock.patch.object(app, "save_state_as") as save_as:
-        app.save_state_to_file()
+    with mock.patch.object(app.state_files, "save_as") as save_as:
+        app.state_files.save()
     save_as.assert_called_once()
     assert path.read_bytes() == original
 
@@ -170,10 +170,12 @@ def test_save_as_writes_the_file_and_makes_it_the_source(app, tmp_path):
     new_path = tmp_path / "renamed.dm41"
     app.memory.mark_modified()
     with (
-        mock.patch("gui.app.filedialog.asksaveasfilename", return_value=str(new_path)),
+        mock.patch(
+            "gui.state_files.filedialog.asksaveasfilename", return_value=str(new_path)
+        ),
         mock.patch("gui.app.messagebox.showinfo"),
     ):
-        app.save_state_as()
+        app.state_files.save_as()
 
     assert new_path.exists()
     assert app.memory_source == new_path
@@ -185,15 +187,15 @@ def test_saving_over_the_loaded_file_asks_first(app, tmp_path, confirm):
     path = tmp_path / "already-open.dm41"
     Memory().to_file(path)
     original = path.read_bytes()
-    app._load_state_into_buffer(str(path))
+    app.state_files.load(str(path))
     app.memory.status_registers.set_flag(0, True)  # something to save
 
     with (
-        mock.patch.object(app, "save_state_as") as save_as,
+        mock.patch.object(app.state_files, "save_as") as save_as,
         mock.patch("gui.app.messagebox.showinfo"),
         mock.patch("gui.app.messagebox.askyesno", return_value=confirm) as ask,
     ):
-        app.save_state_to_file()
+        app.state_files.save()
 
     ask.assert_called_once()
     save_as.assert_not_called()
@@ -209,7 +211,7 @@ def test_a_tab_edit_marks_the_state_modified_and_guards_it(app):
     assert app.memory.modified is True
 
     with mock.patch("gui.app.messagebox.askyesno", return_value=False) as ask:
-        app.new_memory_buffer()
+        app.state_files.new_buffer()
     ask.assert_called_once()
 
 
@@ -256,7 +258,7 @@ def _send(app, name, *, answer=True):
     mocks for the error box and the confirmation, in that order.
 
     The state is assigned directly, with the DM41X profile, rather than
-    opened through _load_state_into_buffer(): since phase 6, opening a
+    opened through StateFiles.load(): since phase 6, opening a
     too-large state in DM41L mode offers a switch to DM41X mode instead
     of loading it, so the load path can no longer produce the situation
     the Send check guards against. These tests are about Send's own
@@ -373,7 +375,7 @@ def test_a_state_file_opens_with_the_modes_profile(app_in_mode, mode, state):
     """A DM41L owner's own state is shown as a DM41L's, not padded out to
     the DM41X's memory map."""
     app = app_in_mode(mode)
-    app._load_state_into_buffer(str(DATA_DIR / state))
+    app.state_files.load(str(DATA_DIR / state))
     assert app.memory.profile is DeviceMode(mode).profile
 
 
@@ -385,7 +387,7 @@ def test_a_dm41l_state_from_the_calculator_keeps_the_dm41l_profile(app):
 
 def test_manyfiles_lists_all_its_files_across_three_regions(app):
     with mock.patch("gui.app.messagebox.showerror") as error:
-        app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+        app.state_files.load(str(DATA_DIR / "dm41x_manyfiles.dm41"))
 
     error.assert_not_called()
     app.xm_files_tab.render(app.memory)  # tabs render lazily, when shown
@@ -396,7 +398,7 @@ def test_manyfiles_lists_all_its_files_across_three_regions(app):
 
 
 def test_overview_reports_five_registers_free_on_manyfiles(app):
-    app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    app.state_files.load(str(DATA_DIR / "dm41x_manyfiles.dm41"))
 
     files, used, free = app.overview_tab._xm_summary_texts()
 
@@ -431,8 +433,10 @@ def test_hex_view_runs_to_the_end_of_the_profiles_map(app, profile, last):
 
 
 def test_open_dialog_offers_both_extensions(app):
-    with mock.patch("gui.app.filedialog.askopenfilename", return_value="") as ask:
-        app.load_state_from_file()
+    with mock.patch(
+        "gui.state_files.filedialog.askopenfilename", return_value=""
+    ) as ask:
+        app.state_files.open_dialog()
 
     types = dict(ask.call_args.kwargs["filetypes"])
     assert set(types["DM41 memory state"]) == {"*.dm41", "*.d41"}
@@ -442,10 +446,12 @@ def test_open_dialog_offers_both_extensions(app):
     "name, extension", [("xrom.d41", ".d41"), ("6x-xm.dm41", ".dm41")]
 )
 def test_save_as_keeps_the_files_own_extension(app, name, extension):
-    app._load_state_into_buffer(str(DATA_DIR / name))
+    app.state_files.load(str(DATA_DIR / name))
 
-    with mock.patch("gui.app.filedialog.asksaveasfilename", return_value="") as ask:
-        app.save_state_as()
+    with mock.patch(
+        "gui.state_files.filedialog.asksaveasfilename", return_value=""
+    ) as ask:
+        app.state_files.save_as()
 
     assert ask.call_args.kwargs["defaultextension"] == extension
 
@@ -455,21 +461,25 @@ def test_save_as_of_a_new_buffer_follows_the_mode(app_in_mode, mode, extension):
     """A buffer with no file of its own gets the extension the current
     mode's calculator writes (plan, phase 6)."""
     app = app_in_mode(mode)
-    with mock.patch("gui.app.filedialog.asksaveasfilename", return_value="") as ask:
-        app.save_state_as()
+    with mock.patch(
+        "gui.state_files.filedialog.asksaveasfilename", return_value=""
+    ) as ask:
+        app.state_files.save_as()
     assert ask.call_args.kwargs["defaultextension"] == extension
 
 
 def test_a_d41_file_saves_back_identically(app, tmp_path):
     text = (DATA_DIR / "dm41x_xrom_keys.d41").read_text()
-    app._load_state_into_buffer(str(DATA_DIR / "dm41x_xrom_keys.d41"))
+    app.state_files.load(str(DATA_DIR / "dm41x_xrom_keys.d41"))
     target = tmp_path / "copy.d41"
 
     with (
-        mock.patch("gui.app.filedialog.asksaveasfilename", return_value=str(target)),
+        mock.patch(
+            "gui.state_files.filedialog.asksaveasfilename", return_value=str(target)
+        ),
         mock.patch("gui.app.messagebox.showinfo"),
     ):
-        app.save_state_as()
+        app.state_files.save_as()
 
     assert " ".join(target.read_text().split()) == " ".join(text.split())
 
@@ -489,7 +499,7 @@ def test_a_d41_file_saves_back_identically(app, tmp_path):
 def test_every_tab_renders_every_dm41x_sample(app, name):
     """Smoke test (plan, phase 3 step 7): no tab raises on a state opened
     the way the app now opens every file."""
-    app._load_state_into_buffer(str(DATA_DIR / name))
+    app.state_files.load(str(DATA_DIR / name))
 
     for tab in (
         app.overview_tab,
@@ -505,7 +515,7 @@ def test_every_tab_renders_every_dm41x_sample(app, name):
 
 
 def test_xm_tab_shows_retyped_files_as_at_with_their_type(app):
-    app._load_state_into_buffer(str(DATA_DIR / "dm41x_retpfl_after.d41"))
+    app.state_files.load(str(DATA_DIR / "dm41x_retpfl_after.d41"))
     app.xm_files_tab.render(app.memory)
 
     rows = {row[0]: row for row in _tree_rows(app.xm_files_tab._tree)}
@@ -521,7 +531,7 @@ def test_xm_tab_shows_retyped_files_as_at_with_their_type(app):
 
 
 def test_editing_a_data_file_in_the_third_region_keeps_every_other_file(app):
-    app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    app.state_files.load(str(DATA_DIR / "dm41x_manyfiles.dm41"))
     app.xm_files_tab.render(app.memory)  # tabs render lazily, when shown
     xm = app.memory.extended_memory
 
@@ -557,7 +567,7 @@ def test_editing_a_data_file_in_the_third_region_keeps_every_other_file(app):
 
 
 def test_flags_tab_shows_and_toggles_flag_31_on_a_dm41x_state(app):
-    app._load_state_into_buffer(str(DATA_DIR / "dm41x_base.d41"))
+    app.state_files.load(str(DATA_DIR / "dm41x_base.d41"))
     flags = app.memory.status_registers
     app.flags_tab.render(app.memory)
     assert flags_label(app, 31) == "31 timer MDY / DMY"
@@ -670,7 +680,7 @@ def test_the_mode_comes_from_the_saved_preference(app_in_mode, mode, profile):
     assert app.mode is DeviceMode(mode)
     assert app.profile is profile
     with _yes():
-        app.new_memory_buffer()
+        app.state_files.new_buffer()
     assert app.memory.profile is profile, "a new buffer uses the mode's profile"
 
 
@@ -682,7 +692,7 @@ def test_switching_mode_starts_an_empty_state(app_in_mode, start, target, state)
     """In either direction: keeping the state would mean rebuilding the
     Memory through to_string()/from_string(), which phase 6 avoids."""
     app = app_in_mode(start)
-    app._load_state_into_buffer(str(DATA_DIR / state))
+    app.state_files.load(str(DATA_DIR / state))
     assert app.memory_source is not None
 
     with _yes():
@@ -695,7 +705,7 @@ def test_switching_mode_starts_an_empty_state(app_in_mode, start, target, state)
 
 
 def test_switching_to_the_same_mode_does_nothing(app):
-    app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    app.state_files.load(str(DATA_DIR / "dm41x_manyfiles.dm41"))
     source = app.memory_source
 
     with mock.patch("gui.app.messagebox.askyesno") as ask:
@@ -706,7 +716,7 @@ def test_switching_to_the_same_mode_does_nothing(app):
 
 
 def test_declining_the_switch_confirmation_changes_nothing(app):
-    app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    app.state_files.load(str(DATA_DIR / "dm41x_manyfiles.dm41"))
     source = app.memory_source
 
     with _no():
@@ -721,7 +731,7 @@ def test_the_discard_guard_runs_before_the_switch_confirmation(app):
     """An unsaved buffer gets the usual discard prompt first, and
     declining it stops the switch before the mode question is even
     asked."""
-    app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+    app.state_files.load(str(DATA_DIR / "dm41x_manyfiles.dm41"))
     app.on_memory_changed()
     assert app.memory.modified
 
@@ -768,7 +778,7 @@ def test_switching_mode_persists_only_when_asked(app, prefs_file):
 
 def test_a_too_large_state_offers_dm41x_mode_and_loads_on_yes(dm41l_app):
     with _yes() as ask:
-        dm41l_app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+        dm41l_app.state_files.load(str(DATA_DIR / "dm41x_manyfiles.dm41"))
 
     message = ask.call_args.args[2]
     # Just the reason, not the findings (GitHub issue #60).
@@ -786,7 +796,7 @@ def test_an_accepted_auto_switch_is_not_persisted(dm41l_app, dm41l_prefs):
     """Someone who owns one calculator will rarely want the other mode
     permanently, so the offer is session-only."""
     with _yes():
-        dm41l_app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+        dm41l_app.state_files.load(str(DATA_DIR / "dm41x_manyfiles.dm41"))
 
     assert dm41l_app.mode is DeviceMode.DM41X
     assert dm41l_app.config_store.mode is DeviceMode.DM41L
@@ -796,11 +806,11 @@ def test_an_accepted_auto_switch_is_not_persisted(dm41l_app, dm41l_prefs):
 
 def test_declining_the_offer_aborts_the_load(dm41l_app):
     """The mode and the previously open state are both untouched."""
-    dm41l_app._load_state_into_buffer(str(DATA_DIR / "lander.dm41"))
+    dm41l_app.state_files.load(str(DATA_DIR / "lander.dm41"))
     before = dm41l_app.memory.to_string()
 
     with _no():
-        dm41l_app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+        dm41l_app.state_files.load(str(DATA_DIR / "dm41x_manyfiles.dm41"))
 
     assert dm41l_app.mode is DeviceMode.DM41L
     assert dm41l_app.memory_source == DATA_DIR / "lander.dm41"
@@ -826,7 +836,7 @@ def test_declining_the_offer_aborts_the_load(dm41l_app):
 )
 def test_a_state_a_dm41l_can_hold_loads_without_an_offer(dm41l_app, state):
     with mock.patch("gui.app.messagebox.askyesno") as ask:
-        dm41l_app._load_state_into_buffer(str(DATA_DIR / state))
+        dm41l_app.state_files.load(str(DATA_DIR / state))
 
     ask.assert_not_called()
     assert dm41l_app.mode is DeviceMode.DM41L
@@ -849,7 +859,7 @@ def test_an_unreadable_xm_directory_does_not_offer_dm41x_mode(dm41l_app, tmp_pat
     assert broken.read_text() != text
 
     with _yes() as ask:
-        dm41l_app._load_state_into_buffer(str(broken))
+        dm41l_app.state_files.load(str(broken))
 
     ask.assert_not_called()
     assert dm41l_app.mode is DeviceMode.DM41L
@@ -943,7 +953,7 @@ def test_preferences_can_confirm_a_session_override_without_erasing(dm41l_app):
     Choosing DM41X in Preferences then means "make that the setting" --
     there is nothing to erase, so it must not prompt."""
     with _yes():
-        dm41l_app._load_state_into_buffer(str(DATA_DIR / "dm41x_manyfiles.dm41"))
+        dm41l_app.state_files.load(str(DATA_DIR / "dm41x_manyfiles.dm41"))
     assert dm41l_app.mode_is_temporary
     files = len(dm41l_app.memory.extended_memory.list_files())
 
@@ -1032,7 +1042,7 @@ def test_the_mode_sets_the_extended_memory_size(app_in_mode, mode, capacity):
 def test_a_dm41x_state_file_that_fits_is_usable_in_dm41l_mode(dm41l_app):
     """Issue #43, DM41L mode item 4: a .d41 is just a state file, and one
     that fits a DM41L opens, edits and saves in DM41L mode."""
-    dm41l_app._load_state_into_buffer(str(DATA_DIR / "dm41x_retpfl_before.d41"))
+    dm41l_app.state_files.load(str(DATA_DIR / "dm41x_retpfl_before.d41"))
 
     assert dm41l_app.mode is DeviceMode.DM41L
     assert dm41l_app.memory.profile is DM41L
@@ -1306,8 +1316,8 @@ def test_save_as_has_a_shift_shortcut(app, key):
     assert _accelerator(app, "File", "Save State As...") == f"{acc}+Shift+S"
 
     with (
-        mock.patch.object(app, "save_state_as") as save_as,
-        mock.patch.object(app, "save_state_to_file") as save,
+        mock.patch.object(app.state_files, "save_as") as save_as,
+        mock.patch.object(app.state_files, "save") as save,
     ):
         app.focus_force()
         app.update()
@@ -1324,7 +1334,7 @@ def test_save_as_has_a_shift_shortcut(app, key):
 def test_program_tab_exports_the_selected_programs_oldest_first(app, tmp_path):
     from memory import decode_program_raw, split_programs
 
-    app._load_state_into_buffer(str(DATA_DIR / "manyfiles.dm41"))
+    app.state_files.load(str(DATA_DIR / "manyfiles.dm41"))
     tab = app.program_tab
     tab.render(app.memory)
     programs = app.memory.programs.list_programs()  # XMBCD, XMALPHA, PURXM
@@ -1351,7 +1361,7 @@ def test_program_tab_exports_the_selected_programs_oldest_first(app, tmp_path):
 def _export_first_program(app, path):
     """Exports manyfiles.dm41's first program (XMBCD) to `path`; returns
     the program's bytes and the "Exported" message."""
-    app._load_state_into_buffer(str(DATA_DIR / "manyfiles.dm41"))
+    app.state_files.load(str(DATA_DIR / "manyfiles.dm41"))
     tab = app.program_tab
     tab.render(app.memory)
     tab._tree.selection_set(("0",))
@@ -1397,7 +1407,7 @@ def test_preferences_save_the_raw_checksum_choice(app, prefs_file):
 
 
 def test_program_tab_highlights_every_selected_row(app):
-    app._load_state_into_buffer(str(DATA_DIR / "manyfiles.dm41"))
+    app.state_files.load(str(DATA_DIR / "manyfiles.dm41"))
     tab = app.program_tab
     tab.render(app.memory)
     tab._tree.selection_set(("0", "2"))
@@ -1409,7 +1419,7 @@ def test_program_tab_highlights_every_selected_row(app):
 
 
 def test_program_tab_remove_refuses_more_than_one_row(app):
-    app._load_state_into_buffer(str(DATA_DIR / "manyfiles.dm41"))
+    app.state_files.load(str(DATA_DIR / "manyfiles.dm41"))
     tab = app.program_tab
     tab.render(app.memory)
     tab._tree.selection_set(("0", "1"))
@@ -1433,7 +1443,7 @@ def _import_txt(app, tmp_path, text, *, answer=None):
     the replace warning with `answer`. Returns the askyesno mock."""
     path = tmp_path / "import.txt"
     path.write_text(text)
-    app._load_state_into_buffer(str(DATA_DIR / "manyfiles.dm41"))
+    app.state_files.load(str(DATA_DIR / "manyfiles.dm41"))
     tab = app.program_tab
     tab.render(app.memory)
     with (

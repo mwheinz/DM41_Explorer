@@ -61,14 +61,14 @@ class MenuBar:
         file_menu = Menu(menubar, tearoff=0)
         file_menu.add_command(
             label="New Memory Buffer",
-            command=app.new_memory_buffer,
+            command=app.state_files.new_buffer,
             accelerator=f"{acc}+N",
             underline=0,
         )
         file_menu.add_separator()
         file_menu.add_command(
             label="Open State...",
-            command=app.load_state_from_file,
+            command=app.state_files.open_dialog,
             accelerator=f"{acc}+O",
             underline=0,
         )
@@ -76,13 +76,13 @@ class MenuBar:
         file_menu.add_cascade(label="Open Recent", menu=self.recent_menu, underline=5)
         file_menu.add_command(
             label="Save State",
-            command=app.save_state_to_file,
+            command=app.state_files.save,
             accelerator=f"{acc}+S",
             underline=0,
         )
         file_menu.add_command(
             label="Save State As...",
-            command=app.save_state_as,
+            command=app.state_files.save_as,
             accelerator=f"{acc}+Shift+S",
             underline=13,
         )
@@ -203,14 +203,14 @@ class MenuBar:
         app = self.app
         acc = self._acc
 
-        app.bind(f"<{acc}-n>", lambda e: app.new_memory_buffer())
-        app.bind(f"<{acc}-o>", lambda e: app.load_state_from_file())
-        app.bind(f"<{acc}-s>", lambda e: app.save_state_to_file())
+        app.bind(f"<{acc}-n>", lambda e: app.state_files.new_buffer())
+        app.bind(f"<{acc}-o>", lambda e: app.state_files.open_dialog())
+        app.bind(f"<{acc}-s>", lambda e: app.state_files.save())
         # Shift turns the key into "S" on some platforms but not others, so
         # both are bound. Either is more specific than <{acc}-s> above,
         # which therefore doesn't also fire.
         for key in ("S", "s"):
-            app.bind(f"<{acc}-Shift-{key}>", lambda e: app.save_state_as())
+            app.bind(f"<{acc}-Shift-{key}>", lambda e: app.state_files.save_as())
         app.bind(f"<{acc}-q>", lambda e: app.on_close())
         app.bind(f"<{acc}-comma>", lambda e: app.show_preferences())
         app.bind("<F5>", lambda e: app.render_tabs())
@@ -264,7 +264,7 @@ class MenuBar:
         for path_str in recent:
             self.recent_menu.add_command(
                 label=_format_recent_label(path_str),
-                command=lambda p=path_str: self.app.open_state_file(p),
+                command=lambda p=path_str: self.app.state_files.open(p),
             )
         self.recent_menu.add_separator()
         self.recent_menu.add_command(
