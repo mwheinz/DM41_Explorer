@@ -1,6 +1,19 @@
 """
 DM41_Explorer: a CustomTkinter GUI for DM41-series calculator memory states.
 
+This module is the entry point and the main window: the tabs, the status
+bar, the open memory buffer, the DM41L/DM41X mode, Preferences and
+shutdown. The rest of the window's work is done by helpers it owns, each
+in its own module (GitHub issue #77):
+
+- `connection` (gui/connection.py): the DM41L serial connection and the
+  Connect menu;
+- `menus` (gui/menus.py): the menu bar, keyboard shortcuts and Open Recent;
+- `mode_switcher` (gui/device_mode.py): changing the mode;
+- `state_files` (gui/state_files.py): opening and saving state files;
+- `xrom_libraries` (gui/tools_actions.py, with Pack Memory): the XROM
+  libraries in use;
+- `window_size` (gui/window_state.py): the remembered size and position.
 """
 
 import logging
@@ -22,17 +35,9 @@ from gui.connection import Connection
 from gui.contrast import SECONDARY_TEXT, WARNING_TEXT, improve_theme_contrast
 from gui.device_mode import ModeSwitcher
 from gui.menus import MenuBar
-from gui.screens import screen_rectangles
 from gui.state_files import StateFiles
 from gui.tools_actions import XromLibraries
-from gui.window_geometry import (
-    geometry_string,
-    initial_window_size,
-    minimum_window_size,
-    parse_geometry,
-    parse_position,
-    restored_position,
-)
+from gui.window_state import WindowSizeKeeper
 from gui.preferences_dialog import PreferencesDialog
 from gui.help_dialog import KeyboardShortcutsDialog
 from gui.mnemonics_reference_dialog import MnemonicsReferenceDialog
@@ -208,18 +213,10 @@ def _apply_color_theme(name):
 class DM41ExplorerApp(ctk.CTk):
     """Main application window."""
 
-    # How long after the last resize event the window size is saved.
-    RESIZE_SAVE_DELAY_MS = 1000
-
     def __init__(self):
         super().__init__()
 
         self._closing = False
-        self._tracking_size = False
-        self._applied_size = None
-        self._applied_position = None
-        self._resize_after_id = None
-        self._tracking_after_id = None
 
         self.config_store = ProjectConfig()
         try:
@@ -256,7 +253,8 @@ class DM41ExplorerApp(ctk.CTk):
         self.state_files = StateFiles(self)
 
         self._build_layout()
-        self._apply_window_size()
+        self.window_size = WindowSizeKeeper(self)
+        self.window_size.apply()
         self.menus = MenuBar(self, is_mac=PLATFORM_SYSTEM == "Darwin")
         self.menus.set_serial_enabled(self.mode.supports_serial)
         self.menus.bind_shortcuts()
@@ -329,123 +327,13 @@ class DM41ExplorerApp(ctk.CTk):
 
     # -- Window size ------------------------------------------------------
 
-    def _apply_window_size(self):
-        """Sets the minimum size and the opening size (GitHub issue #42).
-
-        Must run after _build_layout(): the minimum is never less than what
-        the tab bar and status bar ask for, and both grow with the
-        application font. The opening size is the one saved at the last
-        close if there is one, else a default scaled with the font; see
-        gui/window_geometry.py for the rules.
-        """
-        self.update_idletasks()
-        needed = (
-            self._reverse_window_scaling(self.winfo_reqwidth()),
-            self._reverse_window_scaling(self.winfo_reqheight()),
-        )
-        screen = (
-            self._reverse_window_scaling(self.winfo_screenwidth()),
-            self._reverse_window_scaling(self.winfo_screenheight()),
-        )
-        font_size = ctk.ThemeManager.theme["CTkFont"]["size"]
-        self.minsize(*minimum_window_size(font_size, needed, screen))
-        width, height = initial_window_size(
-            self.config_store.window_size, font_size, needed, screen
-        )
-        # The position saved at the last close too, if the window would
-        # still be on a screen there (GitHub issue #63); otherwise the
-        # window manager places it.
-        position = restored_position(
-            self.config_store.window_position, (width, height), screen_rectangles(self)
-        )
-        self.geometry(geometry_string((width, height), position))
-        self._applied_size = (width, height)
-        self._applied_position = position
-        # Let the window manager finish placing the window before resizes
-        # count as the user's: the size is then re-read, and every later
-        # change is saved shortly after it stops (see _on_configure()).
-        self._tracking_after_id = self.after(2000, self._start_tracking_size)
-
-    def _start_tracking_size(self):
-        self._tracking_after_id = None
-        self.update_idletasks()
-        geometry = self.geometry()
-        self._applied_size = parse_geometry(geometry) or self._applied_size
-        self._applied_position = parse_position(geometry) or self._applied_position
-        self._tracking_size = True
-        self.bind("<Configure>", self._on_configure, add="+")
-
-    def _on_configure(self, event):
-        """Saves the window size a moment after the user stops resizing, so
-        it survives however the app ends (force quit, crash, a quit path
-        that never reaches on_close())."""
-        if event.widget is not self or not self._tracking_size:
-            return
-        if self._resize_after_id is not None:
-            self.after_cancel(self._resize_after_id)
-        self._resize_after_id = self.after(
-            self.RESIZE_SAVE_DELAY_MS, self._save_size_after_resize
-        )
-
-    def _save_size_after_resize(self):
-        self._resize_after_id = None
-        self._remember_window_size()
-
     def destroy(self):
         """Cancels the pending size timers first, so none fires into a
         window that no longer exists."""
-        for name in ("_tracking_after_id", "_resize_after_id"):
-            after_id = getattr(self, name, None)
-            if after_id is not None:
-                try:
-                    self.after_cancel(after_id)
-                except Exception:
-                    pass
-                setattr(self, name, None)
+        keeper = getattr(self, "window_size", None)
+        if keeper is not None:
+            keeper.cancel_timers()
         super().destroy()
-
-    def _window_is_maximized(self) -> bool:
-        """True if the window is maximized/zoomed, whose size must not be
-        remembered (restoring it would open a normal window at full-screen
-        size)."""
-        try:
-            if self.state() == "zoomed":
-                return True
-        except Exception:
-            pass
-        try:
-            return bool(self.attributes("-zoomed"))  # X11
-        except Exception:
-            return False
-
-    def _remember_window_size(self):
-        """Saves the current window size and position to the preferences,
-        for the next launch. Only what the user changed is saved, and the
-        position only once tracking has started: until then the window
-        manager may still be placing the window. Never raises: failing to
-        save mustn't stop the app from closing."""
-        try:
-            if self._window_is_maximized():
-                return
-            geometry = self.geometry()
-            size = parse_geometry(geometry)
-            position = parse_position(geometry) if self._tracking_size else None
-            new_size = size is not None and size != self._applied_size
-            new_position = position is not None and position != self._applied_position
-            if not (new_size or new_position):
-                return  # nothing the user changed: don't touch the file
-            if new_size:
-                self.config_store.window_size = size
-            if new_position:
-                self.config_store.window_position = position
-            self.config_store.save()
-            # Only once saved, so a failed save is tried again later.
-            if new_size:
-                self._applied_size = size
-            if new_position:
-                self._applied_position = position
-        except Exception as e:
-            logger.warning("Could not save the window size and position: %s", e)
 
     # -- Layout ---------------------------------------------------------
 
@@ -702,10 +590,7 @@ class DM41ExplorerApp(ctk.CTk):
         if not self.confirm_discard("quit"):
             return
         self._closing = True
-        if self._resize_after_id is not None:
-            self.after_cancel(self._resize_after_id)
-            self._resize_after_id = None
-        self._remember_window_size()
+        self.window_size.save_now()
         self.connection.close()
         self.destroy()
 

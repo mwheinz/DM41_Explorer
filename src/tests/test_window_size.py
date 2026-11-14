@@ -64,13 +64,13 @@ def test_closing_a_maximized_window_keeps_the_previous_size(
     app, prefs_file, monkeypatch
 ):
     _report_size(app, monkeypatch, 1200, 800)
-    monkeypatch.setattr(app, "_window_is_maximized", lambda: True)
+    monkeypatch.setattr(app.window_size, "is_maximized", lambda: True)
     app.on_close()
     assert _saved(prefs_file) == (0, 0)
 
 
 def test_nothing_is_written_when_the_user_never_resized(app, prefs_file, monkeypatch):
-    _report_size(app, monkeypatch, *app._applied_size)
+    _report_size(app, monkeypatch, *app.window_size.applied_size)
     app.on_close()
     assert _saved(prefs_file) == (0, 0)
 
@@ -100,10 +100,10 @@ def test_a_burst_of_resizes_is_saved_once_after_it_stops(app, prefs_file, monkey
 
     monkeypatch.setattr(app, "after", after)
     monkeypatch.setattr(app, "after_cancel", lambda after_id: pending.pop(after_id))
-    app._tracking_size = True
+    app.window_size.tracking = True
     resize = types.SimpleNamespace(widget=app)
     for _ in range(4):
-        app._on_configure(resize)
+        app.window_size._on_configure(resize)
     assert len(pending) == 1, "every earlier timer was cancelled"
 
     _report_size(app, monkeypatch, 930, 640)
@@ -116,8 +116,8 @@ def test_resizes_are_ignored_until_tracking_starts(app, monkeypatch):
     """The window manager's own placement after launch isn't the user's."""
     scheduled = []
     monkeypatch.setattr(app, "after", lambda _ms, fn: scheduled.append(fn))
-    app._tracking_size = False
-    app._on_configure(types.SimpleNamespace(widget=app))
+    app.window_size.tracking = False
+    app.window_size._on_configure(types.SimpleNamespace(widget=app))
     assert scheduled == []
 
 
@@ -174,8 +174,8 @@ def _saved_position(prefs_file):
 
 
 def test_a_moved_window_saves_its_position(app, prefs_file, monkeypatch):
-    app._tracking_size = True
-    width, height = app._applied_size
+    app.window_size.tracking = True
+    width, height = app.window_size.applied_size
     _report_geometry(app, monkeypatch, f"{width}x{height}+-1200+150")
     app.on_close()
     assert _saved_position(prefs_file) == (-1200, 150)
@@ -184,17 +184,17 @@ def test_a_moved_window_saves_its_position(app, prefs_file, monkeypatch):
 
 def test_no_position_is_saved_before_tracking_starts(app, prefs_file, monkeypatch):
     """Until then the window manager may still be placing the window."""
-    app._tracking_size = False
-    width, height = app._applied_size
+    app.window_size.tracking = False
+    width, height = app.window_size.applied_size
     _report_geometry(app, monkeypatch, f"{width}x{height}+300+200")
     app.on_close()
     assert _saved_position(prefs_file) == (None, None)
 
 
 def test_an_unmoved_window_writes_nothing(app, prefs_file, monkeypatch):
-    app._tracking_size = True
-    app._applied_position = (300, 200)
-    width, height = app._applied_size
+    app.window_size.tracking = True
+    app.window_size.applied_position = (300, 200)
+    width, height = app.window_size.applied_size
     _report_geometry(app, monkeypatch, f"{width}x{height}+300+200")
     before = prefs_file.read_text()
     app.on_close()
@@ -205,7 +205,7 @@ def _launch_with(prefs_file, monkeypatch, position, screen):
     data = json.loads(prefs_file.read_text())
     data.update(window_x=position[0], window_y=position[1])
     prefs_file.write_text(json.dumps(data))
-    monkeypatch.setattr("gui.app.screen_rectangles", lambda window: [screen])
+    monkeypatch.setattr("gui.window_state.screen_rectangles", lambda window: [screen])
     from gui.app import DM41ExplorerApp
 
     return DM41ExplorerApp()
@@ -214,7 +214,7 @@ def _launch_with(prefs_file, monkeypatch, position, screen):
 def test_the_saved_position_is_used_at_launch(prefs_file, monkeypatch):
     app = _launch_with(prefs_file, monkeypatch, (-1200, 150), (-1600, 0, 1600, 1200))
     try:
-        assert app._applied_position == (-1200, 150)
+        assert app.window_size.applied_position == (-1200, 150)
     finally:
         app.destroy()
 
@@ -222,6 +222,6 @@ def test_the_saved_position_is_used_at_launch(prefs_file, monkeypatch):
 def test_a_saved_position_off_every_screen_is_ignored(prefs_file, monkeypatch):
     app = _launch_with(prefs_file, monkeypatch, (-1200, 150), (0, 0, 1920, 1080))
     try:
-        assert app._applied_position is None
+        assert app.window_size.applied_position is None
     finally:
         app.destroy()
