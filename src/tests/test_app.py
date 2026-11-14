@@ -221,7 +221,7 @@ def test_mnemonics_reference_opens_once_and_is_reused(app):
 
 # -- Send: the check against the connected calculator's model ---------------
 #
-# Phase 2 of docs/dm41x_explorer_plan.md. The serial connection declares its
+# Phase 2 of the DM41X plan (archived on #78). The serial connection declares its
 # model (SerialManager.profile, the DM41L); Send refuses what that model
 # cannot hold and asks before sending what it cannot run.
 

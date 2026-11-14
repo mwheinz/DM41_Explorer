@@ -441,7 +441,7 @@ class KeyAssignmentEditDialog(ctk.CTkToplevel):
         # Typed input doesn't have to match the display name's exact
         # spelling or case: any spelling program-text import accepts works
         # here too ("sigma+", "x^2", "p->r", "\\EREG";
-        # docs/mnemonic_dialects_plan.md). Keyboard-only functions (CAT,
+        # docs/mnemonic_rules.md). Keyboard-only functions (CAT,
         # SST, ...) are assignable, so programmable_only is off. An unknown
         # name raises with "did you mean" hints.
         return resolve(text, programmable_only=False, prefer_modules=True)

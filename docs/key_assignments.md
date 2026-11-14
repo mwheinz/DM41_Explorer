@@ -109,6 +109,21 @@ packed as the first 36 bits of register R (unshifted) and the first 36 bits of
 register e (shifted) respectively. This is a fast existence check consulted
 *before* searching the Key Assignment Registers or scanning global labels.
 
+The rest of register R, its low 20 bits, is not part of the bitmap. It varies
+between states independently of which keys are flagged, and what it holds is
+not known:
+
+| State | R | Keys flagged |
+| --- | --- | --- |
+| `empty.dm41` | `00000000000000` | none |
+| `empty-128.dm41` | `00000000006000` | none |
+| `simple.dm41` | `00000000001000` | none |
+| `helloworld.dm41` | `0000000000c000` | none |
+| `twolabels.dm41` | `00000000077000` | none |
+| DM41X `memorylost.d41` | `0000000000e000` | none |
+| `global-key-assignments.dm41` | `00000010110999` | 11, 12 |
+| `alarmtest.dm41` | `000000101a6821` | 11, 12 |
+
 Bit position for key row `M`, physical column `N` (0-indexed, MSB-first — the
 same convention `StatusRegisters.get_flag()`/`set_flag()` use for register d's
 56 flags):
@@ -214,7 +229,7 @@ double-height on the DM41L — and occupies two grid positions while
 remaining a single key with a single pair of assignments.
 
 **The Explorer draws one of them at a time**, the one belonging to the
-model it is working as (`docs/dm41x_explorer_plan.md`, phase 6). GitHub
+model it is working as (the DM41L/DM41X mode, issue #43). GitHub
 issue #39 originally put each layout on its own sub-tab so both were
 available at once; that is superseded (Mike, 2026-10-09), since the
 model is now an explicit mode rather than something the user switches

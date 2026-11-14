@@ -1,5 +1,5 @@
 """XM files whose header type is 4-15 (phase 3 step 6 of
-docs/dm41x_explorer_plan.md).
+the DM41X plan, archived on #78).
 
 RETPFL on a DM41X rewrites a file's type nibble to any value (S4). The
 calculator labels every type above 3 "@" (S4c). tests/data/

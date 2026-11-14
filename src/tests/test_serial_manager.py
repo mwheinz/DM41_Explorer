@@ -32,7 +32,7 @@ class TestSerialManager:
 
     def test_the_serial_console_declares_the_dm41l(self, manager):
         """The model on the other end is declared by the driver, not
-        inferred; the Send check uses it (docs/dm41x_explorer_plan.md)."""
+        inferred; the Send check uses it (the DM41X plan, archived on #78)."""
         assert manager.profile is DM41L
 
     @patch("serial.tools.list_ports.comports")

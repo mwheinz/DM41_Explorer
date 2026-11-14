@@ -1,6 +1,6 @@
 """
-Hand-maintained FOCAL mnemonic dialects (docs/mnemonic_dialects_plan.md
-sec 3.3, "Layer 2").
+Hand-maintained FOCAL mnemonic dialects (docs/mnemonic_rules.md
+sec 5.3, "Layer 2").
 
 A dialect is a named, sourced list of alternate spellings for
 instructions, for spellings that use a different *word* rather than just
@@ -12,7 +12,7 @@ Each dialect maps an instruction's canonical (hp41uc) name to the extra
 spellings it accepts. memory/mnemonics.py resolves the canonical names
 when it builds its registry, so a typo here fails at import time, and
 any spelling that would mean two different instructions is a build
-error there too (sec 3.5) -- dialects never override each other.
+error there too (docs/mnemonic_rules.md sec 6) -- dialects never override each other.
 
 To add a dialect: append a Dialect to DIALECTS below, then run the test
 suite (tests/test_mnemonics.py builds the registry and checks it).

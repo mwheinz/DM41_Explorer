@@ -82,7 +82,7 @@ XM_NEXT_FILE_RESERVE_REGISTERS = 2
 def xm_total_registers(profile: DeviceProfile) -> int:
     """What EMDIR reports on `profile`'s calculator with extended memory
     empty: 362 on a DM41L, and 600 on a DM41X (confirmed on a real DM41X,
-    docs/dm41x_explorer_plan.md S8)."""
+    sample S8 of the DM41X plan, archived on #78)."""
     return (
         profile.xm_raw_registers
         - XM_EOM_SENTINEL_REGISTERS

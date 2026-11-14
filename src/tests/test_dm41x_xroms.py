@@ -1,5 +1,5 @@
 """Tests for the DM41X's additions to the XROM table (phase 1 of
-docs/dm41x_explorer_plan.md).
+the DM41X plan, archived on #78).
 
 The DM41X (and DM41XN) add 18 XROM functions to the HP-41CX set: X<I>Y
 (XROM 25,63), TRNG (26,36), and the 16 functions of the DM41X's own module

@@ -1,7 +1,7 @@
 """Tests for the DM41L/DM41X mode layer: DeviceMode and DEFAULT_MODE in
 memory/device_profile.py, DeviceProfile.supports_serial, and
-evaluate_mode_switch() in memory/profile_fit.py (phase 6 of
-docs/dm41x_explorer_plan.md).
+evaluate_mode_switch() in memory/profile_fit.py (GitHub issue
+#43).
 
 The mode is the single source of truth for the active profile. These tests
 cover the core of that, with no Tk window involved; the application's own

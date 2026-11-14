@@ -1,6 +1,6 @@
 """Tests for memory/profile_fit.py: check_profile_fit(memory, profile), the
 check before a memory state is sent to a DM41L (phase 2 of
-docs/dm41x_explorer_plan.md).
+the DM41X plan, archived on #78).
 
 The fixtures that matter:
   - dm41x_manyfiles.dm41: 59 XM files across all three regions (error).

@@ -284,7 +284,7 @@ def _decode_txt_bytes(data: bytes) -> str:
     compiler recognizes CP437 byte 0xE4 as Sigma (Σ+, CLΣ, ΣREG). CP437
     maps every byte to a character, so this never fails; a file that
     was really some other encoding shows up as a compile error instead
-    (docs/mnemonic_dialects_plan.md sec 3.7).
+    (docs/mnemonic_rules.md sec 7).
     """
     try:
         return data.decode("utf-8-sig")

@@ -11,7 +11,7 @@ This document describes the `.cst` file the DM41X uses to save and load its CST 
 - **DM41X User Manual v1.34 (2026-09-24)**, `DM41X/DM41X_Data/dm41x_user_manual.pdf`: §3.3 "CST - Custom Menu", §3.3.2 "CONF Screen", §6.4.5 "Create Full Backup".
 - **`src/tests/data/CSTtest.cst`**: hand-made test file (91 bytes). Assignments were made on a real DM41X in the CONF screen and saved from there.
 - **`src/tests/data/backuptest.cst`**: the `.cst` written by Setup › Settings › Create Full Backup with the same assignments loaded. It is byte-identical to `CSTtest.cst`.
-- **`memorylost.cst`** (on the calculator's `/BACKUP` folder, not in the repo): the same layout with every slot empty. Recorded in `dm41x_first_look_2026-10-04.md`.
+- **`memorylost.cst`** (on the calculator's `/BACKUP` folder, not in the repo): the same layout with every slot empty. Listed in `dm41x.md` section 3.
 
 ## 2. What CST Is
 
@@ -91,7 +91,7 @@ These need further samples from the calculator; none has been tested.
 - **Case.** All samples are upper case. Whether lower case can be entered, and whether it is stored as typed, is unknown.
 - **Special characters.** The manual says `[SHIFT]` enters special characters in the editor. How characters such as Σ, →, ≠ or the append mark are written to the file (UTF-8, a single byte in an HP-41 character set, or something else) is unknown.
 - **Spaces, quotes and other punctuation** in a command: not tested.
-- **Tolerance on load.** Not tested: a missing trailing newline, CRLF endings, missing lines, extra lines, or trailing whitespace. The related `.d41` state format was shown to load without its trailing whitespace; see `dm41x_first_look_2026-10-04.md`.
+- **Tolerance on load.** Not tested: a missing trailing newline, CRLF endings, missing lines, extra lines, or trailing whitespace. The related `.d41` state format was shown to load without its trailing whitespace; see `state_format.md` section 4.
 - **Whether CST is also stored inside the `.d41` state file.** Nothing in `backuptest.d41` has been identified as CST data, and Create Full Backup writes the `.cst` as its own file, but the question has not been tested by changing only the CST and comparing two `.d41` files.
 - **Firmware dependence.** Whether the format differs between firmware versions is unknown. The firmware version of the unit was not recorded with the samples.
 
@@ -103,4 +103,4 @@ Design notes only; no code has been written.
 - Keep the file's own slot labels (`1.`-`3.`) in the data model and map them to Shift-α, Shift-▲ and Shift-▼ only in the UI, so the mapping lives in one place.
 - Do not reject unknown command names (section 5). Offer a warning when a name matches neither a function nor a known global label.
 - Keep unknown content (lines beyond the 19, or lower-case or non-ASCII text) as read rather than normalising it, until the questions in section 6 are answered.
-- The core must stay pure and synchronous, with bytes or text in and objects out, and with exact, stable error messages, so the web decoder can port it (see the portability rules in `dm41x_explorer_plan.md`).
+- The core must stay pure and synchronous, with bytes or text in and objects out, and with exact, stable error messages, so the web decoder can port it (see the portability rules in the DM41X plan, archived on [issue #78](https://github.com/mwheinz/DM41_Explorer/issues/78#issuecomment-6885508799)).

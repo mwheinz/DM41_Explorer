@@ -1,5 +1,5 @@
 """
-The FOCAL instruction-name registry (docs/mnemonic_dialects_plan.md).
+The FOCAL instruction-name registry (docs/mnemonic_rules.md).
 
 Every instruction has three kinds of name:
 
@@ -61,7 +61,7 @@ An `Op` identifies an instruction by its encoding, not its name:
   function byte of their own.
 
 The registry is built once, at import time, and the build fails loudly
-if any spelling would mean two different instructions (plan sec 3.5).
+if any spelling would mean two different instructions (docs/mnemonic_rules.md sec 6).
 """
 
 import difflib
@@ -501,7 +501,7 @@ class Registry:
 
     @staticmethod
     def _normalize(token: str) -> str:
-        """Plan sec 3.3 steps 1-2. Trigraphs are decoded first, before
+        """docs/mnemonic_rules.md sec 5.1 steps 1-2. Trigraphs are decoded first, before
         any case folding, because their shorthands are case-sensitive
         (\\E is Sigma, \\e isn't a trigraph at all). The decoded FOCAL
         bytes are then rendered as the display glyphs (\\E -> Σ,

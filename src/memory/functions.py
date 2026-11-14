@@ -5,8 +5,8 @@ by the program-byte ("Instruction Prefix") encoding - there are some
 assignment instructions that can't actually be used in a program (SST, BST,
 ASN, etc..)
 
-Names are the HP-41's own display names (docs/mnemonic_dialects_plan.md
-sec 3.2): only the glyphs the HP-41 can show (Σ, ≠, ↑), never later
+Names are the HP-41's own display names (docs/mnemonic_rules.md
+sec 3): only the glyphs the HP-41 can show (Σ, ≠, ↑), never later
 models' → or ≤. This table is raw data; memory/mnemonics.py builds the
 instruction-name registry (display/canonical names, input spellings) on
 top of it, and everything else should go through that module.

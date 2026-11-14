@@ -175,7 +175,7 @@ def test_a_hand_edited_raw_checksum_value_reads_as_the_default(prefs_file, junk)
     assert config.raw_checksum is True
 
 
-# -- The DM41L/DM41X mode (docs/dm41x_explorer_plan.md phase 6) -----------
+# -- The DM41L/DM41X mode (GitHub issue #43) --------------------------------
 
 
 def test_mode_defaults_to_dm41x(prefs_file):

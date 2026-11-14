@@ -38,7 +38,7 @@ _STACK_REGISTER_NAMES):
      instruction *names* come from memory/mnemonics.py, which builds on
      those tables: export writes hp41uc's canonical names, and import
      accepts any spelling mnemonics.resolve() knows
-     (docs/mnemonic_dialects_plan.md).
+     (docs/mnemonic_rules.md).
   3. `src/tests/data/tower.raw`/`tower.txt` -- a real 1088-byte program
      hp41uc itself compiled and decompiled, used to empirically pin down
      every byte range/format `functions.py` doesn't already cover:
@@ -1202,7 +1202,7 @@ def decode_program_txt(text: str) -> bytes:
     compiles here. Instruction names can be any spelling
     memory/mnemonics.py's resolve() accepts (canonical hp41uc names, the
     HP-41's own display names, and their dialect/substitution variants;
-    docs/mnemonic_dialects_plan.md). Two more exceptions:
+    docs/mnemonic_rules.md). Two more exceptions:
 
     - A numeric literal that encode_program_txt() rendered with a
       cosmetic space before a non-initial "E" (`_render_number_run()`,

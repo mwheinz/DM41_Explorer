@@ -2,7 +2,7 @@
 
 2026-10-04 · Michael Heinz (research by Claude)
 
-This document describes three small files in the DM41X's Full Backup set: the `.b41` manifest, the `.m41` module list and the `.ram` RAM-page file. The other two files in a Full Backup are the `.cst` (see `cst.md`) and the `.d41`, which is the same text state format as a DM41L `.dm41` file (see `dm41x_first_look_2026-10-04.md`).
+This document describes three small files in the DM41X's Full Backup set: the `.b41` manifest, the `.m41` module list and the `.ram` RAM-page file. The other two files in a Full Backup are the `.cst` (see `cst.md`) and the `.d41`, which is the same text state format as a DM41L `.dm41` file (see `state_format.md`).
 
 **Status.** `.b41` and `.m41` are decoded from samples and the manual. `.ram` is only partly understood: both samples are entirely zero.
 
@@ -20,7 +20,7 @@ Setup › Settings › Create Full Backup creates five files in `/BACKUP`, all w
 | --- | --- | --- |
 | `.b41` | Base backup file listing the others | section 3 |
 | `.cst` | CST keys | `cst.md` |
-| `.d41` | State file | `dm41x_first_look_2026-10-04.md` |
+| `.d41` | State file | `state_format.md` |
 | `.m41` | Module lists | section 4 |
 | `.ram` | RAM pages | section 5 |
 
@@ -111,4 +111,4 @@ Design notes only; no code has been written.
 - Treat `.b41` and `.m41` as ordered lists of lines and keep the order and filenames exactly as read.
 - Read `.ram` as an opaque block of bytes in whole pages until a non-zero sample shows how it is organised.
 - The Full Backup writer must produce all four manifest kinds in the order shown and keep `RAM:` with its colon.
-- The core must stay pure and synchronous so the web decoder can port it (see `dm41x_explorer_plan.md`).
+- The core must stay pure and synchronous so the web decoder can port it (see the DM41X plan, archived on [issue #78](https://github.com/mwheinz/DM41_Explorer/issues/78#issuecomment-6885508799)).

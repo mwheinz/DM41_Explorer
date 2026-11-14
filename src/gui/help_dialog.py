@@ -35,7 +35,7 @@ _SECTIONS = [
     (
         # DM41L mode only: a DM41X has no serial console, so in DM41X
         # mode these menu items are disabled and the shortcuts say so
-        # rather than acting (docs/dm41x_explorer_plan.md phase 6).
+        # rather than acting (GitHub issue #43).
         "Connect (DM41L mode only)",
         [
             ("Connect / Reconnect...", f"{_ACC}+K"),

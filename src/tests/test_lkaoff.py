@@ -1,5 +1,5 @@
 """How LKAOFF shows up in a state file (phase 3 step 8 of
-docs/dm41x_explorer_plan.md; S2b and S2g).
+the DM41X plan, archived on #78; S2b and S2g).
 
 LKAOFF clears the KEYFLAGS bits of the top two rows of keys and leaves the
 assignments alone, so the OS treats those keys as unassigned and falls back

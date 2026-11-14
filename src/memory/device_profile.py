@@ -15,7 +15,7 @@ see docs/extended_memory.md. An XROM is identified by its (byte1, byte2)
 pair, as in memory/functions.py.
 
 DeviceMode, at the end of this module, is the user-facing choice of which
-profile the application works in (docs/dm41x_explorer_plan.md phase 6). The
+profile the application works in (GitHub issue #43). The
 mode is the single source of truth for the active profile: not the file's
 extension, and not what is plugged in.
 """
@@ -117,7 +117,7 @@ DM41L = DeviceProfile(
 # against tests/data/dm41x_manyfiles.dm41, a real state whose files span all
 # three regions. Its XROMs are the CX set plus its own additions (X<I>Y, TRNG
 # and the DM41X module): its built-in library, dm41x-cx.json. The
-# DM41XN is treated identically (docs/dm41x_explorer_plan.md), except that
+# DM41XN is treated identically (the DM41X plan, archived on #78), except that
 # its newer USB interface does offer a serial console; when its own profile
 # is added it will set supports_serial=True. The DM41X is strictly
 # file-based, so its mode offers no serial actions.

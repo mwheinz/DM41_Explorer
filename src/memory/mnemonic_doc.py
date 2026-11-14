@@ -1,5 +1,5 @@
 """
-The FOCAL mnemonic reference (docs/mnemonic_dialects_plan.md sec 3.8):
+The FOCAL mnemonic reference (docs/mnemonic_rules.md sec 9):
 every instruction's display and canonical names, the other spellings
 text import accepts, the character-substitution table and the trigraph
 table, all generated from memory/mnemonics.py and memory/trigraphs.py so

@@ -9,7 +9,7 @@ would not fit, for the two callers that need to know:
                          Asked before a state is SENT to a calculator.
   evaluate_mode_switch() only what makes the state unloadable -- the errors.
                          Asked before a state is OPENED in a mode
-                         (docs/dm41x_explorer_plan.md phase 6).
+                         (GitHub issue #43).
 
 The second is a filter over the first, deliberately, so that "does it fit?"
 has exactly one definition in the code rather than two that can drift.
@@ -134,7 +134,7 @@ def evaluate_mode_switch(
     This is the question the application asks when a state is opened in
     DM41L mode: an empty list means it loads in that mode, and anything
     returned means it does not and the user should be offered DM41X mode
-    instead (docs/dm41x_explorer_plan.md phase 6).
+    instead (GitHub issue #43).
 
     Only ERROR findings count here, which is the whole difference from
     check_profile_fit():

@@ -1,5 +1,5 @@
 """Tests for memory/mnemonics.py, the FOCAL instruction-name registry
-(docs/mnemonic_dialects_plan.md), and for how program_text.py uses it.
+(docs/mnemonic_rules.md), and for how program_text.py uses it.
 
 The hp41uc tables below were transcribed from hp41uc's source at
 commit ff23b21 (hp41ucg.h single20_8F/prefix90_9F, compile.h
@@ -196,7 +196,7 @@ def test_double_star_is_rejected_outside_power_functions(spelling):
         resolve(spelling)
 
 
-# -- Registry safety rules (plan sec 3.5) -----------------------------------
+# -- Registry safety rules (docs/mnemonic_rules.md sec 6) -------------------
 
 
 def test_registry_rejects_a_spelling_that_means_two_instructions():
@@ -289,7 +289,7 @@ def test_later_model_spellings_are_rejected_in_program_text():
         decode_program_txt('LBL "T"\nP→R\nEND\n')
 
 
-# -- Trigraph spellings (plan sec 3.3 step 1) --------------------------------
+# -- Trigraph spellings (docs/mnemonic_rules.md sec 5.1 step 1) --------------
 
 
 @pytest.mark.parametrize(
@@ -331,7 +331,7 @@ def test_bad_trigraph_in_program_text_names_the_line():
         decode_program_txt('LBL "T"\n\\qREG 05\nEND\n')
 
 
-# -- "Did you mean ...?" suggestions (decision 3) ---------------------------
+# -- "Did you mean ...?" suggestions (docs/mnemonic_rules.md sec 5.1) -------
 
 
 @pytest.mark.parametrize(

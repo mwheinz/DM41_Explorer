@@ -46,7 +46,7 @@ SAMPLE_PORTS = ["/dev/cu.usbmodem14101", "/dev/cu.Bluetooth-Incoming-Port"]
 # options: "size" is the window size; "first_row" scrolls the Hex View so
 # that register address `first_row` is at the top.
 #
-# The mode matters since phase 6 of docs/dm41x_explorer_plan.md: it picks
+# The mode matters since GitHub issue #43: it picks
 # the memory map a state is opened with, which keyboard the Key
 # Assignments tab draws, and whether the serial actions are available at
 # all. The two keyboards used to be sub-tabs of one view and were chosen

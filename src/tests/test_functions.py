@@ -2,7 +2,7 @@
 function name in the Key Assignment dialog (GitHub issue #17).
 
 functions.py's names are the HP-41's own display names
-(docs/mnemonic_dialects_plan.md sec 3.2). Typed names go through
+(docs/mnemonic_rules.md sec 3). Typed names go through
 memory/mnemonics.py's resolve(programmable_only=False) -- the same
 spellings program-text import accepts, plus keyboard-only functions --
 then key_bytes_for() gives the Key Assignment Register encoding.

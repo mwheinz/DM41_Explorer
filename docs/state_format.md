@@ -8,7 +8,8 @@ This document describes the text file format shared by the DM41L's `.dm41` memor
 
 - **`src/memory/memory.py`**: `Memory.from_string()` and `Memory.to_string()`, the reader and writer this document was checked against.
 - **`src/tests/data/*.dm41` and `*.d41`**: the 40 sample states.
-- **`dm41x_first_look_2026-10-04.md`**: where the DM41X `.d41` was first shown to be this format.
+- **The first DM41X `.d41` files** (`/STATE` and `/BACKUP` on a new calculator, 2026-10-04), which showed the DM41X uses this format and loaded unchanged. The notes are archived in [issue #78](https://github.com/mwheinz/DM41_Explorer/issues/78#issuecomment-6885499867); `dm41x.md` describes the rest of the disk.
+- **PX-41CX and DM41 dumps from the hp41cx_tools test data** (GPL-3.0-or-later), compared for the special registers in section 3.3 (#79). The PX-41CX's variant of this format is in #82.
 
 **Where the samples came from.** `dm41x_manyfiles.dm41` and `backuptest.d41` were made on a real DM41X (stated by the user). The other fixtures with calculator-style spacing (section 4) are believed to be calculator output as well, but no record of how each was made was checked.
 
@@ -54,10 +55,11 @@ M: <14 hex digits>  N: <14 hex digits>  G: <2 hex digits>
 ```
 
 - `A`, `B`, `C`, `S`, `M` and `N` are 7 bytes (14 hex digits). `G` is **1 byte** (2 hex digits).
-- The code comment in `Memory.to_string()` calls these "representations of the HP41's CPU registers". That is the code's own description; this project has not decoded them.
+- They appear to be the HP-41's CPU registers as they were when the calculator saved the state. Only `B` and `C` are understood (#79). `B` is always the flags register (0x0e) with its last byte replaced by `fd`. `C` is the same value on the DM41, and the flags shifted right two digits, ending `00fd`, on the PX-41CX. `A` holds a BCD number or ALPHA text left from the last operation. None of them was seen to hold a memory address, so editing memory leaves nothing in them to update.
+- DM41_Explorer never changes them: a loaded state keeps its own values, and a new `Memory()` starts with "Memory Lost" values.
 - Three lines in the order `A B C`, then `S`, then `M N G`. `S` is optional in what `to_string()` will write; the other six are required once any special register is present.
 - The special registers always come **after** all register rows. The reader raises an error for a register row after a special-register line.
-- These values change from one save to the next, so they should be carried through unchanged. In the first look, two `.d41` files saved minutes apart differed only in `B`, `C`, `S` and `N`.
+- These values change from one save to the next, so they should be carried through unchanged. Two `.d41` files saved minutes apart on a new DM41X differed only in `B`, `C`, `S` and `N`.
 
 ### 3.4 Line endings and the end of the file
 
@@ -117,5 +119,5 @@ The register contents themselves are unchanged. Loading a file, saving it and lo
 - Does a DM41L accept a state without the trailing spaces? The DM41X test is one file.
 - Does the calculator accept single spaces between special-register pairs, or any of the other variations in section 5? Only the trailing-space removal has been tested.
 - Why do `lander.dm41` and `targ.dm41` lack trailing spaces when the other calculator-style files have them?
-- What do the special registers `A` to `N` and `G` hold, and which parts of them matter when a state is loaded back into a calculator?
+- What do `S`, `M`, `N` and `G` hold, and does the calculator use any of the special registers when a state is loaded back into it? Files the hp41cx_tools encoder writes with them all zero are described as loading fine, but only in an emulator.
 - Does a `.d41` file from a DM41XN (not yet released) use the same format?

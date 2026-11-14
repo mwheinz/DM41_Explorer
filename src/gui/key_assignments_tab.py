@@ -14,7 +14,7 @@ their physical keyboards lay them out differently (see
 docs/key_assignments.md, "Keyboard layouts"), so there are two layout
 tables, in memory/keyboard.py (shared with the PDF keyboard diagram,
 issue #76). Only the grid for the model the app is working as is drawn
-(docs/dm41x_explorer_plan.md phase 6).
+(GitHub issue #43).
 
 The layout follows the rendered state's own `profile`, which is the
 mode's profile by construction -- the application builds every Memory
