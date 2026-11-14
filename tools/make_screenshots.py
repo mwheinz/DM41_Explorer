@@ -247,8 +247,8 @@ def main():
             use_mode(app, app_module, mode)
             if state is None:
                 app.memory_source = None
-                app._on_state_received(app_module.Memory().to_string())
-                app._set_status("Not connected")
+                app.connection._on_state_received(app_module.Memory().to_string())
+                app.set_status("Not connected")
             else:
                 app._load_state_into_buffer(str(scratch / state))
             app.tabview.set(tab)
@@ -352,7 +352,7 @@ def main():
                 from gui.port_dialog import PortSelectionDialog
 
                 dialog = PortSelectionDialog(
-                    app, app.serial, default_port=SAMPLE_PORTS[0]
+                    app, app.connection.serial, default_port=SAMPLE_PORTS[0]
                 )
                 dialog.geometry(
                     "+%d+%d" % (app.winfo_rootx() + 330, app.winfo_rooty() + 220)

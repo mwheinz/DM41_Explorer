@@ -7,40 +7,22 @@ import logging
 import logging.handlers
 import sys
 from pathlib import Path
-from datetime import datetime
 import platform
 from tkinter import filedialog, messagebox, Menu
 from typing import NamedTuple, Optional
 
 import customtkinter as ctk
 
-from memory import (
-    ERROR,
-    WARNING,
-    DeviceMode,
-    Memory,
-    check_profile_fit,
-    evaluate_mode_switch,
-    format_findings,
-)
+from memory import DeviceMode, Memory, evaluate_mode_switch
 from memory.mnemonics import set_active_libraries
 from memory.xrom_import import user_library_paths
 from memory.xrom_library import WARNING as XROM_WARNING
 from memory.xrom_library import active_set, find_conflicts, load_libraries
-from engine.serial_manager import SerialManager
-from engine.command_engine import CommandEngine
-from engine.commands import (
-    BatteryCheckCommand,
-    GetTimeCommand,
-    SetTimeCommand,
-    MemoryStringCommand,
-    LoadMemoryStringCommand,
-    ConsoleTimeoutCommand,
-)
 
 from config import ProjectConfig
 from gui import fonts
 from gui.fonts import font_for
+from gui.connection import Connection
 from gui.contrast import SECONDARY_TEXT, WARNING_TEXT, improve_theme_contrast
 from gui.dialog_common import ask_yes_no
 from gui.screens import screen_rectangles
@@ -52,7 +34,6 @@ from gui.window_geometry import (
     parse_position,
     restored_position,
 )
-from gui.port_dialog import PortSelectionDialog
 from gui.preferences_dialog import PreferencesDialog
 from gui.xrom_libraries_dialog import XromLibrariesDialog
 from gui.help_dialog import KeyboardShortcutsDialog
@@ -70,8 +51,6 @@ try:
     from dm41version import APP_VERSION
 except ImportError:
     APP_VERSION = "unknown"
-
-ENGINE_POLL_MS = 50
 
 PLATFORM_SYSTEM = platform.system()
 
@@ -262,9 +241,6 @@ class DM41ExplorerApp(ctk.CTk):
     # How long after the last resize event the window size is saved.
     RESIZE_SAVE_DELAY_MS = 1000
 
-    # How long show_connect_dialog() waits after the menu command returns.
-    CONNECT_DIALOG_DELAY_MS = 20
-
     def __init__(self):
         super().__init__()
 
@@ -302,8 +278,7 @@ class DM41ExplorerApp(ctk.CTk):
         # an instruction name (GitHub issue #53).
         xrom_errors = self._apply_xrom_libraries()
 
-        self.serial = SerialManager()
-        self.engine = CommandEngine(self.serial)
+        self.connection = Connection(self)
         self.memory = Memory(profile=self.profile)
         self.memory_source = None
 
@@ -313,7 +288,7 @@ class DM41ExplorerApp(ctk.CTk):
         self._apply_mode_to_menus()
         self._bind_keys()
         if xrom_errors:
-            self._set_status(
+            self.set_status(
                 f"{len(xrom_errors)} XROM library file(s) could not be loaded; "
                 "see Tools > XROM Libraries."
             )
@@ -333,11 +308,8 @@ class DM41ExplorerApp(ctk.CTk):
             # unsaved-changes prompt and the saving of the window size.
             self.createcommand("::tk::mac::Quit", self.on_close)
 
-        self._start_engine_pump()
+        self.connection.start()
         self._render_tabs()
-
-        # Nothing touches the serial port until the user chooses
-        # Connect / Reconnect... (the app starts offline).
 
     # -- Mode (DM41L / DM41X) ---------------------------------------------
 
@@ -365,7 +337,7 @@ class DM41ExplorerApp(ctk.CTk):
             text += " (this session)"
         return text
 
-    def _idle_status(self) -> str:
+    def idle_status(self) -> str:
         """The status text for "nothing going on": the connection state in
         a mode that has a serial console, and nothing at all in one that
         does not.
@@ -386,26 +358,11 @@ class DM41ExplorerApp(ctk.CTk):
         the app has them and why they are unavailable.
 
         The keyboard shortcuts bypass menu state entirely, so every one of
-        these actions also guards itself with _require_serial_mode()."""
+        these actions also guards itself with
+        Connection.require_serial_mode()."""
         state = "normal" if self.mode.supports_serial else "disabled"
         for index in self._serial_menu_indices:
             self._connect_menu.entryconfigure(index, state=state)
-
-    def _require_serial_mode(self) -> bool:
-        """True if the serial actions apply in this mode. Otherwise says
-        why and returns False -- the guard behind every serial action, for
-        the keyboard shortcuts that never consult the menu's state."""
-        if self.mode.supports_serial:
-            return True
-        messagebox.showinfo(
-            f"Not Available in {self.mode.value} Mode",
-            f"A {self.mode.value} has no serial console, so there is "
-            "nothing to connect to.\n\n"
-            "Switch to DM41L mode in Preferences to use the serial "
-            "connection. Note that switching mode starts a new, empty "
-            "memory state.",
-        )
-        return False
 
     def set_mode(self, mode, *, persist: bool, reason: str = None) -> bool:
         """Changes the effective mode, erasing the open state.
@@ -431,7 +388,7 @@ class DM41ExplorerApp(ctk.CTk):
         if mode is self.mode:
             return True
 
-        if not self._confirm_discard(f"switch to {mode.value} mode"):
+        if not self.confirm_discard(f"switch to {mode.value} mode"):
             return False
 
         lines = []
@@ -441,7 +398,7 @@ class DM41ExplorerApp(ctk.CTk):
             f"Switching to {mode.value} mode starts a new, empty memory "
             "state. Anything still in the current one is discarded."
         )
-        connected = self.serial.is_connected
+        connected = self.connection.serial.is_connected
         if connected:
             lines.append("The serial connection will be closed.")
         lines.append(
@@ -455,7 +412,7 @@ class DM41ExplorerApp(ctk.CTk):
             return False
 
         if connected:
-            self.disconnect()
+            self.connection.disconnect()
 
         previous = self.mode
         self.mode = mode
@@ -473,8 +430,8 @@ class DM41ExplorerApp(ctk.CTk):
 
         self._apply_mode_to_menus()
         self._refresh_mode_indicator()
-        self._replace_memory(Memory(profile=self.profile))
-        self._set_status(
+        self.replace_memory(Memory(profile=self.profile))
+        self.set_status(
             f"Switched to {mode.value} mode; started a new, empty memory state."
         )
         return True
@@ -501,19 +458,9 @@ class DM41ExplorerApp(ctk.CTk):
             f"\n\n{target.value} mode can open it."
         )
         if not self.set_mode(target, persist=False, reason=reason):
-            self._set_status(f"Did not load {Path(path).name}: needs DM41X mode.")
+            self.set_status(f"Did not load {Path(path).name}: needs DM41X mode.")
             return False
         return True
-
-    def _handle_serial_error(self, msg: str):
-        logger.error("Serial error: %s", msg)
-        self._set_status(self._idle_status())
-        # Runs on the main Tk thread: _pump_engine() drains SerialManager's
-        # error queue, which its background thread fills after it has
-        # already closed its own port handle and cleared is_connected -- so
-        # there's nothing left to disconnect here. The dialog is deferred
-        # for the same reentrancy reason as _on_command_error's.
-        self.after(0, lambda: messagebox.showerror("Error", "Disconnected."))
 
     # -- Window size ------------------------------------------------------
 
@@ -646,7 +593,7 @@ class DM41ExplorerApp(ctk.CTk):
 
         # The effective mode comes first: it is the
         # standing fact about the session, while the label beside it is a
-        # running commentary that _set_status() rewrites constantly. This
+        # running commentary that set_status() rewrites constantly. This
         # order also keeps the bar tidy in DM41X mode, where the status
         # text is empty -- the mode reads flush left instead of sitting
         # behind an empty label's padding.
@@ -663,7 +610,7 @@ class DM41ExplorerApp(ctk.CTk):
         )
         self._mode_label.pack(side="left", padx=8, pady=6)
         self._status_label = ctk.CTkLabel(
-            status_bar, text=self._idle_status(), font=font_for("ui")
+            status_bar, text=self.idle_status(), font=font_for("ui")
         )
         self._status_label.pack(side="left", padx=8, pady=6)
         self._modified_label = ctk.CTkLabel(
@@ -772,33 +719,33 @@ class DM41ExplorerApp(ctk.CTk):
         self._serial_menu_indices = []
         connect_menu.add_command(
             label="Connect / Reconnect...",
-            command=self.show_connect_dialog,
+            command=self.connection.show_connect_dialog,
             accelerator=f"{acc}+K",
             underline=0,
         )
         connect_menu.add_command(
             label="Disconnect",
-            command=self.disconnect,
+            command=self.connection.disconnect,
             accelerator=f"{acc}+D",
             underline=0,
         )
         connect_menu.add_separator()
         connect_menu.add_command(
             label="Set Calculator Time",
-            command=self.set_calculator_time,
+            command=self.connection.set_calculator_time,
             accelerator=f"{acc}+T",
             underline=4,
         )
         connect_menu.add_separator()
         connect_menu.add_command(
             label="Get State from DM41L",
-            command=self.get_state_from_calculator,
+            command=self.connection.get_state_from_calculator,
             accelerator=f"{acc}+G",
             underline=0,
         )
         connect_menu.add_command(
             label="Send State to DM41L",
-            command=self.send_state_to_calculator,
+            command=self.connection.send_state_to_calculator,
             accelerator=f"{acc}+U",
             underline=0,
         )
@@ -884,11 +831,11 @@ class DM41ExplorerApp(ctk.CTk):
         # when the serial port isn't open, exactly like clicking the menu
         # item itself would, so binding them globally doesn't open up any
         # new not-connected crash path.
-        self.bind(f"<{acc}-k>", lambda e: self.show_connect_dialog())
-        self.bind(f"<{acc}-d>", lambda e: self.disconnect())
-        self.bind(f"<{acc}-t>", lambda e: self.set_calculator_time())
-        self.bind(f"<{acc}-g>", lambda e: self.get_state_from_calculator())
-        self.bind(f"<{acc}-u>", lambda e: self.send_state_to_calculator())
+        self.bind(f"<{acc}-k>", lambda e: self.connection.show_connect_dialog())
+        self.bind(f"<{acc}-d>", lambda e: self.connection.disconnect())
+        self.bind(f"<{acc}-t>", lambda e: self.connection.set_calculator_time())
+        self.bind(f"<{acc}-g>", lambda e: self.connection.get_state_from_calculator())
+        self.bind(f"<{acc}-u>", lambda e: self.connection.send_state_to_calculator())
 
     def _show_about(self):
         messagebox.showinfo(
@@ -960,9 +907,9 @@ class DM41ExplorerApp(ctk.CTk):
         self._rebuild_recent_files_menu()
 
     def _persist_config(self, context: str):
-        """Saves self.config_store to disk, surfacing a failure the
-        same way _connect_and_verify's own preference-save already
-        does -- these config writes are rare enough (once per state
+        """Saves self.config_store to disk, surfacing a failure as
+        Connection._connect_and_verify() does for the serial port --
+        these config writes are rare enough (once per state
         opened/saved) that a real failure (e.g. a read-only home
         directory) is worth telling the user about rather than
         silently dropping."""
@@ -976,8 +923,14 @@ class DM41ExplorerApp(ctk.CTk):
                 "Could Not Save Preferences", f"Could not save {context}: {e}"
             )
 
-    def _set_status(self, text: str):
+    def set_status(self, text: str):
         self._status_label.configure(text=text)
+
+    def set_battery_text(self, text: str):
+        self._battery_label.configure(text=text)
+
+    def set_calc_time_text(self, text: str):
+        self._calc_time_label.configure(text=text)
 
     def _on_memory_changed(self):
         self.memory.mark_modified()
@@ -1018,14 +971,14 @@ class DM41ExplorerApp(ctk.CTk):
             self._tabs_dirty[name] = True
         self._render_active_tab()
 
-    def _confirm_discard(self, action: str) -> bool:
+    def confirm_discard(self, action: str) -> bool:
         """True if there are no unsaved changes, or the user agrees to
         discard them in order to `action` (e.g. "quit")."""
         return not self.memory.modified or messagebox.askyesno(
             "Unsaved Changes", f"Discard unsaved changes and {action}?"
         )
 
-    def _replace_memory(self, memory, source=None):
+    def replace_memory(self, memory, source=None):
         """Makes `memory` the open buffer -- read from the file `source`,
         or None for a new buffer or one read from the calculator -- and
         refreshes everything that shows it."""
@@ -1041,218 +994,13 @@ class DM41ExplorerApp(ctk.CTk):
         )
         self._source_label.configure(text=text)
 
-    # -- Engine pump (drives CommandEngine off the Tk main loop) ---------
-
-    def _start_engine_pump(self):
-        self._pump_engine()
-
-    def _pump_engine(self):
-        try:
-            while self.engine.process_incoming_data():
-                pass
-        except Exception as e:
-            logger.error("Engine pump error: %s", e)
-        error = self.serial.get_next_error()
-        if error is not None:
-            self._handle_serial_error(error)
-        self.after(ENGINE_POLL_MS, self._pump_engine)
-
-    # -- Connection -------------------------------------------------------
-
-    def _prompt_for_port(self, message: str):
-        dialog = PortSelectionDialog(
-            self,
-            self.serial,
-            default_port=self.config_store.serial_port,
-            message=message,
-        )
-        self.wait_window(dialog)
-        if dialog.result:
-            self._connect_and_verify(dialog.result)
-        elif self.serial.is_connected:
-            # Cancelling out of Reconnect leaves the existing connection
-            # untouched -- don't overwrite the status bar with "Not
-            # connected".
-            self._set_status(f"Connected to {self.serial.serial_inst.port}")
-        else:
-            self._set_status(self._idle_status())
-
-    def show_connect_dialog(self):
-        if not self._require_serial_mode():
-            return
-        # _prompt_for_port() blocks in wait_window() until the dialog closes.
-        # Called straight from a menu item, that nested wait runs inside
-        # macOS's menu-tracking event loop mode, which never delivers events
-        # to the new window: the dialog shows, but can't be clicked or
-        # closed, and the app gets the spinning beachball. Returning from the
-        # menu command first lets the dialog run in the normal event loop.
-        self.after(self.CONNECT_DIALOG_DELAY_MS, lambda: self._prompt_for_port(None))
-
-    def disconnect(self):
-        if not self.serial.is_connected:
-            return
-        self.serial.disconnect()
-        self._set_status(self._idle_status())
-        self._battery_label.configure(text="")
-        self._calc_time_label.configure(text="")
-
-    def _connect_and_verify(self, port: str):
-        self._set_status(f"Connecting to {port}...")
-        success, message = self.serial.connect(
-            port, baudrate=self.config_store.baudrate
-        )
-        if not success:
-            self._set_status(self._idle_status())
-            self._prompt_for_port(f"Connection to '{port}' failed: {message}")
-            return
-
-        self.config_store.serial_port = port
-        try:
-            self.config_store.save()
-        except Exception as e:
-            logger.error(
-                "Could not save preferences to %s: %s", self.config_store.PREFS_FILE, e
-            )
-            messagebox.showerror(
-                "Could not save preferences", f"{self.config_store.PREFS_FILE}, {e}"
-            )
-        self._set_status(f"Connected to {port} -- verifying...")
-
-        self._execute_command(
-            BatteryCheckCommand(timeout=2.0),
-            self._on_startup_battery,
-            self._on_verify_failed,
-        )
-
-    def _on_verify_failed(self, message: str):
-        # This callback runs on the main Tk thread (via the engine pump in
-        # _pump_engine), so it's safe to call disconnect() directly here --
-        # the same as every other engine and serial error handler.
-        if self.serial.is_connected:
-            self.serial.disconnect()
-        self._set_status(self._idle_status())
-        self.after(
-            0,
-            lambda: self._prompt_for_port(
-                f"Connected to the port, but the DM41L did not respond ({message}). "
-                "Please select a different serial port."
-            ),
-        )
-
-    # -- Startup sequence: battery -> timeout -> time -> memory state
-
-    def _on_startup_battery(self, voltage_mv):
-        logger.info("Battery: %s", voltage_mv)
-        self._battery_label.configure(text=f"Battery: {voltage_mv} mV")
-        self._set_status(f"Connected to {self.serial.serial_inst.port}")
-        self.after(
-            10,
-            lambda: self._execute_command(
-                ConsoleTimeoutCommand([self.config_store.console_timeout_minutes]),
-                self._on_timeout_command,
-                self._on_command_error,
-            ),
-        )
-
-    def _on_timeout_command(self, result):
-        logger.info("Timeout: %s", result)
-        self.after(
-            10,
-            lambda: self._execute_command(
-                GetTimeCommand(), self._on_startup_time, self._on_command_error
-            ),
-        )
-
-    def _on_startup_time(self, time_str):
-        logger.info("Time: %s", time_str)
-        self._calc_time_label.configure(text=f"Calc time: {time_str}")
-        self.after(10, self._fetch_memory_state)
-
-    def _fetch_memory_state(self):
-        if self.memory_source is None and not self.memory.modified:
-            self._set_status("Reading memory state...")
-            self.after(
-                10,
-                lambda: self._execute_command(
-                    MemoryStringCommand(),
-                    self._on_auto_state_received,
-                    self._on_command_error,
-                ),
-            )
-            return
-
-        # A file or edited buffer is already loaded: keep it, don't fetch.
-        self._set_status(f"Connected to {self.serial.serial_inst.port}")
-
-    def _on_auto_state_received(self, state):
-        # Re-check right at the moment the fetched state is about to be
-        # applied. It's a small race condition, but it does exist.
-        if self.memory_source is not None or self.memory.modified:
-            logger.info(
-                "Discarding auto-connect's fetched state: a file was opened "
-                "in the meantime."
-            )
-            self._set_status(f"Connected to {self.serial.serial_inst.port}")
-            return
-        self._on_state_received(state)
-
-    def _on_state_received(self, state):
-        logger.info("State received.")
-        try:
-            # The profile is the connection driver's declared model (the
-            # serial driver declares the DM41L), not the app's mode: this
-            # state came off that calculator. The two agree today, since
-            # only DM41L mode can connect at all.
-            state_memory = Memory.from_string(state, profile=self.serial.profile)
-            self._replace_memory(state_memory)
-            self._set_status("Connected -- memory state loaded.")
-        except Exception as e:
-            self._on_command_error(f"Failed to parse memory state: {e}")
-
-    # -- Command callbacks -------------------------------------------------
-
-    def _execute_command(self, command, on_success, on_error) -> bool:
-        """Runs `command` on the engine, which refuses it while another
-        command is still in progress. A refused command is reported to the
-        user and the status bar is put back, rather than the request being
-        dropped silently while the status still claims it is under way.
-        Returns whether the command was accepted -- a caller with a
-        follow-up step (Send's trigger_transfer()) must check it."""
-        if self.engine.execute(command, on_success, on_error):
-            return True
-        logger.warning(
-            "%s not sent: another command is still in progress.",
-            type(command).__name__,
-        )
-        if self.serial.is_connected:
-            self._set_status(f"Connected to {self.serial.serial_inst.port}")
-        else:
-            self._set_status(self._idle_status())
-        messagebox.showwarning(
-            "Busy",
-            "Another command is still in progress. Please wait a moment and try again.",
-        )
-        return False
-
-    def _on_command_error(self, message: str):
-        logger.error("%s", message)
-        self._set_status(self._idle_status())
-        # Runs on the main Tk thread (engine callback via _pump_engine), so
-        # a direct disconnect() call here is safe -- see _on_verify_failed.
-        if self.serial.is_connected:
-            self.serial.disconnect()
-        # Deferred: showing a modal dialog immediately would open a nested
-        # Tk event loop while the engine is mid-reset, risking reentrant
-        # calls into process_incoming_data().
-        self.after(0, lambda: messagebox.showerror("Error", message))
-
     # -- File menu actions --------------------------------------------------
 
     def new_memory_buffer(self):
-        if not self._confirm_discard("start a new buffer"):
+        if not self.confirm_discard("start a new buffer"):
             return
-        self._replace_memory(Memory(profile=self.profile))
-        self._set_status("Started a new, empty memory buffer.")
+        self.replace_memory(Memory(profile=self.profile))
+        self.set_status("Started a new, empty memory buffer.")
 
     # -- Tools menu actions --------------------------------------------------
 
@@ -1285,36 +1033,14 @@ class DM41ExplorerApp(ctk.CTk):
                     f", {recovered} program(s) recovered -- their global "
                     "labels are now visible and can be assigned to a key"
                 )
-            self._set_status(f"Packed memory -- {summary}.")
+            self.set_status(f"Packed memory -- {summary}.")
             messagebox.showinfo("Pack Memory", f"Packed memory: {summary}.")
         else:
-            self._set_status("Packed memory -- already fully packed.")
+            self.set_status("Packed memory -- already fully packed.")
             messagebox.showinfo(
                 "Pack Memory",
                 "Memory is already fully packed -- nothing to reclaim.",
             )
-
-    def set_calculator_time(self):
-        if not self._require_serial_mode():
-            return
-        if not self.serial.is_connected:
-            messagebox.showwarning("Not Connected", "Connect to the DM41L first.")
-            return
-        now = datetime.now()
-        args = [now.strftime("%Y%m%d"), now.strftime("%H%M%S")]
-        self._execute_command(
-            SetTimeCommand(args), self._on_time_set, self._on_command_error
-        )
-
-    def _on_time_set(self, result):
-        logger.info("Time set: %s", result)
-        self._calc_time_label.configure(text="Calc time set to system time")
-        self.after(
-            0,
-            lambda: messagebox.showinfo(
-                "Success", "Calculator clock set to system time."
-            ),
-        )
 
     def save_state_to_file(self):
         if self.memory_source is None:
@@ -1360,7 +1086,7 @@ class DM41ExplorerApp(ctk.CTk):
         messagebox.showinfo("Saved", f"Memory state written to {path}")
 
     def load_state_from_file(self):
-        if not self._confirm_discard("load a different state"):
+        if not self.confirm_discard("load a different state"):
             return
         path = filedialog.askopenfilename(filetypes=STATE_FILETYPES)
         if not path:
@@ -1413,8 +1139,8 @@ class DM41ExplorerApp(ctk.CTk):
                 messagebox.showerror("Error", f"Could not load state: {e}")
                 return
 
-        self._replace_memory(loaded, source=path)
-        self._set_status(f"Loaded state from {Path(path).name}")
+        self.replace_memory(loaded, source=path)
+        self.set_status(f"Loaded state from {Path(path).name}")
         logger.info("State loaded from %s (%s mode)", path, self.mode.value)
         self._remember_recent_file(path)
 
@@ -1435,7 +1161,7 @@ class DM41ExplorerApp(ctk.CTk):
             self.config_store.remove_recent_file(path)
             self._recent_files_changed()
             return
-        if not self._confirm_discard("load a different state"):
+        if not self.confirm_discard("load a different state"):
             return
         self._load_state_into_buffer(path)
 
@@ -1454,87 +1180,6 @@ class DM41ExplorerApp(ctk.CTk):
         # the least surprising choice for a single-document app.
         self.open_state_file(paths[-1])
 
-    # -- Connect menu actions -----------------------------------------------
-
-    def send_state_to_calculator(self):
-        if not self._require_serial_mode():
-            return
-        if not self.serial.is_connected:
-            messagebox.showwarning("Not Connected", "Connect to the DM41L first.")
-            return
-
-        # A state can hold things the calculator on the other end does not
-        # have. The connection declares which model that is -- not the
-        # app's mode; see memory/profile_fit.py.
-        #
-        # Since phase 6 the XM *error* branch below is defence in depth
-        # rather than a path a user can reach: connecting needs DM41L
-        # mode, and opening a state too large for a DM41L in DM41L mode
-        # forces a switch to DM41X mode, which disconnects. The check is
-        # kept because it is shared with evaluate_mode_switch() and costs
-        # nothing, and because a later model (a DM41XN over serial) could
-        # make the combination reachable again. The XROM *warning* branch
-        # is still reached normally: a state full of DM41X-only functions
-        # opens in DM41L mode quite happily.
-        target = self.serial.profile
-        findings = check_profile_fit(self.memory, target)
-        errors = [f for f in findings if f.level == ERROR]
-        warnings = [f for f in findings if f.level == WARNING]
-        for finding in findings:
-            logger.warning("Send check (%s): %s", finding.level, finding)
-        if errors:
-            messagebox.showerror(
-                f"Cannot Send to {target.name}",
-                f"This memory state cannot be sent to a {target.name}:\n\n"
-                f"{format_findings(errors)}\n\nNothing was sent.",
-            )
-            return
-
-        message = (
-            "This will overwrite the calculator's current memory with the "
-            "currently loaded state."
-        )
-        if warnings:
-            message += (
-                f"\n\nThese will not work on a {target.name}:\n\n"
-                f"{format_findings(warnings)}\n\nSend it anyway?"
-            )
-        else:
-            message += " Continue?"
-        # Not messagebox.askyesno(): on macOS that box is too narrow for
-        # the list, which then wraps on every line (GitHub issue #55).
-        if not ask_yes_no(self, "Send State to Calculator", message):
-            return
-
-        state_text = self.memory.to_string()
-
-        command = LoadMemoryStringCommand([state_text], serial=self.serial)
-        if self._execute_command(command, self._on_state_sent, self._on_command_error):
-            command.trigger_transfer()
-
-    def _on_state_sent(self, result):
-        logger.info("State sent: %s", result)
-        self.after(
-            0,
-            lambda: messagebox.showinfo("Sent", "Memory state sent to the calculator."),
-        )
-
-    def get_state_from_calculator(self):
-        if not self._require_serial_mode():
-            return
-        if not self.serial.is_connected:
-            messagebox.showwarning("Not Connected", "Connect to the DM41L first.")
-            return
-        if not self._confirm_discard("read the calculator's memory"):
-            return
-        self._set_status("Reading memory state...")
-        self.after(
-            10,
-            lambda: self._execute_command(
-                MemoryStringCommand(), self._on_state_received, self._on_command_error
-            ),
-        )
-
     def show_preferences(self):
         """Opens Preferences, or raises the one already open -- the menu
         item and the Cmd/Ctrl+, binding may both deliver the same key
@@ -1547,7 +1192,7 @@ class DM41ExplorerApp(ctk.CTk):
         self._preferences_dialog = PreferencesDialog(
             self,
             self.config_store,
-            self.serial,
+            self.connection.serial,
             on_saved=self._on_preferences_saved,
             mode=self.config_store.mode,
         )
@@ -1598,7 +1243,7 @@ class DM41ExplorerApp(ctk.CTk):
         self._render_tabs()
         active = self.xrom_active.libraries
         plugins = [library for library in active if not library.builtin_on]
-        self._set_status(
+        self.set_status(
             f"XROM libraries: {len(plugins)} plug-in "
             f"{'library' if len(plugins) == 1 else 'libraries'} active."
         )
@@ -1667,17 +1312,14 @@ class DM41ExplorerApp(ctk.CTk):
     def on_close(self):
         if self._closing:
             return  # e.g. Cmd+Q delivered by two routes at once
-        if not self._confirm_discard("quit"):
+        if not self.confirm_discard("quit"):
             return
         self._closing = True
         if self._resize_after_id is not None:
             self.after_cancel(self._resize_after_id)
             self._resize_after_id = None
         self._remember_window_size()
-        # Runs on the main Tk thread (window-close handler), so a direct
-        # disconnect() call here is safe -- see _on_verify_failed.
-        if self.serial.is_connected:
-            self.serial.disconnect()
+        self.connection.close()
         self.destroy()
 
 

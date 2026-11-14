@@ -23,6 +23,7 @@ from config import ProjectConfig
 from engine.command_engine import CommandEngine
 from memory import DM41L, DM41X, DeviceMode, Memory
 import gui.app as app_module
+import gui.connection as connection_module
 from gui.app import DM41ExplorerApp
 from memory.mnemonics import resolve, set_active_libraries, xrom_op
 from gui.overview_tab import xm_total_registers
@@ -36,11 +37,12 @@ def _write_prefs(path, **prefs):
 def no_unexpected_questions(monkeypatch):
     """ask_yes_no() opens a real dialog and waits for a click, which would
     hang the run. A test that expects the question patches it itself,
-    inside this one."""
-    monkeypatch.setattr(
-        "gui.app.ask_yes_no",
-        mock.Mock(side_effect=AssertionError("unexpected ask_yes_no() question")),
-    )
+    inside this one, in the module that asks it."""
+    for module in ("gui.app", "gui.connection"):
+        monkeypatch.setattr(
+            f"{module}.ask_yes_no",
+            mock.Mock(side_effect=AssertionError("unexpected ask_yes_no() question")),
+        )
 
 
 @pytest.fixture(scope="module")
@@ -62,12 +64,12 @@ def _reset(app):
     app.config_store.load()
     app.mode = app.config_store.mode
     app._apply_xrom_libraries()
-    app.serial.is_connected = False
-    app.serial.serial_inst = None
-    app.serial.__dict__.pop("profile", None)  # a test may override it
-    while app.serial.get_next_error() is not None:
+    app.connection.serial.is_connected = False
+    app.connection.serial.serial_inst = None
+    app.connection.serial.__dict__.pop("profile", None)  # a test may override it
+    while app.connection.serial.get_next_error() is not None:
         pass
-    app.engine = CommandEngine(app.serial)
+    app.connection.engine = CommandEngine(app.connection.serial)
     app._closing = False
     dialog = getattr(app, "_mnemonics_reference", None)
     if dialog is not None and dialog.winfo_exists():
@@ -80,8 +82,8 @@ def _reset(app):
     app._apply_mode_to_menus()
     app._refresh_mode_indicator()
     app.tabview.set("Overview")
-    app._replace_memory(Memory(profile=app.profile))
-    app._set_status(app._idle_status())
+    app.replace_memory(Memory(profile=app.profile))
+    app.set_status(app.idle_status())
     app._battery_label.configure(text="")
     app._calc_time_label.configure(text="")
     app._rebuild_recent_files_menu()
@@ -138,7 +140,9 @@ def dm41l_app(_shared_app, dm41l_prefs):
 @pytest.mark.parametrize(
     "replace",
     [
-        lambda app: app._on_state_received(Memory().to_string()),  # Get State
+        lambda app: app.connection._on_state_received(
+            Memory().to_string()
+        ),  # Get State
         lambda app: app.new_memory_buffer(),
     ],
     ids=["calculator state", "new buffer"],
@@ -239,8 +243,10 @@ def connected_app(dm41l_app):
 
     In DM41L mode, because that is the only mode that can connect at all
     (phase 6): a DM41X has no serial console."""
-    dm41l_app.serial.is_connected = True
-    with mock.patch.object(dm41l_app.engine, "execute", return_value=True) as execute:
+    dm41l_app.connection.serial.is_connected = True
+    with mock.patch.object(
+        dm41l_app.connection.engine, "execute", return_value=True
+    ) as execute:
         dm41l_app.sent = execute
         yield dm41l_app
 
@@ -260,9 +266,9 @@ def _send(app, name, *, answer=True):
     app.memory_source = DATA_DIR / name
     with (
         mock.patch("gui.app.messagebox.showerror") as error,
-        mock.patch("gui.app.ask_yes_no", return_value=answer) as confirm,
+        mock.patch("gui.connection.ask_yes_no", return_value=answer) as confirm,
     ):
-        app.send_state_to_calculator()
+        app.connection.send_state_to_calculator()
     return error, confirm
 
 
@@ -324,7 +330,7 @@ def test_send_lists_key_assignments_a_dm41l_cannot_run(connected_app):
 def test_send_of_a_state_that_fits_asks_the_usual_question(
     connected_app, state, connection
 ):
-    connected_app.serial.profile = connection
+    connected_app.connection.serial.profile = connection
 
     error, confirm = _send(connected_app, state)
 
@@ -345,9 +351,9 @@ def test_send_when_not_connected_does_not_check_anything(dm41l_app):
     )
     with (
         mock.patch("gui.app.messagebox.showwarning") as warn,
-        mock.patch("gui.app.check_profile_fit") as check,
+        mock.patch("gui.connection.check_profile_fit") as check,
     ):
-        dm41l_app.send_state_to_calculator()
+        dm41l_app.connection.send_state_to_calculator()
 
     warn.assert_called_once()
     check.assert_not_called()
@@ -372,7 +378,7 @@ def test_a_state_file_opens_with_the_modes_profile(app_in_mode, mode, state):
 
 
 def test_a_dm41l_state_from_the_calculator_keeps_the_dm41l_profile(app):
-    app._on_state_received(Memory().to_string())
+    app.connection._on_state_received(Memory().to_string())
 
     assert app.memory.profile is DM41L
 
@@ -580,7 +586,6 @@ def test_the_app_starts_offline_and_never_touches_the_serial_port(
     import time
 
     from engine.serial_manager import SerialManager
-    from gui import app as app_module
 
     calls = []
     monkeypatch.setattr(
@@ -592,7 +597,7 @@ def test_the_app_starts_offline_and_never_touches_the_serial_port(
         lambda self, *a, **k: calls.append("connect") or (False, "no"),
     )
     monkeypatch.setattr(
-        app_module,
+        connection_module,
         "PortSelectionDialog",
         lambda *a, **k: calls.append("dialog"),
     )
@@ -601,7 +606,7 @@ def test_the_app_starts_offline_and_never_touches_the_serial_port(
         time.sleep(0.4)  # longer than the old 100 ms start-up delay
         instance.update()
         assert calls == []
-        assert not instance.serial.is_connected
+        assert not instance.connection.serial.is_connected
         # Empty, not "Not connected": this app is in DM41X mode, where
         # there is nothing to connect to (see the idle-status tests).
         assert instance._status_label.cget("text") == ""
@@ -620,8 +625,8 @@ def test_connect_menu_command_returns_before_the_dialog_blocks(dm41l_app):
 
     In DM41L mode: since phase 6, DM41X mode refuses the action outright
     and never reaches the dialog."""
-    with mock.patch.object(dm41l_app, "_prompt_for_port") as prompt:
-        dm41l_app.show_connect_dialog()
+    with mock.patch.object(dm41l_app.connection, "_prompt_for_port") as prompt:
+        dm41l_app.connection.show_connect_dialog()
         prompt.assert_not_called()
         deadline = time.time() + 2
         while not prompt.called and time.time() < deadline:
@@ -891,9 +896,9 @@ def test_the_serial_actions_refuse_in_dm41x_mode(app, action):
     action guards itself as well."""
     with (
         mock.patch("gui.app.messagebox.showinfo") as info,
-        mock.patch.object(app.serial, "connect") as connect,
+        mock.patch.object(app.connection.serial, "connect") as connect,
     ):
-        getattr(app, action)()
+        getattr(app.connection, action)()
 
     assert info.called, f"{action} said nothing"
     assert "DM41X Mode" in info.call_args.args[0]
@@ -904,9 +909,9 @@ def test_the_serial_actions_refuse_in_dm41x_mode(app, action):
 def test_switching_mode_while_connected_warns_and_disconnects_only_on_yes(
     dm41l_app, confirm
 ):
-    dm41l_app.serial.is_connected = True
+    dm41l_app.connection.serial.is_connected = True
     with (
-        mock.patch.object(dm41l_app, "disconnect") as disconnect,
+        mock.patch.object(dm41l_app.connection, "disconnect") as disconnect,
         _answer(confirm) as ask,
     ):
         assert dm41l_app.set_mode(DeviceMode.DM41X, persist=True) is confirm
@@ -978,11 +983,11 @@ def test_switching_to_dm41x_leaves_no_stale_not_connected(dm41l_app):
 
 
 def test_disconnecting_in_dm41l_mode_says_not_connected(dm41l_app):
-    dm41l_app.serial.is_connected = True
-    dm41l_app._set_status("Connected to /dev/ttyUSB0")
+    dm41l_app.connection.serial.is_connected = True
+    dm41l_app.set_status("Connected to /dev/ttyUSB0")
 
-    with mock.patch.object(dm41l_app.serial, "disconnect"):
-        dm41l_app.disconnect()
+    with mock.patch.object(dm41l_app.connection.serial, "disconnect"):
+        dm41l_app.connection.disconnect()
 
     assert dm41l_app._status_label.cget("text") == "Not connected"
 
@@ -991,11 +996,11 @@ def test_a_serial_failure_in_dm41x_mode_leaves_the_status_empty(app):
     """Not reachable through the UI -- DM41X mode refuses to connect at
     all -- but the error callbacks are shared, so they must not print a
     connection state in a mode that has no connection."""
-    app._set_status("")
+    app.set_status("")
     # _on_command_error posts its dialog with after(0, ...), so update()
     # below would open a real modal box and block forever.
     with mock.patch("gui.app.messagebox.showerror"):
-        app._on_command_error("something went wrong")
+        app.connection._on_command_error("something went wrong")
         app.update()
 
     assert app._status_label.cget("text") == ""
@@ -1050,12 +1055,12 @@ def test_serial_thread_errors_are_handled_by_the_engine_pump(dm41l_app):
     """A fatal error from SerialManager's background thread is queued, and
     the app picks it up from its own Tk-thread pump instead of the
     background thread calling into Tk directly."""
-    dm41l_app.serial.error_queue.put("Serial communications failure: boom")
+    dm41l_app.connection.serial.error_queue.put("Serial communications failure: boom")
     with mock.patch.object(dm41l_app, "after") as after:
-        dm41l_app._pump_engine()
+        dm41l_app.connection._pump_engine()
 
-    assert dm41l_app._status_label.cget("text") == dm41l_app._idle_status()
-    assert dm41l_app.serial.get_next_error() is None
+    assert dm41l_app._status_label.cget("text") == dm41l_app.idle_status()
+    assert dm41l_app.connection.serial.get_next_error() is None
     # The error dialog is deferred; the pump reschedules itself.
     assert after.call_count == 2
 
@@ -1064,19 +1069,19 @@ def test_auto_fetch_keeps_the_reading_status_until_the_state_arrives(connected_a
     """With nothing loaded, connecting fetches the calculator's state and the
     status bar says so -- it must not be overwritten straight away by
     "Connected to ...", which made the fetch look finished."""
-    connected_app.serial.serial_inst = mock.Mock(port="/dev/tty.test")
+    connected_app.connection.serial.serial_inst = mock.Mock(port="/dev/tty.test")
     with mock.patch.object(connected_app, "after") as after:
-        connected_app._fetch_memory_state()
+        connected_app.connection._fetch_memory_state()
 
     assert connected_app._status_label.cget("text") == "Reading memory state..."
     after.assert_called_once()
 
 
 def test_auto_fetch_is_skipped_when_a_state_is_already_loaded(connected_app):
-    connected_app.serial.serial_inst = mock.Mock(port="/dev/tty.test")
+    connected_app.connection.serial.serial_inst = mock.Mock(port="/dev/tty.test")
     connected_app.memory.mark_modified()
     with mock.patch.object(connected_app, "after") as after:
-        connected_app._fetch_memory_state()
+        connected_app.connection._fetch_memory_state()
 
     assert connected_app._status_label.cget("text") == "Connected to /dev/tty.test"
     after.assert_not_called()
@@ -1090,10 +1095,12 @@ def busy_app(dm41l_app):
     """A connected app whose engine refuses every command, as it does while
     another command is still in progress. after() runs its callback at
     once, so deferred commands are attempted inside the test."""
-    dm41l_app.serial.is_connected = True
-    dm41l_app.serial.serial_inst = mock.Mock(port="/dev/tty.test")
+    dm41l_app.connection.serial.is_connected = True
+    dm41l_app.connection.serial.serial_inst = mock.Mock(port="/dev/tty.test")
     with (
-        mock.patch.object(dm41l_app.engine, "execute", return_value=False) as execute,
+        mock.patch.object(
+            dm41l_app.connection.engine, "execute", return_value=False
+        ) as execute,
         mock.patch.object(
             dm41l_app, "after", side_effect=lambda ms, fn=None: fn() if fn else None
         ),
@@ -1115,10 +1122,14 @@ def _assert_reported_busy(app):
 @pytest.mark.parametrize(
     "action",
     [
-        lambda app: app.get_state_from_calculator(),
-        lambda app: app._fetch_memory_state(),  # the automatic fetch on connect
-        lambda app: app.set_calculator_time(),
-        lambda app: app._on_timeout_command("Console timeout set"),  # a startup step
+        lambda app: app.connection.get_state_from_calculator(),
+        lambda app: (
+            app.connection._fetch_memory_state()
+        ),  # the automatic fetch on connect
+        lambda app: app.connection.set_calculator_time(),
+        lambda app: app.connection._on_timeout_command(
+            "Console timeout set"
+        ),  # a startup step
     ],
     ids=["get state", "auto fetch", "set time", "startup step"],
 )
@@ -1132,10 +1143,12 @@ def test_a_command_refused_as_busy_is_reported_and_the_status_restored(
 def test_busy_send_is_reported_and_nothing_is_transferred(busy_app):
     busy_app.memory = Memory.from_file(DATA_DIR / "6x-xm.dm41", profile=DM41L)
     with (
-        mock.patch("gui.app.ask_yes_no", return_value=True),
-        mock.patch("gui.app.LoadMemoryStringCommand.trigger_transfer") as transfer,
+        mock.patch("gui.connection.ask_yes_no", return_value=True),
+        mock.patch(
+            "gui.connection.LoadMemoryStringCommand.trigger_transfer"
+        ) as transfer,
     ):
-        busy_app.send_state_to_calculator()
+        busy_app.connection.send_state_to_calculator()
 
     _assert_reported_busy(busy_app)
     transfer.assert_not_called()
