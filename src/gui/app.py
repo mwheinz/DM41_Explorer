@@ -8,7 +8,7 @@ import logging.handlers
 import sys
 from pathlib import Path
 import platform
-from tkinter import filedialog, messagebox, Menu
+from tkinter import filedialog, messagebox
 from typing import NamedTuple, Optional
 
 import customtkinter as ctk
@@ -25,6 +25,7 @@ from gui.fonts import font_for
 from gui.connection import Connection
 from gui.contrast import SECONDARY_TEXT, WARNING_TEXT, improve_theme_contrast
 from gui.dialog_common import ask_yes_no
+from gui.menus import MenuBar
 from gui.screens import screen_rectangles
 from gui.window_geometry import (
     geometry_string,
@@ -60,7 +61,7 @@ class TabSpec(NamedTuple):
     attribute that holds it. `editable` tabs get the app's on_change
     callback. `export_method`/`import_method` name the tab's own header-
     button handlers that Cmd/Ctrl+E / Cmd/Ctrl+I forward to while it is
-    the active tab (see _dispatch_tab_action()); None means that shortcut
+    the active tab (see dispatch_tab_action()); None means that shortcut
     is a silent no-op there."""
 
     name: str
@@ -105,18 +106,6 @@ TABS = (
     ),
     TabSpec("Hex View", "hex_view_tab", HexViewTab, editable=False),
 )
-
-# File > Open Recent: long paths are shortened by keeping the tail
-# (the part that actually distinguishes files living in different
-# folders) rather than the head.
-_MAX_RECENT_LABEL_LEN = 60
-
-
-def _format_recent_label(path_str: str) -> str:
-    if len(path_str) <= _MAX_RECENT_LABEL_LEN:
-        return path_str
-    return "\u2026" + path_str[-(_MAX_RECENT_LABEL_LEN - 1) :]
-
 
 logger = logging.getLogger(__name__)
 
@@ -284,9 +273,9 @@ class DM41ExplorerApp(ctk.CTk):
 
         self._build_layout()
         self._apply_window_size()
-        self._menubar = self._build_menus()
-        self._apply_mode_to_menus()
-        self._bind_keys()
+        self.menus = MenuBar(self, is_mac=PLATFORM_SYSTEM == "Darwin")
+        self.menus.set_serial_enabled(self.mode.supports_serial)
+        self.menus.bind_shortcuts()
         if xrom_errors:
             self.set_status(
                 f"{len(xrom_errors)} XROM library file(s) could not be loaded; "
@@ -309,7 +298,7 @@ class DM41ExplorerApp(ctk.CTk):
             self.createcommand("::tk::mac::Quit", self.on_close)
 
         self.connection.start()
-        self._render_tabs()
+        self.render_tabs()
 
     # -- Mode (DM41L / DM41X) ---------------------------------------------
 
@@ -351,18 +340,6 @@ class DM41ExplorerApp(ctk.CTk):
 
     def _refresh_mode_indicator(self):
         self._mode_label.configure(text=self._mode_status_text())
-
-    def _apply_mode_to_menus(self):
-        """Greys out the serial actions in a mode whose calculator has no
-        serial console -- disabled rather than hidden, so the user can see
-        the app has them and why they are unavailable.
-
-        The keyboard shortcuts bypass menu state entirely, so every one of
-        these actions also guards itself with
-        Connection.require_serial_mode()."""
-        state = "normal" if self.mode.supports_serial else "disabled"
-        for index in self._serial_menu_indices:
-            self._connect_menu.entryconfigure(index, state=state)
 
     def set_mode(self, mode, *, persist: bool, reason: str = None) -> bool:
         """Changes the effective mode, erasing the open state.
@@ -420,7 +397,7 @@ class DM41ExplorerApp(ctk.CTk):
         self._apply_xrom_libraries()
         if persist:
             self.config_store.mode = mode
-            self._persist_config("the DM41L/DM41X mode")
+            self.persist_config("the DM41L/DM41X mode")
         logger.info(
             "Mode changed from %s to %s (%s)",
             previous.value,
@@ -428,7 +405,7 @@ class DM41ExplorerApp(ctk.CTk):
             "saved" if persist else "this session only",
         )
 
-        self._apply_mode_to_menus()
+        self.menus.set_serial_enabled(self.mode.supports_serial)
         self._refresh_mode_indicator()
         self.replace_memory(Memory(profile=self.profile))
         self.set_status(
@@ -645,199 +622,7 @@ class DM41ExplorerApp(ctk.CTk):
         self.program_tab.raw_checksum_enabled = lambda: self.config_store.raw_checksum
         self.key_assignments_tab.source_path = lambda: self.memory_source
 
-    def _build_menus(self):
-        """Builds the application's menu bar. Every basic function lives
-        here rather than in toolbar buttons, per the current design."""
-
-        acc = "Command" if PLATFORM_SYSTEM == "Darwin" else "Control"
-
-        menubar = Menu(self)
-
-        if PLATFORM_SYSTEM == "Darwin":
-            # About and Preferences live in the application menu (under the
-            # app's name), where Mac users look for them. Tk shows that menu's
-            # Preferences item, with its standard Cmd+, shortcut, only once
-            # this command exists; a Preferences item elsewhere doesn't get
-            # to show Cmd+, at all (GitHub issue #62).
-            self.createcommand("tkAboutDialog", self._show_about)
-            self.createcommand("::tk::mac::ShowPreferences", self.show_preferences)
-
-        # File Menu
-        file_menu = Menu(menubar, tearoff=0)
-        file_menu.add_command(
-            label="New Memory Buffer",
-            command=self.new_memory_buffer,
-            accelerator=f"{acc}+N",
-            underline=0,
-        )
-        file_menu.add_separator()
-        file_menu.add_command(
-            label="Open State...",
-            command=self.load_state_from_file,
-            accelerator=f"{acc}+O",
-            underline=0,
-        )
-        self._recent_menu = Menu(file_menu, tearoff=0)
-        file_menu.add_cascade(label="Open Recent", menu=self._recent_menu, underline=5)
-        file_menu.add_command(
-            label="Save State",
-            command=self.save_state_to_file,
-            accelerator=f"{acc}+S",
-            underline=0,
-        )
-        file_menu.add_command(
-            label="Save State As...",
-            command=self.save_state_as,
-            accelerator=f"{acc}+Shift+S",
-            underline=13,
-        )
-        if PLATFORM_SYSTEM != "Darwin":
-            # On macOS these are in the application menu instead (above).
-            file_menu.add_separator()
-            file_menu.add_command(
-                label="About Box", command=self._show_about, underline=0
-            )
-            file_menu.add_command(
-                label="Preferences",
-                command=self.show_preferences,
-                accelerator=f"{acc}+,",
-                underline=0,
-            )
-            file_menu.add_separator()
-            file_menu.add_command(
-                label="Quit", command=self.on_close, accelerator=f"{acc}+Q", underline=0
-            )
-        menubar.add_cascade(label="File", menu=file_menu)
-
-        # Connect Menu
-        connect_menu = Menu(menubar, tearoff=0)
-        # Every entry in this menu needs a serial console, so the whole
-        # menu is gated by the mode (see _apply_mode_to_menus). The indices
-        # are collected as the entries are added rather than hard-coded, so
-        # inserting an entry later cannot silently gate the wrong one.
-        self._connect_menu = connect_menu
-        self._serial_menu_indices = []
-        connect_menu.add_command(
-            label="Connect / Reconnect...",
-            command=self.connection.show_connect_dialog,
-            accelerator=f"{acc}+K",
-            underline=0,
-        )
-        connect_menu.add_command(
-            label="Disconnect",
-            command=self.connection.disconnect,
-            accelerator=f"{acc}+D",
-            underline=0,
-        )
-        connect_menu.add_separator()
-        connect_menu.add_command(
-            label="Set Calculator Time",
-            command=self.connection.set_calculator_time,
-            accelerator=f"{acc}+T",
-            underline=4,
-        )
-        connect_menu.add_separator()
-        connect_menu.add_command(
-            label="Get State from DM41L",
-            command=self.connection.get_state_from_calculator,
-            accelerator=f"{acc}+G",
-            underline=0,
-        )
-        connect_menu.add_command(
-            label="Send State to DM41L",
-            command=self.connection.send_state_to_calculator,
-            accelerator=f"{acc}+U",
-            underline=0,
-        )
-        self._serial_menu_indices = [
-            index
-            for index in range(connect_menu.index("end") + 1)
-            if connect_menu.type(index) == "command"
-        ]
-        menubar.add_cascade(label="Connect", menu=connect_menu)
-
-        # View Menu
-        view_menu = Menu(menubar, tearoff=0)
-        view_menu.add_command(
-            label="Refresh Tabs",
-            command=self._render_tabs,
-            accelerator="F5",
-            underline=0,
-        )
-        menubar.add_cascade(label="View", menu=view_menu)
-
-        # Tools Menu
-        tools_menu = Menu(menubar, tearoff=0)
-        tools_menu.add_command(
-            label="Pack Memory...",
-            command=self.pack_memory,
-            underline=0,
-        )
-        tools_menu.add_command(
-            label="XROM Libraries...",
-            command=self.show_xrom_libraries,
-            underline=0,
-        )
-        menubar.add_cascade(label="Tools", menu=tools_menu)
-
-        # Help Menu
-        help_menu = Menu(menubar, tearoff=0)
-        if PLATFORM_SYSTEM != "Darwin":
-            help_menu.add_command(label="About DM41_Explorer", command=self._show_about)
-            help_menu.add_separator()
-        help_menu.add_command(
-            label="Keyboard Shortcuts",
-            command=self.show_keyboard_shortcuts,
-            underline=0,
-        )
-        help_menu.add_command(
-            label="FOCAL Mnemonics Reference",
-            command=self.show_mnemonics_reference,
-            underline=0,
-        )
-        menubar.add_cascade(label="Help", menu=help_menu)
-
-        self.config(menu=menubar)
-        self._rebuild_recent_files_menu()
-        return menubar
-
-    def _bind_keys(self):
-        acc = "Command" if PLATFORM_SYSTEM == "Darwin" else "Control"
-
-        self.bind(f"<{acc}-n>", lambda e: self.new_memory_buffer())
-        self.bind(f"<{acc}-o>", lambda e: self.load_state_from_file())
-        self.bind(f"<{acc}-s>", lambda e: self.save_state_to_file())
-        # Shift turns the key into "S" on some platforms but not others, so
-        # both are bound. Either is more specific than <{acc}-s> above,
-        # which therefore doesn't also fire.
-        for key in ("S", "s"):
-            self.bind(f"<{acc}-Shift-{key}>", lambda e: self.save_state_as())
-        self.bind(f"<{acc}-q>", lambda e: self.on_close())
-        # A menu's `accelerator=` text is only a label in Tk -- every
-        # shortcut shown in the menus needs its own bind() here.
-        self.bind(f"<{acc}-comma>", lambda e: self.show_preferences())
-        self.bind("<F5>", lambda e: self._render_tabs())
-
-        # Export.../Import... are tab-scoped header buttons (Data
-        # Registers, XM Files, Programs; Cmd/Ctrl+E is Save PDF... on Key
-        # Assignments), not menu items, so their
-        # shortcuts are bound globally here and forward to whichever tab
-        # is active -- see _dispatch_tab_action().
-        self.bind(f"<{acc}-e>", lambda e: self._export_current_tab())
-        self.bind(f"<{acc}-i>", lambda e: self._import_current_tab())
-
-        # Connect menu (GitHub issue #9) -- each of these already no-ops
-        # with a "Not Connected" warning (or, for disconnect(), silently)
-        # when the serial port isn't open, exactly like clicking the menu
-        # item itself would, so binding them globally doesn't open up any
-        # new not-connected crash path.
-        self.bind(f"<{acc}-k>", lambda e: self.connection.show_connect_dialog())
-        self.bind(f"<{acc}-d>", lambda e: self.connection.disconnect())
-        self.bind(f"<{acc}-t>", lambda e: self.connection.set_calculator_time())
-        self.bind(f"<{acc}-g>", lambda e: self.connection.get_state_from_calculator())
-        self.bind(f"<{acc}-u>", lambda e: self.connection.send_state_to_calculator())
-
-    def _show_about(self):
+    def show_about(self):
         messagebox.showinfo(
             "About DM41_Explorer",
             f"Read, Write and Manipulate\n"
@@ -848,13 +633,7 @@ class DM41ExplorerApp(ctk.CTk):
             "version 3, with no warranty. See the LICENSE file.\n",
         )
 
-    def _export_current_tab(self):
-        self._dispatch_tab_action("export_method")
-
-    def _import_current_tab(self):
-        self._dispatch_tab_action("import_method")
-
-    def _dispatch_tab_action(self, which: str):
+    def dispatch_tab_action(self, which: str):
         """Forwards Cmd/Ctrl+E or Cmd/Ctrl+I to the active tab's own
         export or import handler (`which` is the TabSpec field naming it),
         if it has one -- see TABS. Every target method already guards
@@ -867,46 +646,7 @@ class DM41ExplorerApp(ctk.CTk):
         if method_name is not None:
             getattr(self._tabs[name], method_name)()
 
-    # -- File > Open Recent ----------------------------------------------
-
-    def _rebuild_recent_files_menu(self):
-        """Repopulates File > Open Recent from
-        self.config_store.recent_files -- called once at startup
-        (_build_menus()) and again every time the list changes (a
-        state opened/saved, a stale entry pruned in open_state_file(),
-        or Clear Recent Files). Tk menu items are static once added,
-        so the submenu has to be torn down and rebuilt rather than
-        updated in place."""
-        self._recent_menu.delete(0, "end")
-        recent = self.config_store.recent_files
-        if not recent:
-            self._recent_menu.add_command(label="(No Recent Files)", state="disabled")
-            return
-        for path_str in recent:
-            self._recent_menu.add_command(
-                label=_format_recent_label(path_str),
-                command=lambda p=path_str: self.open_state_file(p),
-            )
-        self._recent_menu.add_separator()
-        self._recent_menu.add_command(
-            label="Clear Recent Files", command=self._clear_recent_files
-        )
-
-    def _clear_recent_files(self):
-        self.config_store.clear_recent_files()
-        self._recent_files_changed()
-
-    def _remember_recent_file(self, path):
-        """Puts `path` at the top of File > Open Recent."""
-        self.config_store.add_recent_file(path)
-        self._recent_files_changed()
-
-    def _recent_files_changed(self):
-        """Saves the recent-files list and rebuilds its menu to match."""
-        self._persist_config("recent files")
-        self._rebuild_recent_files_menu()
-
-    def _persist_config(self, context: str):
+    def persist_config(self, context: str):
         """Saves self.config_store to disk, surfacing a failure as
         Connection._connect_and_verify() does for the serial port --
         these config writes are rare enough (once per state
@@ -963,7 +703,7 @@ class DM41ExplorerApp(ctk.CTk):
         self._tabs[name].render(self.memory)
         self._tabs_dirty[name] = False
 
-    def _render_tabs(self):
+    def render_tabs(self):
         """Invalidates every tab (e.g. after loading a whole new state) and
         immediately re-renders whichever one is currently visible; the
         rest pick up the new memory next time they're selected."""
@@ -986,7 +726,7 @@ class DM41ExplorerApp(ctk.CTk):
         self.memory_source = None if source is None else Path(source)
         self._modified_label.configure(text="")
         self._update_source_label()
-        self._render_tabs()
+        self.render_tabs()
 
     def _update_source_label(self):
         text = (
@@ -1025,7 +765,7 @@ class DM41ExplorerApp(ctk.CTk):
             recovered,
         )
         self._on_memory_changed()
-        self._render_tabs()
+        self.render_tabs()
         if freed > 0 or recovered > 0:
             summary = f"{freed} register(s) reclaimed"
             if recovered > 0:
@@ -1082,7 +822,7 @@ class DM41ExplorerApp(ctk.CTk):
         self.memory_source = Path(path)
         self._modified_label.configure(text="")
         self._update_source_label()
-        self._remember_recent_file(path)
+        self.menus.remember_recent_file(path)
         messagebox.showinfo("Saved", f"Memory state written to {path}")
 
     def load_state_from_file(self):
@@ -1142,7 +882,7 @@ class DM41ExplorerApp(ctk.CTk):
         self.replace_memory(loaded, source=path)
         self.set_status(f"Loaded state from {Path(path).name}")
         logger.info("State loaded from %s (%s mode)", path, self.mode.value)
-        self._remember_recent_file(path)
+        self.menus.remember_recent_file(path)
 
     def open_state_file(self, path):
         """Opens `path` as the app's current state, prompting to discard
@@ -1158,8 +898,7 @@ class DM41ExplorerApp(ctk.CTk):
         if not Path(path).exists():
             logger.warning("Could not find file: %s", path)
             messagebox.showerror("Error", f"Could not find file: {path}")
-            self.config_store.remove_recent_file(path)
-            self._recent_files_changed()
+            self.menus.forget_recent_file(path)
             return
         if not self.confirm_discard("load a different state"):
             return
@@ -1238,9 +977,9 @@ class DM41ExplorerApp(ctk.CTk):
         changed and its libraries clash on an XROM number, says so once."""
         before = [library.id for library in self.xrom_active.libraries]
         self.config_store.set_xrom_library_entries(self.mode, entries)
-        self._persist_config("the XROM libraries")
+        self.persist_config("the XROM libraries")
         self._apply_xrom_libraries()
-        self._render_tabs()
+        self.render_tabs()
         active = self.xrom_active.libraries
         plugins = [library for library in active if not library.builtin_on]
         self.set_status(
@@ -1289,7 +1028,7 @@ class DM41ExplorerApp(ctk.CTk):
             # user has confirmed this session's override as the saved
             # setting. Nothing to erase; just stop calling it temporary.
             self.config_store.mode = requested_mode
-            self._persist_config("the DM41L/DM41X mode")
+            self.persist_config("the DM41L/DM41X mode")
             self._refresh_mode_indicator()
 
         ctk.set_appearance_mode(self.config_store.appearance_mode)
@@ -1305,7 +1044,7 @@ class DM41ExplorerApp(ctk.CTk):
         self.xm_files_tab.refresh_theme()
         self.program_tab.refresh_theme()
         self.alarms_tab.refresh_theme()
-        self._render_tabs()
+        self.render_tabs()
 
     # -- Shutdown -----------------------------------------------------------
 

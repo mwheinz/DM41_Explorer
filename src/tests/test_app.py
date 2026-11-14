@@ -79,14 +79,14 @@ def _reset(app):
     if dialog is not None and dialog.winfo_exists():
         dialog.destroy()
     app._preferences_dialog = None
-    app._apply_mode_to_menus()
+    app.menus.set_serial_enabled(app.mode.supports_serial)
     app._refresh_mode_indicator()
     app.tabview.set("Overview")
     app.replace_memory(Memory(profile=app.profile))
     app.set_status(app.idle_status())
     app._battery_label.configure(text="")
     app._calc_time_label.configure(text="")
-    app._rebuild_recent_files_menu()
+    app.menus.rebuild_recent_files()
 
 
 @pytest.fixture
@@ -860,17 +860,17 @@ def test_an_unreadable_xm_directory_does_not_offer_dm41x_mode(dm41l_app, tmp_pat
 
 
 def _connect_entries(instance):
-    menu = instance._connect_menu
+    menu = instance.menus.connect_menu
     return [
         menu.entrycget(index, "state") or "normal"
-        for index in instance._serial_menu_indices
+        for index in instance.menus.serial_menu_indices
     ]
 
 
 def test_the_connect_menu_follows_the_mode(app):
     """The serial entries are disabled, not hidden, in a mode with no
     serial console."""
-    assert app._serial_menu_indices, "there are serial entries to gate"
+    assert app.menus.serial_menu_indices, "there are serial entries to gate"
     assert set(_connect_entries(app)) == {"disabled"}
 
     with _yes():
@@ -1231,7 +1231,7 @@ def test_a_number_clash_is_shown_once_after_a_change(app, builtin_xroms_after):
 
 
 def _menu_labels(app, name):
-    menu = app.nametowidget(app._menubar.entrycget(name, "menu"))
+    menu = app.nametowidget(app.menus.menubar.entrycget(name, "menu"))
     return [
         menu.entrycget(i, "label")
         for i in range(menu.index("end") + 1)
@@ -1290,7 +1290,7 @@ def test_preferences_opens_only_once(app):
 
 
 def _accelerator(app, menu_name, label):
-    menu = app.nametowidget(app._menubar.entrycget(menu_name, "menu"))
+    menu = app.nametowidget(app.menus.menubar.entrycget(menu_name, "menu"))
     for i in range(menu.index("end") + 1):
         if menu.type(i) == "command" and menu.entrycget(i, "label") == label:
             return menu.entrycget(i, "accelerator")
