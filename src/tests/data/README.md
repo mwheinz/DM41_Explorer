@@ -58,3 +58,27 @@ correctly.
 * unlabelled.dm41: Two apps with no global labels at all.
 * xrom-keyassignments.dm41: Used both to test key assignments to external rom
   functions and to test a bug fix involving key assignments to row 4.
+
+## PX-41CX dumps (#82)
+
+`px41cx_*.px41` are memory dumps in the PX-41CX's variant of the state text
+format (header `PX41`, usually a trailing `EOF` line, single spaces between
+registers). They are copied byte for byte from the decoder test data of
+Martin Krischik's hp41cx_tools, part of the Calculator Scripts project
+(https://sourceforge.net/projects/calculator-scripts/), GPL-3.0-or-later.
+Source folder `Tools/hp41cx_tools/test/share/hp41cx_tools_test_decoder/` at
+commit 8f929353481ef4f618d7675811e8689d6d162a6e, where each is named
+`in_<name>.px41`; here they are `px41cx_<name>.px41`. The name says what each
+dump was made to exercise (key assignments, the clock, END, GTO, labels,
+number entry, registers, SIZE, special characters, XROMs).
+
+Not all of them came from a PX-41CX:
+
+* px41cx_GRAVITY.px41 is a DM41 state with its header changed and an `EOF`
+  added: its special registers are the DM41's (`C` equals `B`), and its
+  registers are separated by two spaces, as a DM41 writes them.
+* px41cx_NQUEENS.px41 was written by hp41cx_tools' encoder, not a calculator:
+  every special register is zero, there is no `S:` line and no `EOF`, and
+  registers are separated by two spaces.
+
+Nothing loads these files yet: golden.py sweeps only `.dm41` and `.d41`.
