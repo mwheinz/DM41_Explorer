@@ -94,6 +94,16 @@ def test_the_dumps_with_upper_extended_memory_fit_it(name):
     ), findings
 
 
+def test_a_px41_header_names_the_px41cx_mode():
+    assert DeviceMode.that_wrote("PX41") is DeviceMode.PX41CX
+
+
+def test_a_dm41_header_names_no_mode():
+    """It could be a DM41L's or a DM41X's."""
+    assert DeviceMode.that_wrote("DM41") is None
+    assert DeviceMode.that_wrote("HP41") is None
+
+
 def test_every_mode_has_a_save_extension():
     from gui.state_files import DEFAULT_EXTENSION_BY_MODE
 

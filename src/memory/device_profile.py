@@ -24,7 +24,7 @@ extension, and not what is plugged in.
 
 import enum
 from dataclasses import dataclass
-from typing import FrozenSet, Tuple
+from typing import FrozenSet, Optional, Tuple
 
 from .xrom_library import builtin_xrom_names
 
@@ -185,6 +185,16 @@ class DeviceMode(enum.Enum):
         """Whether the serial actions mean anything in this mode. Asks the
         profile; never tests the mode's name."""
         return self.profile.supports_serial
+
+    @classmethod
+    def that_wrote(cls, header: str) -> Optional["DeviceMode"]:
+        """The mode whose calculator writes states with `header`, if only
+        one does (#82). A PX41 header means a PX-41CX wrote the file; a
+        DM41 one could be a DM41L's or a DM41X's, so it names no mode, and
+        the file opens in the current one. Asks each profile's
+        `state_header`; never tests a mode's name."""
+        modes = [mode for mode in cls if mode.profile.state_header == header]
+        return modes[0] if len(modes) == 1 else None
 
     @classmethod
     def from_value(cls, value, default: "DeviceMode" = None) -> "DeviceMode":

@@ -179,10 +179,14 @@ class StateFiles:
         modified and confirming with the user first, since the right prompt
         (or whether to prompt at all) differs by caller.
 
-        A state is opened with the current mode's profile. If it does not
-        fit that model, the user is offered DM41X mode instead
-        (ModeSwitcher.offer_switch_for_load); declining leaves the open state
-        alone, so nothing is assigned here until that is settled."""
+        A state is opened with the current mode's profile. If its header
+        says another mode's calculator wrote it (a PX-41CX dump, #82), the
+        user is offered that mode; declining opens it in the current one,
+        if it fits. If it does not fit the current model, the user is
+        offered a mode it fits -- the one that wrote it, else DM41X -- and
+        declining leaves the open state alone (see
+        ModeSwitcher.offer_switch_for_load), so nothing is assigned here
+        until that is settled."""
         app = self.app
         # Parsed into a local first: the state only replaces the open
         # buffer once it is known to fit the mode (or the user has agreed
@@ -192,7 +196,17 @@ class StateFiles:
             return
 
         findings = evaluate_mode_switch(loaded, app.profile)
-        if findings and evaluate_mode_switch(loaded, DeviceMode.DM41X.profile):
+        written_by = DeviceMode.that_wrote(loaded.header)
+        target = None
+        if (
+            written_by is not None
+            and written_by is not app.mode
+            and not evaluate_mode_switch(loaded, written_by.profile)
+        ):
+            target = written_by
+        elif findings and not evaluate_mode_switch(loaded, DeviceMode.DM41X.profile):
+            target = DeviceMode.DM41X
+        elif findings:
             # It does not fit DM41X mode either -- an XM directory that
             # cannot be read in any mode -- so offering that mode as the
             # cure would be wrong (GitHub issue #68). It opens as it is,
@@ -203,14 +217,19 @@ class StateFiles:
                 path,
                 "; ".join(str(finding) for finding in findings),
             )
-        elif findings:
-            if not app.mode_switcher.offer_switch_for_load(path, findings):
+
+        if target is not None:
+            before = app.mode
+            if not app.mode_switcher.offer_switch_for_load(
+                path, target, findings, written_by_target=target is written_by
+            ):
                 return
-            # The mode moved, so the state has to be re-read under the new
-            # profile: the one just parsed still carries the old memory map.
-            loaded = self._read(path)
-            if loaded is None:
-                return
+            if app.mode is not before:
+                # The state has to be re-read under the new profile: the one
+                # just parsed still carries the old memory map.
+                loaded = self._read(path)
+                if loaded is None:
+                    return
 
         app.replace_memory(loaded, source=path)
         app.set_status(f"Loaded state from {Path(path).name}")
