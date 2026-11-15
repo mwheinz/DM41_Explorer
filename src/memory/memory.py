@@ -24,6 +24,8 @@ from .constants import (
     REGISTER_SIZE_BYTES,
     SPECIAL_REGISTER_SIZE_OVERRIDES,
     SPECIAL_REGISTER_LABELS,
+    STATE_END_MARKER,
+    STATE_STYLES,
 )
 from .regions import RegionSpan, VoidRegion, FreeSpace
 from .status_registers import StatusRegisters
@@ -36,9 +38,20 @@ from .xm_file import ExtendedMemory
 
 class Memory:
     """A complete DM41-series memory state (a DM41L `.dm41` state or a DM41X
-    `.d41` state file -- the text format is identical)."""
+    `.d41` state file -- the text format is identical), or a PX-41CX dump
+    (`.px41`), which holds the same registers in a slightly different
+    layout (#82).
+
+    `header` is the state's header line, "DM41" or "PX41". It says which
+    layout to_string() writes, and is kept from the text a state was read
+    from."""
 
     def __init__(self, header: str = "DM41", profile: DeviceProfile = DM41L):
+        if header not in STATE_STYLES:
+            raise ValueError(
+                f"Unknown state header {header!r} "
+                f"(expected one of {', '.join(STATE_STYLES)})"
+            )
         self._header = header
         # Which DM41 model's memory map this state uses. The state text
         # doesn't say, so the caller chooses -- see device_profile.py.
@@ -110,8 +123,13 @@ class Memory:
     def from_string(cls, buffer: str, profile: DeviceProfile = DM41L) -> "Memory":
         """
         Creates a new Memory object from a string that contains a DM41
-        memory state. `profile` says which model's memory map to use (the
-        text format is identical for every model).
+        memory state or a PX-41CX dump. `profile` says which model's memory
+        map to use (the text format is identical for every DM41 model).
+
+        The header line is kept, so to_string() writes the state back in
+        the same layout. A line `EOF`, which the PX-41CX writes at the end
+        of a dump, ends the state in either layout: what follows it is
+        ignored.
         """
 
         memory = cls(profile=profile)
@@ -129,9 +147,12 @@ class Memory:
         # none), and to_string() leaves it out when there is none.
         memory._special_registers.pop("S", None)
 
-        header = lines[0]
-        if header != "DM41":
-            raise ValueError(f"Invalid header: {header}")
+        header = lines[0].strip()
+        if header not in STATE_STYLES:
+            raise ValueError(
+                f"Invalid header: {header} (expected one of {', '.join(STATE_STYLES)})"
+            )
+        memory._header = header
 
         phase = 1
         next_base = 0
@@ -139,6 +160,8 @@ class Memory:
             line = line.strip()
             if not line:
                 continue
+            if line == STATE_END_MARKER:
+                break
 
             token = line.split()
             if ":" not in token[0]:
@@ -224,9 +247,11 @@ class Memory:
             return cls.from_string(f.read(), profile=profile)
 
     def to_string(self) -> str:
-        """Create a string representation of the memory state."""
+        """Create a string representation of the memory state, in the
+        layout its header calls for (constants.STATE_STYLES)."""
+        style = STATE_STYLES[self._header]
 
-        # Section I: "DM41"
+        # Section I: the header, "DM41" or "PX41"
         lines = [self._header]
 
         # Section II: Core Memory. For compactness, a row that consists of all
@@ -253,7 +278,7 @@ class Memory:
                     continue
                 row = [f"{base_idx:02x}"]
                 row.extend(register.get_hex() for register in registers)
-                lines.append("  ".join(row))
+                lines.append(style["row_sep"].join(row) + style["row_end"])
 
         # Section III: Special Registers
         # These appear to be representations of the HP41's CPU registers. Note
@@ -261,20 +286,18 @@ class Memory:
         # state keeps its own, and a new Memory starts with "Memory Lost"
         # values (#79).
         if self._special_registers:
-            # These need to be emitted in the same order they first appeared.
-            A = self._special_registers["A"].get_hex()
-            B = self._special_registers["B"].get_hex()
-            C = self._special_registers["C"].get_hex()
-            lines.append(f"A: {A} B: {B} C: {C}")
-            # S may not be present.
-            S = self._special_registers.get("S", None)
-            if S is not None:
-                lines.append(f"S: {S.get_hex()}")
-            M = self._special_registers["M"].get_hex()
-            N = self._special_registers["N"].get_hex()
-            G = self._special_registers["G"].get_hex()
-            lines.append(f"M: {M} N: {N} G: {G}")
+            # Three lines, A B C, then S, then M N G; S may not be present.
+            for labels in (("A", "B", "C"), ("S",), ("M", "N", "G")):
+                pairs = [
+                    f"{label}: {self._special_registers[label].get_hex()}"
+                    for label in labels
+                    if label in self._special_registers
+                ]
+                if pairs:
+                    lines.append(style["pair_sep"].join(pairs))
 
+        if style["end_marker"]:
+            lines.append(style["end_marker"])
         return "\n".join(lines) + "\n"
 
     def to_file(self, path: Union[str, Path]):

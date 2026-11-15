@@ -1,8 +1,9 @@
 """
 A representation of the memory of a DM41-series emulator (DM41L, DM41X).
 
-A state has three parts: the "DM41" header, the main memory registers, and
-the "special registers" (apparently the emulated HP-41 CPU registers).
+A state has three parts: the header ("DM41", or "PX41" in a PX-41CX dump),
+the main memory registers, and the "special registers" (apparently the
+emulated HP-41 CPU registers).
 `Memory` (memory.py) holds one, and reaches each kind of memory through a
 region object; everything public is re-exported here.
 
