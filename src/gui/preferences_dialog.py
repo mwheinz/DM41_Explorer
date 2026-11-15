@@ -74,6 +74,10 @@ MODE_HINTS = {
         "DM41X: no serial connection, 600 extended-memory registers,\n"
         "and the DM41X's own functions as well."
     ),
+    DeviceMode.PX41CX: (
+        "PX-41CX: no serial connection, 600 extended-memory registers,\n"
+        "only the HP-41CX's functions, and .px41 state files."
+    ),
 }
 
 

@@ -67,6 +67,7 @@ from .device_profile import (
     DEFAULT_MODE,
     DM41L,
     DM41X,
+    PX41CX,
     PROFILES,
 )
 from .constants import (
@@ -154,6 +155,7 @@ __all__ = [
     "DEFAULT_MODE",
     "DM41L",
     "DM41X",
+    "PX41CX",
     "PROFILES",
     "MIN_SANE_R00",
     "MemoryRegion",

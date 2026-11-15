@@ -456,7 +456,10 @@ def test_save_as_keeps_the_files_own_extension(app, name, extension):
     assert ask.call_args.kwargs["defaultextension"] == extension
 
 
-@pytest.mark.parametrize("mode, extension", [("DM41X", ".d41"), ("DM41L", ".dm41")])
+@pytest.mark.parametrize(
+    "mode, extension",
+    [("DM41X", ".d41"), ("DM41L", ".dm41"), ("PX-41CX", ".px41")],
+)
 def test_save_as_of_a_new_buffer_follows_the_mode(app_in_mode, mode, extension):
     """A buffer with no file of its own gets the extension the current
     mode's calculator writes (plan, phase 6)."""
@@ -466,6 +469,90 @@ def test_save_as_of_a_new_buffer_follows_the_mode(app_in_mode, mode, extension):
     ) as ask:
         app.state_files.save_as()
     assert ask.call_args.kwargs["defaultextension"] == extension
+
+
+# -- The extension decides the layout (#82) ----------------------------------
+
+
+def _save_as(app, path):
+    with (
+        mock.patch(
+            "gui.state_files.filedialog.asksaveasfilename", return_value=str(path)
+        ),
+        mock.patch("gui.app.messagebox.showinfo"),
+    ):
+        app.state_files.save_as()
+    return path.read_text()
+
+
+@pytest.mark.parametrize(
+    "mode, source, target, header",
+    [
+        # A DM41 state named .px41 is written as a PX-41CX dump...
+        ("DM41X", "dm41x_xrom_keys.d41", "copy.px41", "PX41"),
+        # ...and a PX-41CX dump named .d41 or .dm41 as a DM41 state.
+        ("PX-41CX", "px41cx_GTO.px41", "copy.d41", "DM41"),
+        ("DM41L", "px41cx_GTO.px41", "copy.dm41", "DM41"),
+        # A file named .px41 stays one in a DM41 mode.
+        ("DM41X", "px41cx_GTO.px41", "copy.px41", "PX41"),
+        # Any other extension gets the mode's own layout.
+        ("PX-41CX", None, "notes.txt", "PX41"),
+        ("DM41X", None, "notes.txt", "DM41"),
+        ("PX-41CX", "dm41x_xrom_keys.d41", "notes.txt", "PX41"),
+    ],
+)
+def test_the_extension_saved_to_decides_the_layout(
+    app_in_mode, tmp_path, mode, source, target, header
+):
+    app = app_in_mode(mode)
+    if source:
+        app.state_files.load(str(DATA_DIR / source))
+    loaded = Memory.from_string(app.memory.to_string(), profile=app.profile)
+
+    written = _save_as(app, tmp_path / target)
+
+    assert written.splitlines()[0] == header
+    assert written.endswith("\nEOF\n") is (header == "PX41")
+    assert app.memory.header == header
+    # Only the layout changed: the registers are the ones loaded.
+    saved = Memory.from_string(written, profile=app.profile)
+    for addr in set(saved._core_memory) | set(loaded._core_memory):
+        assert saved.get_register(addr) == loaded.get_register(addr), hex(addr)
+
+
+def test_a_later_save_keeps_the_layout_save_as_chose(app_in_mode, tmp_path):
+    app = app_in_mode("DM41X")
+    app.state_files.load(str(DATA_DIR / "dm41x_xrom_keys.d41"))
+    path = tmp_path / "copy.px41"
+    _save_as(app, path)
+
+    app.memory.status_registers.set_flag(0, True)
+    app.on_memory_changed()
+    with (
+        mock.patch("gui.app.messagebox.askyesno", return_value=True),
+        mock.patch("gui.app.messagebox.showinfo"),
+    ):
+        app.state_files.save()
+
+    assert path.read_text().startswith("PX41\n")
+
+
+def test_a_failed_save_leaves_the_layout_as_it_was(app_in_mode, tmp_path):
+    app = app_in_mode("DM41X")
+    app.state_files.load(str(DATA_DIR / "dm41x_xrom_keys.d41"))
+    with (
+        mock.patch.object(app.memory, "to_file", side_effect=OSError("disk full")),
+        mock.patch("gui.app.messagebox.showerror") as error,
+    ):
+        target = tmp_path / "copy.px41"
+        with mock.patch(
+            "gui.state_files.filedialog.asksaveasfilename",
+            return_value=str(target),
+        ):
+            app.state_files.save_as()
+    error.assert_called_once()
+    assert app.memory.header == "DM41"
+    assert not target.exists()
 
 
 def test_a_d41_file_saves_back_identically(app, tmp_path):

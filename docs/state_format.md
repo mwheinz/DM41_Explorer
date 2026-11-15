@@ -144,6 +144,8 @@ The register contents themselves are unchanged. Loading a file, saving it and lo
 
 A PX41 file is written in the PX-41CX layout of section 4.1, so a dump in that layout comes back **byte for byte**; `src/tests/test_px41_state_format.py` checks this for the 12 captures in it. A PX41 file in any other layout is rewritten in it.
 
+`Memory.to_string()` writes the layout of the state's own header. When DM41_Explorer saves a file, the header is first set from the file's extension (`gui/state_files.py`, `HEADER_BY_EXTENSION`): `.px41` gives a PX-41CX dump and `.dm41` or `.d41` a DM41 state, wherever the state came from; any other extension gives the current mode's layout. Save As offers the current mode's extension for a new state, so choosing another extension is how a state is converted from one layout to the other.
+
 ## 7. Open Questions
 
 - Does a DM41L accept a state without the trailing spaces? The DM41X test is one file.

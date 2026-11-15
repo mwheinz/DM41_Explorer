@@ -5,7 +5,9 @@ models.
 Every DM41-series calculator shares one HP-41CX memory model and one state
 text format (a DM41L `.dm41` state and a DM41X `.d41` state file are the same
 format, with the same `DM41` header line), so a file cannot say which model
-wrote it. The caller says: Memory.from_string(text, profile=DM41X).
+wrote it. The caller says: Memory.from_string(text, profile=DM41X). The
+PX-41CX, an HP-41CX clone, has the same memory model and its own variant of
+the format, with a `PX41` header (#82).
 
 A profile holds the list of extended-memory regions, the set of XROM
 functions the model has built in, and whether the model can be reached over
@@ -52,13 +54,18 @@ class DeviceProfile:
     `loads_modules` is whether the model can plug in other ROM modules
     (.mod files), so whether an XROM outside `builtin_xroms` may still
     run on it. The DM41X can; the DM41L has only its built-in ROMs. Also
-    defaults to False."""
+    defaults to False.
+
+    `state_header` is the header line of the state files the model writes,
+    "DM41" or "PX41" (#82): the one a new, empty state for it gets, so it is
+    saved in the model's own layout."""
 
     name: str
     xm_regions: Tuple[Tuple[int, int], ...]
     builtin_xroms: FrozenSet[Tuple[int, int]]
     supports_serial: bool = False
     loads_modules: bool = False
+    state_header: str = "DM41"
 
     def __post_init__(self):
         if not self.xm_regions:
@@ -129,7 +136,25 @@ DM41X = DeviceProfile(
     loads_modules=True,
 )
 
-PROFILES = {profile.name: profile for profile in (DM41L, DM41X)}
+# The PX-41CX is an HP-41CX clone (#82). Its dumps hold extended memory in
+# the same three regions as the DM41X (tests/data/px41cx_SIZE300.px41 has
+# rows from 0x220 to 0x2ec and at 0x300; px41cx_ASN.px41 and
+# px41cx_CLOCK.px41 have data at 0x301-0x3ef). It pre-loads only the
+# original HP-41CX's ROMs, Extended Functions (XROM 25) and Time (XROM 26),
+# so its built-in library is the DM41L's hp41cx.json, without the DM41X's
+# additions; other ROMs are loaded by the user, as on the DM41X. Its
+# USB serial link speaks COMDUMP, not the DM41L's console, so its mode offers
+# no serial actions for now.
+PX41CX = DeviceProfile(
+    "PX-41CX",
+    ((0x40, 0xBF), (0x201, 0x2EF), (0x301, 0x3EF)),
+    frozenset(builtin_xrom_names("PX-41CX", headers=True)),
+    supports_serial=False,
+    loads_modules=True,
+    state_header="PX41",
+)
+
+PROFILES = {profile.name: profile for profile in (DM41L, DM41X, PX41CX)}
 
 
 class DeviceMode(enum.Enum):
@@ -148,6 +173,7 @@ class DeviceMode(enum.Enum):
 
     DM41L = "DM41L"
     DM41X = "DM41X"
+    PX41CX = "PX-41CX"
 
     @property
     def profile(self) -> DeviceProfile:

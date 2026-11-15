@@ -44,9 +44,11 @@ class Memory:
 
     `header` is the state's header line, "DM41" or "PX41". It says which
     layout to_string() writes, and is kept from the text a state was read
-    from."""
+    from; a new, empty state gets its profile's (`state_header`)."""
 
-    def __init__(self, header: str = "DM41", profile: DeviceProfile = DM41L):
+    def __init__(self, header: str = None, profile: DeviceProfile = DM41L):
+        if header is None:
+            header = profile.state_header
         if header not in STATE_STYLES:
             raise ValueError(
                 f"Unknown state header {header!r} "
@@ -340,6 +342,24 @@ class Memory:
         """Return the MemoryRegion registered under `key` Raises KeyError for
         anything else if the region name does not exist.."""
         return self._regions[key]
+
+    @property
+    def header(self) -> str:
+        """The state's header line, "DM41" or "PX41": which layout
+        to_string() writes (#82)."""
+        return self._header
+
+    @header.setter
+    def header(self, header: str):
+        """Changes the layout the state is written in, e.g. to save a DM41
+        state as a PX-41CX dump. The registers are untouched, so this does
+        not count as a modification."""
+        if header not in STATE_STYLES:
+            raise ValueError(
+                f"Unknown state header {header!r} "
+                f"(expected one of {', '.join(STATE_STYLES)})"
+            )
+        self._header = header
 
     @property
     def profile(self) -> DeviceProfile:

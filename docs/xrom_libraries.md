@@ -17,7 +17,7 @@ The design and the tests on real calculators behind it are in GitHub issues [#44
 
 | Model | Library | Contents |
 | --- | --- | --- |
-| DM41L | `hp41cx` | The HP-41CX Extended Functions (XROM 25) and Time (XROM 26) ROMs, with their section headers (`-EXT FCN 2D`, `-CX EXT FCN`, `-TIME 2C`, `-CX TIME`). |
+| DM41L, PX-41CX | `hp41cx` | The HP-41CX Extended Functions (XROM 25) and Time (XROM 26) ROMs, with their section headers (`-EXT FCN 2D`, `-CX EXT FCN`, `-TIME 2C`, `-CX TIME`). The PX-41CX, an HP-41CX clone, pre-loads only these (#82); its section headers have not been checked on one. |
 | DM41X | `dm41x-cx` | The DM41X's patched versions of those ROMs: the HP-41CX set plus X<I>Y (25,63), TRNG (26,36), the 16 `-DM 41X-` functions (26,38–26,53) and the ROMs' section headers. |
 
 **Shipped with DM41_Explorer.** These are the 20 application pacs on the DM41X's disk, plus the Thermal Printer, which is preloaded in the DM41X's flash. The pac libraries were read from the `.mod` files themselves, and their numbers were checked against a real DM41X:
@@ -41,7 +41,7 @@ Several pacs share an XROM number, as on the original HP-41, where only one of t
 
 ## Choosing libraries
 
-**Tools → XROM Libraries…** opens the manager for the current mode (DM41L or DM41X).
+**Tools → XROM Libraries…** opens the manager for the current mode (DM41L, DM41X or PX-41CX).
 
 ![XROM Libraries](../resources/screenshots/xrom_libraries.png)
 
