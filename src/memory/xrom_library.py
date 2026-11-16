@@ -52,7 +52,7 @@ FORMAT_VERSION = 1
 
 # The models a library can be built into. Kept here rather than read from
 # device_profile.PROFILES, which will depend on this module (see above).
-KNOWN_MODELS = ("DM41L", "DM41X")
+KNOWN_MODELS = ("DM41L", "DM41X", "PX-41CX")
 
 # Where the libraries shipped with the application live.
 SHIPPED_DIR = Path(__file__).resolve().parent / "xroms"

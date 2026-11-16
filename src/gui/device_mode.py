@@ -1,18 +1,19 @@
 """
-Switching the main window between DM41L and DM41X mode (GitHub issues #43
-and #77).
+Switching the main window between the DM41L, DM41X and PX-41CX modes
+(GitHub issues #43, #77 and #82).
 
 The mode itself is `DM41ExplorerApp.mode`, the single source of truth for
 the memory map in use. `ModeSwitcher` holds the ways it changes: from
 Preferences (saved), and as an offer when a state too large for the
-current mode is opened (this session only). Changing mode erases the open
-state, so every change goes through set_mode()'s confirmation.
+current mode, or saved by another mode's calculator (a PX-41CX dump, #82),
+is opened (this session only). Changing mode erases the open state, so
+every change goes through set_mode()'s confirmation.
 """
 
 import logging
 from pathlib import Path
 
-from memory import DeviceMode, Memory
+from memory import Memory
 from gui.dialog_common import ask_yes_no
 
 logger = logging.getLogger(__name__)
@@ -81,7 +82,7 @@ class ModeSwitcher:
         app.xrom_libraries.apply()
         if persist:
             app.config_store.mode = mode
-            app.persist_config("the DM41L/DM41X mode")
+            app.persist_config("the calculator mode")
         logger.info(
             "Mode changed from %s to %s (%s)",
             previous.value,
@@ -97,31 +98,50 @@ class ModeSwitcher:
         )
         return True
 
-    def offer_switch_for_load(self, path, findings) -> bool:
-        """Offers DM41X mode for a state that will not fit the current one,
-        and returns whether the caller should go on to load it.
+    def offer_switch_for_load(
+        self, path, target, findings=(), *, written_by_target=False
+    ) -> bool:
+        """Offers `target` mode for the state at `path`, and returns whether
+        the caller should go on to load it (in whichever mode is then in
+        force).
+
+        Offered for two reasons, which `findings` and `written_by_target`
+        say: the state will not fit the current mode (`findings`, what
+        does not fit), or its header says `target`'s calculator wrote it
+        (#82). A state that does not fit is not loaded if the user
+        declines; one that only came from the other calculator is then
+        loaded in the current mode.
 
         The offer is deliberately session-only: someone who owns one
         calculator will rarely want the other mode permanently, so
-        accepting does not write the preference. Declining aborts the load
-        and leaves both the mode and the open state alone."""
+        accepting does not write the preference. A declined offer leaves
+        the mode alone."""
         app = self.app
-        target = DeviceMode.DM41X
-        logger.info(
-            "%s does not fit %s mode: %s",
-            path,
-            app.mode.value,
-            "; ".join(str(finding) for finding in findings),
-        )
+        name = Path(path).name
+        current = app.mode
+        if findings:
+            logger.info(
+                "%s does not fit %s mode: %s",
+                path,
+                current.value,
+                "; ".join(str(finding) for finding in findings),
+            )
         # The findings are for the log, above: to decide whether to switch,
         # the user only needs to know the state is too big (issue #60).
-        reason = (
-            f"{Path(path).name} needs more memory than a {app.mode.value} has."
-            f"\n\n{target.value} mode can open it."
-        )
-        if not self.set_mode(target, persist=False, reason=reason):
-            app.set_status(f"Did not load {Path(path).name}: needs DM41X mode.")
+        lines = []
+        if written_by_target:
+            lines.append(f"{name} was saved by a {target.value}.")
+        if findings:
+            lines.append(f"{name} needs more memory than a {current.value} has.")
+        lines.append(f"{target.value} mode can open it.")
+        if not findings:
+            lines.append(f"If you don't switch, it opens in {current.value} mode.")
+        if self.set_mode(target, persist=False, reason="\n\n".join(lines)):
+            return True
+        if findings:
+            app.set_status(f"Did not load {name}: needs {target.value} mode.")
             return False
+        logger.info("Opening %s in %s mode, as asked", path, current.value)
         return True
 
     def apply_preference(self, requested_mode):
@@ -140,5 +160,5 @@ class ModeSwitcher:
             # user has confirmed this session's override as the saved
             # setting. Nothing to erase; just stop calling it temporary.
             app.config_store.mode = requested_mode
-            app.persist_config("the DM41L/DM41X mode")
+            app.persist_config("the calculator mode")
             app.refresh_mode_indicator()

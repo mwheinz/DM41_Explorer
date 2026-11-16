@@ -5,7 +5,9 @@ models.
 Every DM41-series calculator shares one HP-41CX memory model and one state
 text format (a DM41L `.dm41` state and a DM41X `.d41` state file are the same
 format, with the same `DM41` header line), so a file cannot say which model
-wrote it. The caller says: Memory.from_string(text, profile=DM41X).
+wrote it. The caller says: Memory.from_string(text, profile=DM41X). The
+PX-41CX, an HP-41CX clone, has the same memory model and its own variant of
+the format, with a `PX41` header (#82).
 
 A profile holds the list of extended-memory regions, the set of XROM
 functions the model has built in, and whether the model can be reached over
@@ -22,7 +24,8 @@ extension, and not what is plugged in.
 
 import enum
 from dataclasses import dataclass
-from typing import FrozenSet, Tuple
+from functools import cached_property
+from typing import FrozenSet, Optional, Tuple
 
 from .xrom_library import builtin_xrom_names
 
@@ -52,13 +55,18 @@ class DeviceProfile:
     `loads_modules` is whether the model can plug in other ROM modules
     (.mod files), so whether an XROM outside `builtin_xroms` may still
     run on it. The DM41X can; the DM41L has only its built-in ROMs. Also
-    defaults to False."""
+    defaults to False.
+
+    `state_header` is the header line of the state files the model writes,
+    "DM41" or "PX41" (#82): the one a new, empty state for it gets, so it is
+    saved in the model's own layout."""
 
     name: str
     xm_regions: Tuple[Tuple[int, int], ...]
     builtin_xroms: FrozenSet[Tuple[int, int]]
     supports_serial: bool = False
     loads_modules: bool = False
+    state_header: str = "DM41"
 
     def __post_init__(self):
         if not self.xm_regions:
@@ -72,6 +80,17 @@ class DeviceProfile:
                     f"Bad XM region (0x{lo:x}, 0x{hi:x}) in profile {self.name}"
                 )
             previous_hi = hi
+
+    @cached_property
+    def builtin_modules(self) -> FrozenSet[int]:
+        """The XROM module numbers of the model's built-in ROMs, such as 25
+        (Extended Functions) and 26 (Time). A plugged-in module cannot use
+        one of these numbers, so a function numbered in one of them that
+        is not in `builtin_xroms` is not on the model at all (#82). The
+        module number is decoded as in mnemonics.xrom_numbers()."""
+        return frozenset(
+            ((byte1 & 0x07) << 2) | (byte2 >> 6) for byte1, byte2 in self.builtin_xroms
+        )
 
     @property
     def xm_address_range(self) -> Tuple[int, int]:
@@ -129,7 +148,25 @@ DM41X = DeviceProfile(
     loads_modules=True,
 )
 
-PROFILES = {profile.name: profile for profile in (DM41L, DM41X)}
+# The PX-41CX is an HP-41CX clone (#82). Its dumps hold extended memory in
+# the same three regions as the DM41X (tests/data/px41cx_SIZE300.px41 has
+# rows from 0x220 to 0x2ec and at 0x300; px41cx_ASN.px41 and
+# px41cx_CLOCK.px41 have data at 0x301-0x3ef). It pre-loads only the
+# original HP-41CX's ROMs, Extended Functions (XROM 25) and Time (XROM 26),
+# so its built-in library is the DM41L's hp41cx.json, without the DM41X's
+# additions; other ROMs are loaded by the user, as on the DM41X. Its
+# USB serial link speaks COMDUMP, not the DM41L's console, so its mode offers
+# no serial actions for now.
+PX41CX = DeviceProfile(
+    "PX-41CX",
+    ((0x40, 0xBF), (0x201, 0x2EF), (0x301, 0x3EF)),
+    frozenset(builtin_xrom_names("PX-41CX", headers=True)),
+    supports_serial=False,
+    loads_modules=True,
+    state_header="PX41",
+)
+
+PROFILES = {profile.name: profile for profile in (DM41L, DM41X, PX41CX)}
 
 
 class DeviceMode(enum.Enum):
@@ -148,6 +185,7 @@ class DeviceMode(enum.Enum):
 
     DM41L = "DM41L"
     DM41X = "DM41X"
+    PX41CX = "PX-41CX"
 
     @property
     def profile(self) -> DeviceProfile:
@@ -159,6 +197,16 @@ class DeviceMode(enum.Enum):
         """Whether the serial actions mean anything in this mode. Asks the
         profile; never tests the mode's name."""
         return self.profile.supports_serial
+
+    @classmethod
+    def that_wrote(cls, header: str) -> Optional["DeviceMode"]:
+        """The mode whose calculator writes states with `header`, if only
+        one does (#82). A PX41 header means a PX-41CX wrote the file; a
+        DM41 one could be a DM41L's or a DM41X's, so it names no mode, and
+        the file opens in the current one. Asks each profile's
+        `state_header`; never tests a mode's name."""
+        modes = [mode for mode in cls if mode.profile.state_header == header]
+        return modes[0] if len(modes) == 1 else None
 
     @classmethod
     def from_value(cls, value, default: "DeviceMode" = None) -> "DeviceMode":

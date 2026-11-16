@@ -21,7 +21,7 @@ from unittest import mock
 
 from config import ProjectConfig
 from engine.command_engine import CommandEngine
-from memory import DM41L, DM41X, DeviceMode, Memory
+from memory import DM41L, DM41X, PX41CX, DeviceMode, Memory
 import gui.app as app_module
 import gui.connection as connection_module
 from gui.app import DM41ExplorerApp
@@ -456,7 +456,10 @@ def test_save_as_keeps_the_files_own_extension(app, name, extension):
     assert ask.call_args.kwargs["defaultextension"] == extension
 
 
-@pytest.mark.parametrize("mode, extension", [("DM41X", ".d41"), ("DM41L", ".dm41")])
+@pytest.mark.parametrize(
+    "mode, extension",
+    [("DM41X", ".d41"), ("DM41L", ".dm41"), ("PX-41CX", ".px41")],
+)
 def test_save_as_of_a_new_buffer_follows_the_mode(app_in_mode, mode, extension):
     """A buffer with no file of its own gets the extension the current
     mode's calculator writes (plan, phase 6)."""
@@ -466,6 +469,94 @@ def test_save_as_of_a_new_buffer_follows_the_mode(app_in_mode, mode, extension):
     ) as ask:
         app.state_files.save_as()
     assert ask.call_args.kwargs["defaultextension"] == extension
+
+
+# -- The extension decides the layout (#82) ----------------------------------
+
+
+def _save_as(app, path):
+    with (
+        mock.patch(
+            "gui.state_files.filedialog.asksaveasfilename", return_value=str(path)
+        ),
+        mock.patch("gui.app.messagebox.showinfo"),
+    ):
+        app.state_files.save_as()
+    return path.read_text()
+
+
+@pytest.mark.parametrize(
+    "mode, source, target, header",
+    [
+        # A DM41 state named .px41 is written as a PX-41CX dump...
+        ("DM41X", "dm41x_xrom_keys.d41", "copy.px41", "PX41"),
+        # ...and a PX-41CX dump named .d41 or .dm41 as a DM41 state.
+        ("PX-41CX", "px41cx_GTO.px41", "copy.d41", "DM41"),
+        ("DM41L", "px41cx_GTO.px41", "copy.dm41", "DM41"),
+        # A file named .px41 stays one in a DM41 mode.
+        ("DM41X", "px41cx_GTO.px41", "copy.px41", "PX41"),
+        # Any other extension gets the mode's own layout.
+        ("PX-41CX", None, "notes.txt", "PX41"),
+        ("DM41X", None, "notes.txt", "DM41"),
+        ("PX-41CX", "dm41x_xrom_keys.d41", "notes.txt", "PX41"),
+    ],
+)
+def test_the_extension_saved_to_decides_the_layout(
+    app_in_mode, tmp_path, mode, source, target, header
+):
+    app = app_in_mode(mode)
+    if source:
+        # No to the offer of PX-41CX mode a dump brings up in a DM41 mode:
+        # this is about saving it from the mode it was opened in.
+        with _no():
+            app.state_files.load(str(DATA_DIR / source))
+    assert app.mode is DeviceMode(mode)
+    loaded = Memory.from_string(app.memory.to_string(), profile=app.profile)
+
+    written = _save_as(app, tmp_path / target)
+
+    assert written.splitlines()[0] == header
+    assert written.endswith("\nEOF\n") is (header == "PX41")
+    assert app.memory.header == header
+    # Only the layout changed: the registers are the ones loaded.
+    saved = Memory.from_string(written, profile=app.profile)
+    for addr in set(saved._core_memory) | set(loaded._core_memory):
+        assert saved.get_register(addr) == loaded.get_register(addr), hex(addr)
+
+
+def test_a_later_save_keeps_the_layout_save_as_chose(app_in_mode, tmp_path):
+    app = app_in_mode("DM41X")
+    app.state_files.load(str(DATA_DIR / "dm41x_xrom_keys.d41"))
+    path = tmp_path / "copy.px41"
+    _save_as(app, path)
+
+    app.memory.status_registers.set_flag(0, True)
+    app.on_memory_changed()
+    with (
+        mock.patch("gui.app.messagebox.askyesno", return_value=True),
+        mock.patch("gui.app.messagebox.showinfo"),
+    ):
+        app.state_files.save()
+
+    assert path.read_text().startswith("PX41\n")
+
+
+def test_a_failed_save_leaves_the_layout_as_it_was(app_in_mode, tmp_path):
+    app = app_in_mode("DM41X")
+    app.state_files.load(str(DATA_DIR / "dm41x_xrom_keys.d41"))
+    with (
+        mock.patch.object(app.memory, "to_file", side_effect=OSError("disk full")),
+        mock.patch("gui.app.messagebox.showerror") as error,
+    ):
+        target = tmp_path / "copy.px41"
+        with mock.patch(
+            "gui.state_files.filedialog.asksaveasfilename",
+            return_value=str(target),
+        ):
+            app.state_files.save_as()
+    error.assert_called_once()
+    assert app.memory.header == "DM41"
+    assert not target.exists()
 
 
 def test_a_d41_file_saves_back_identically(app, tmp_path):
@@ -841,6 +932,94 @@ def test_a_state_a_dm41l_can_hold_loads_without_an_offer(dm41l_app, state):
     ask.assert_not_called()
     assert dm41l_app.mode is DeviceMode.DM41L
     assert dm41l_app.memory_source == DATA_DIR / state
+
+
+# -- A PX-41CX dump offers PX-41CX mode (#82) --------------------------------
+
+
+def _px41(tmp_path, name):
+    """tests/data/<name>, a DM41 state, as a PX-41CX dump in tmp_path."""
+    memory = Memory.from_file(DATA_DIR / name, profile=DM41X)
+    memory.header = "PX41"
+    path = tmp_path / (Path(name).stem + ".px41")
+    memory.to_file(path)
+    return path
+
+
+@pytest.mark.parametrize("mode", ["DM41X", "DM41L"])
+def test_a_px41_dump_offers_px41cx_mode_and_loads_on_yes(app_in_mode, mode):
+    app = app_in_mode(mode)
+    path = DATA_DIR / "px41cx_GTO.px41"
+    with _yes() as ask:
+        app.state_files.load(str(path))
+
+    assert ask.call_args.args[2].startswith(
+        "px41cx_GTO.px41 was saved by a PX-41CX.\n\n"
+        "PX-41CX mode can open it.\n\n"
+        f"If you don't switch, it opens in {mode} mode.\n\n"
+    )
+    assert app.mode is DeviceMode.PX41CX
+    assert app.mode_is_temporary, "the offer is for this session only"
+    assert app.memory.profile is PX41CX
+    assert app.memory.header == "PX41"
+    assert app.memory_source == path
+
+
+@pytest.mark.parametrize("mode", ["DM41X", "DM41L"])
+def test_declining_px41cx_mode_opens_the_dump_in_the_current_mode(app_in_mode, mode):
+    """It fits, so declining the switch is not declining the file."""
+    app = app_in_mode(mode)
+    path = DATA_DIR / "px41cx_GTO.px41"
+    with _no():
+        app.state_files.load(str(path))
+
+    assert app.mode is DeviceMode(mode)
+    assert app.memory_source == path
+    assert app.memory.header == "PX41", "it is still saved as a PX-41CX dump"
+    assert app._status_label.cget("text") == "Loaded state from px41cx_GTO.px41"
+
+
+@pytest.mark.parametrize(
+    "state", ["px41cx_GTO.px41", "px41cx_SIZE300.px41", "dm41x_xrom_keys.d41"]
+)
+def test_px41cx_mode_opens_dumps_and_dm41_states_without_asking(app_in_mode, state):
+    """A DM41 header doesn't say which DM41 saved it, and a PX-41CX has the
+    DM41X's memory map, so neither needs another mode. (An unexpected
+    question fails the test: see no_unexpected_questions.)"""
+    app = app_in_mode("PX-41CX")
+    app.state_files.load(str(DATA_DIR / state))
+    assert app.mode is DeviceMode.PX41CX
+    assert app.memory_source == DATA_DIR / state
+
+
+def test_a_dump_too_large_for_a_dm41l_offers_px41cx_mode_not_dm41x(dm41l_app, tmp_path):
+    path = _px41(tmp_path, "dm41x_manyfiles.dm41")
+    with _yes() as ask:
+        dm41l_app.state_files.load(str(path))
+
+    assert ask.call_args.args[2].startswith(
+        "dm41x_manyfiles.px41 was saved by a PX-41CX.\n\n"
+        "dm41x_manyfiles.px41 needs more memory than a DM41L has.\n\n"
+        "PX-41CX mode can open it.\n\n"
+    )
+    assert "If you don't switch" not in ask.call_args.args[2]
+    assert dm41l_app.mode is DeviceMode.PX41CX
+    assert len(dm41l_app.memory.extended_memory.list_files()) == 59
+
+
+def test_declining_px41cx_mode_for_a_dump_too_large_aborts_the_load(
+    dm41l_app, tmp_path
+):
+    dm41l_app.state_files.load(str(DATA_DIR / "lander.dm41"))
+    path = _px41(tmp_path, "dm41x_manyfiles.dm41")
+    with _no():
+        dm41l_app.state_files.load(str(path))
+
+    assert dm41l_app.mode is DeviceMode.DM41L
+    assert dm41l_app.memory_source == DATA_DIR / "lander.dm41"
+    assert dm41l_app._status_label.cget("text") == (
+        "Did not load dm41x_manyfiles.px41: needs PX-41CX mode."
+    )
 
 
 def test_an_unreadable_xm_directory_does_not_offer_dm41x_mode(dm41l_app, tmp_path):

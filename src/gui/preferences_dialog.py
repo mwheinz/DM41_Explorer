@@ -1,7 +1,7 @@
 """
 Preferences dialog, in three tabs (GitHub issue #43):
 
-  General     the DM41L/DM41X mode, and logging (level, directory)
+  General     the calculator mode, and logging (level, directory)
   Appearance  light/dark, color theme, contrast
   Fonts       the four font roles (GitHub issue #61)
   Connection  default serial port, baud rate, console timeout
@@ -73,6 +73,10 @@ MODE_HINTS = {
     DeviceMode.DM41X: (
         "DM41X: no serial connection, 600 extended-memory registers,\n"
         "and the DM41X's own functions as well."
+    ),
+    DeviceMode.PX41CX: (
+        "PX-41CX: no serial connection, 600 extended-memory registers,\n"
+        "only the HP-41CX's functions, and .px41 state files."
     ),
 }
 

@@ -6,7 +6,8 @@ launch, and macOS's "Open Document" for a double-clicked state file.
 A DM41L `.dm41` state and a DM41X `.d41` state file are the same text
 format, so a file cannot say which model wrote it: a state is always
 opened with the app's current mode, and one too large for that mode is
-offered the DM41X mode instead (gui/device_mode.py).
+offered the DM41X mode instead (gui/device_mode.py). A PX-41CX `.px41`
+dump is a variant of the same format (#82).
 """
 
 import logging
@@ -17,17 +18,29 @@ from memory import DeviceMode, Memory, evaluate_mode_switch
 
 logger = logging.getLogger(__name__)
 
-STATE_EXTENSIONS = (".dm41", ".d41")
+STATE_EXTENSIONS = (".dm41", ".d41", ".px41")
 
-# What Save As offers for a buffer that has no file of its own yet. The text
-# format is identical either way; this only picks the extension the user's
-# own calculator writes, so a new state lands with the name they expect.
+# What Save As offers for a buffer that has no file of its own yet: the
+# extension the user's own calculator writes, so a new state lands with the
+# name they expect.
 DEFAULT_EXTENSION_BY_MODE = {
     DeviceMode.DM41L: ".dm41",
     DeviceMode.DM41X: ".d41",
+    DeviceMode.PX41CX: ".px41",
+}
+# The layout a file is written in, by its extension (#82): naming a file
+# .px41 saves a PX-41CX dump, whatever the mode or where the state came
+# from, and .dm41 or .d41 a DM41 state. A file with any other extension is
+# written in the current mode's own layout (DeviceProfile.state_header).
+HEADER_BY_EXTENSION = {
+    ".dm41": "DM41",
+    ".d41": "DM41",
+    ".px41": "PX41",
 }
 STATE_FILETYPES = [
+    ("Memory state", ("*.dm41", "*.d41", "*.px41")),
     ("DM41 memory state", ("*.dm41", "*.d41")),
+    ("PX-41CX memory dump", "*.px41"),
     ("All files", "*.*"),
 ]
 
@@ -65,9 +78,10 @@ class StateFiles:
         """File > Save State As..."""
         app = self.app
         source = app.memory_source
-        # A file keeps its own extension: the text format is the same. A
-        # buffer with no file of its own gets the extension the current
-        # mode's calculator writes (.dm41 for a DM41L, .d41 for a DM41X).
+        # A file keeps its own extension. A buffer with no file of its own
+        # gets the extension the current mode's calculator writes (.dm41
+        # for a DM41L, .d41 for a DM41X, .px41 for a PX-41CX). Either way,
+        # the extension the file ends up with decides its layout (_write).
         extension = (
             source.suffix
             if source and source.suffix in STATE_EXTENSIONS
@@ -81,16 +95,32 @@ class StateFiles:
             return
         self._write(path)
 
+    def header_for(self, path) -> str:
+        """The header, and so the layout, a state saved to `path` gets: the
+        one its extension calls for, or else the current mode's."""
+        suffix = Path(path).suffix.lower()
+        return HEADER_BY_EXTENSION.get(suffix, self.app.profile.state_header)
+
     def _write(self, path):
-        """Writes the buffer to `path`, which then becomes its file. Shared
-        by Save and Save As; any confirmation is the caller's."""
+        """Writes the buffer to `path`, which then becomes its file, in the
+        layout its extension calls for (header_for()). Shared by Save and
+        Save As; any confirmation is the caller's."""
         app = self.app
+        memory = app.memory
+        previous = memory.header
+        memory.header = self.header_for(path)
         try:
-            app.memory.to_file(path)
+            memory.to_file(path)
         except Exception as e:
+            # Not saved, so the buffer keeps the layout it had.
+            memory.header = previous
             logger.exception("Could not save state to %s", path)
             messagebox.showerror("Error", f"Could not save state: {e}")
             return
+        if memory.header != previous:
+            logger.info(
+                "Saving in the %s layout instead of %s", memory.header, previous
+            )
         logger.info("State saved to %s", path)
         app.show_saved_as(path)
         app.menus.remember_recent_file(path)
@@ -149,10 +179,14 @@ class StateFiles:
         modified and confirming with the user first, since the right prompt
         (or whether to prompt at all) differs by caller.
 
-        A state is opened with the current mode's profile. If it does not
-        fit that model, the user is offered DM41X mode instead
-        (ModeSwitcher.offer_switch_for_load); declining leaves the open state
-        alone, so nothing is assigned here until that is settled."""
+        A state is opened with the current mode's profile. If its header
+        says another mode's calculator wrote it (a PX-41CX dump, #82), the
+        user is offered that mode; declining opens it in the current one,
+        if it fits. If it does not fit the current model, the user is
+        offered a mode it fits -- the one that wrote it, else DM41X -- and
+        declining leaves the open state alone (see
+        ModeSwitcher.offer_switch_for_load), so nothing is assigned here
+        until that is settled."""
         app = self.app
         # Parsed into a local first: the state only replaces the open
         # buffer once it is known to fit the mode (or the user has agreed
@@ -162,7 +196,17 @@ class StateFiles:
             return
 
         findings = evaluate_mode_switch(loaded, app.profile)
-        if findings and evaluate_mode_switch(loaded, DeviceMode.DM41X.profile):
+        written_by = DeviceMode.that_wrote(loaded.header)
+        target = None
+        if (
+            written_by is not None
+            and written_by is not app.mode
+            and not evaluate_mode_switch(loaded, written_by.profile)
+        ):
+            target = written_by
+        elif findings and not evaluate_mode_switch(loaded, DeviceMode.DM41X.profile):
+            target = DeviceMode.DM41X
+        elif findings:
             # It does not fit DM41X mode either -- an XM directory that
             # cannot be read in any mode -- so offering that mode as the
             # cure would be wrong (GitHub issue #68). It opens as it is,
@@ -173,14 +217,19 @@ class StateFiles:
                 path,
                 "; ".join(str(finding) for finding in findings),
             )
-        elif findings:
-            if not app.mode_switcher.offer_switch_for_load(path, findings):
+
+        if target is not None:
+            before = app.mode
+            if not app.mode_switcher.offer_switch_for_load(
+                path, target, findings, written_by_target=target is written_by
+            ):
                 return
-            # The mode moved, so the state has to be re-read under the new
-            # profile: the one just parsed still carries the old memory map.
-            loaded = self._read(path)
-            if loaded is None:
-                return
+            if app.mode is not before:
+                # The state has to be re-read under the new profile: the one
+                # just parsed still carries the old memory map.
+                loaded = self._read(path)
+                if loaded is None:
+                    return
 
         app.replace_memory(loaded, source=path)
         app.set_status(f"Loaded state from {Path(path).name}")

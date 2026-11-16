@@ -29,6 +29,7 @@ from memory import (
     DeviceProfile,
     DM41MemoryError,
     Memory,
+    PX41CX,
     Register,
     XMFile,
     check_profile_fit,
@@ -51,7 +52,7 @@ def test_there_is_one_mode_per_profile():
     assert {mode.value for mode in DeviceMode} == set(PROFILE_NAMES)
 
 
-PROFILE_NAMES = ("DM41L", "DM41X")
+PROFILE_NAMES = ("DM41L", "DM41X", "PX-41CX")
 
 
 @pytest.mark.parametrize(
@@ -59,6 +60,7 @@ PROFILE_NAMES = ("DM41L", "DM41X")
     [
         (DeviceMode.DM41L, DM41L),
         (DeviceMode.DM41X, DM41X),
+        (DeviceMode.PX41CX, PX41CX),
     ],
 )
 def test_a_mode_resolves_to_its_profile(mode, expected):

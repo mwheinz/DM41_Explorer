@@ -96,15 +96,18 @@ def test_every_shipped_file_loads(shipped):
 
 def test_each_model_has_exactly_its_own_builtin_library(shipped):
     builtin = {lib.id: sorted(lib.builtin_on) for lib in shipped if lib.builtin_on}
-    assert builtin == {"hp41cx": ["DM41L"], "dm41x-cx": ["DM41X"]}
+    assert builtin == {"hp41cx": ["DM41L", "PX-41CX"], "dm41x-cx": ["DM41X"]}
     assert builtin_library(shipped, "DM41L").id == "hp41cx"
     assert builtin_library(shipped, "DM41X").id == "dm41x-cx"
+    # The PX-41CX pre-loads only the original HP-41CX's ROMs (#82).
+    assert builtin_library(shipped, "PX-41CX").id == "hp41cx"
 
 
 def test_builtin_xrom_names_reads_each_models_library(shipped):
     libraries = _by_id(shipped)
     assert builtin_xrom_names("DM41L") == _pairs(libraries["hp41cx"])
     assert builtin_xrom_names("DM41X") == _pairs(libraries["dm41x-cx"])
+    assert builtin_xrom_names("PX-41CX") == _pairs(libraries["hp41cx"])
     # The DM41X's library includes the DM41L's, so merged they are the
     # DM41X's.
     assert builtin_xrom_names() == builtin_xrom_names("DM41X")
@@ -119,7 +122,9 @@ def test_builtin_xrom_names_returns_a_fresh_dict():
 def test_builtin_xrom_names_leaves_out_section_headers_unless_asked(monkeypatch):
     library = parse_library(_minimal())
     monkeypatch.setattr(
-        xrom_library, "_shipped_builtins", lambda: {"DM41L": library, "DM41X": library}
+        xrom_library,
+        "_shipped_builtins",
+        lambda: {model: library for model in xrom_library.KNOWN_MODELS},
     )
     assert builtin_xrom_names() == {(0xA2, 0xC1): "FOO", (0xA2, 0xC2): "BAR"}
     assert builtin_xrom_names("DM41X", headers=True) == {

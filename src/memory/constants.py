@@ -26,6 +26,28 @@ SPECIAL_REGISTER_SIZE_OVERRIDES = {"G": 1}
 # loaded, since to_string() would silently drop it on save.
 SPECIAL_REGISTER_LABELS = ("A", "B", "C", "S", "M", "N", "G")
 
+# The two variants of the state text format, by their header line (#82):
+# the DM41 series' (`.dm41`/`.d41`) and the PX-41CX's (`.px41`). The
+# registers are the same in both; only the layout differs, so a state is
+# written back in the layout its header calls for.
+#   row_sep      between the address and registers of a register row
+#   row_end      after a register row's last register
+#   pair_sep     between "<letter>: <hex>" pairs on a special-register line
+#   end_marker   a last line of its own, or None
+# The DM41 layout is DM41_Explorer's own, as it always has been: one space
+# between special-register pairs and no trailing spaces, where the
+# calculator writes two and two (docs/state_format.md sec 4). The PX-41CX
+# layout is the one its dumps use (tests/data/px41cx_*.px41).
+STATE_STYLES = {
+    "DM41": {"row_sep": "  ", "row_end": "", "pair_sep": " ", "end_marker": None},
+    "PX41": {"row_sep": " ", "row_end": " ", "pair_sep": "  ", "end_marker": "EOF"},
+}
+
+# A line that ends a state's text, whatever its header. The PX-41CX writes
+# one; anything after it (such as noise from the serial transfer) is not
+# part of the state.
+STATE_END_MARKER = "EOF"
+
 ZERO_REGISTER_HEX = "00000000000000"
 EOM_REGISTER_HEX = "ffffffffffffff"
 

@@ -2,9 +2,9 @@
   "format": "dm41-xrom-library",
   "format_version": 1,
   "id": "hp41cx",
-  "title": "HP-41CX Extended Functions and Time (DM41L)",
+  "title": "HP-41CX Extended Functions and Time (DM41L and PX-41CX)",
   "source": "HP-41CX owner's manual; hp41uc (-EXT FCN 2D, -CX EXT FCN, -TIME 2C, -CX TIME); checked against DM41L states; section headers from CAT 2 on a DM41L",
-  "builtin_on": ["DM41L"],
+  "builtin_on": ["DM41L", "PX-41CX"],
   "modules": [
     {
       "xrom": 25,
