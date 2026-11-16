@@ -117,3 +117,49 @@ def test_every_mode_has_a_preferences_hint():
 
     assert set(MODE_HINTS) == set(DeviceMode)
     assert "PX-41CX" in MODE_VALUES
+
+
+# -- Which XROMs a PX-41CX has ------------------------------------------------
+
+
+def _dm41x_only():
+    from memory.mnemonics import entries
+
+    ops = [entry.op for entry in entries() if entry.dm41x_only]
+    assert len(ops) == 18  # X<I>Y, TRNG and the 16 -DM 41X- functions
+    return ops
+
+
+def test_its_built_in_modules_are_25_and_26():
+    assert PX41CX.builtin_modules == DM41X.builtin_modules == frozenset({25, 26})
+
+
+def test_it_does_not_have_the_dm41xs_own_functions():
+    """They are numbered in XROM 25 and 26, the PX-41CX's own built-in
+    ROMs, so no module it loads can supply them, although it loads
+    modules."""
+    from memory.mnemonics import is_available_on
+
+    for op in _dm41x_only():
+        assert is_available_on(op, DM41X)
+        assert not is_available_on(op, PX41CX)
+        assert not is_available_on(op, DM41L)
+
+
+def test_it_can_have_any_plug_in_xrom():
+    from memory.mnemonics import is_available_on, xrom_op
+
+    solve = xrom_op(0xA0, 0x49)  # XROM 01,09, the Math Pac's SOLVE
+    assert is_available_on(solve, PX41CX)
+    assert is_available_on(solve, DM41X)
+    assert not is_available_on(solve, DM41L)
+
+
+def test_the_key_assignment_picker_offers_it_no_dm41x_function():
+    from memory.mnemonics import assignable_choices
+
+    on_px41cx = {op for _, op in assignable_choices(PX41CX)}
+    on_dm41x = {op for _, op in assignable_choices(DM41X)}
+    for op in _dm41x_only():
+        assert op not in on_px41cx
+        assert op in on_dm41x

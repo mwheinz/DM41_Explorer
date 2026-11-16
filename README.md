@@ -2,13 +2,15 @@
 
 A Windows, MacOS, and Linux desktop GUI for reading, writing, and editing the
 memory of a [DM41L/X](https://www.swissmicros.com/) (HP‑41CX emulator) over its
-serial console or USB disk interface.
+serial console or USB disk interface, and of a PX-41CX (an HP-41CX clone) from
+its memory dumps.
 
 ## Features
 
 - **Live or offline** — connect directly to a DM41L over USB serial, or work
-  offline from a saved `.dm41` or `.d41` state file (File > Open State / Save
-  State, with the last ten files under File > Open Recent).
+  offline from a saved `.dm41` or `.d41` state file or a PX-41CX `.px41`
+  memory dump (File > Open State / Save State, with the last ten files under
+  File > Open Recent).
 - **Overview** — a quick summary of the DM41L/X's memory, including the stack
   and alpha registers, main memory, and extended memory. Also shows the
   current values of R00, .END., ΣREG, and a memory-usage summary at a glance.
@@ -39,12 +41,13 @@ serial console or USB disk interface.
 
 - Python 3.10 or later (tested with 3.12 and 3.14).
 - A DM41L connected over USB, if you want to talk to real hardware —
-  otherwise you only need a `.dm41` or `.d41` state file to explore.
+  otherwise you only need a `.dm41`, `.d41` or `.px41` file to explore.
 
 ## Using DM41_Explorer
 
 DM41_Explorer works in one of two ways: connected over USB serial (for the
-DM41L), or disk-based (for the DM41X, or for editing saved state files).
+DM41L), or disk-based (for the DM41X, for PX-41CX memory dumps, or for editing
+saved state files).
 
 ### Connecting to a DM41L
 
@@ -104,6 +107,24 @@ and choose “Load DM41 State File.”
 Additionally, the “File” menu may be used to load and save state files from
 other directories on your computer.
 
+### Working with PX-41CX Memory Dumps
+
+The PX-41CX saves its memory as a dump (`.px41`) over its USB serial
+connection: MENU → COMDUMP on the calculator, received on the computer with a
+terminal program or the `Receive.py` script from the [Calculator
+Scripts](https://calculator-scripts.sourceforge.io/px-41cx/dump/) project.
+[Pierre Houbert's PX-41CX page](http://www.phweb.me/clones/px41cx/index.php)
+has the calculator's manuals, which explain sending and receiving dumps with a
+terminal program such as CoolTerm. DM41_Explorer doesn't talk to the PX-41CX
+itself yet; it opens and saves the dump files.
+
+A dump holds the same registers as a DM41 state file, in a slightly different
+layout, so the two convert into each other. Open the file, choose Save State
+As…, and give the new file the extension you want: `.px41` writes a PX-41CX
+dump, `.dm41` or `.d41` a DM41 state file. Programs, data, key assignments and
+alarms all carry over; functions a PX-41CX doesn't have (the DM41X's own,
+for example) are kept, but won't run on it.
+
 ## The Tabs
 
 ### Overview Tab
@@ -152,7 +173,8 @@ Shift- or Cmd/Ctrl-click to select their rows before choosing Export.
 The Key Assignments tab allows you to view and edit the user key assignments in
 the loaded state. It shows the keyboard of the model DM41_Explorer is working
 as (see [Calculator model](#calculator-model)): the DM41L's four rows of ten
-keys in DM41L mode, the classic HP-41 keyboard in DM41X mode. Each key has a
+keys in DM41L mode, the classic HP-41 keyboard in DM41X and PX-41CX mode.
+Each key has a
 button for its unshifted assignment and one for its shifted assignment;
 clicking either lets you edit it. You can choose:
 
@@ -312,9 +334,9 @@ elsewhere they do nothing.
 
 The five Connect-menu shortcuts (Connect / Reconnect, Disconnect, Set
 Calculator Time, Get State, Send State) work in **DM41L mode** only. A DM41X
-has no serial console, so in DM41X mode those menu items are greyed out and
-the shortcuts say so rather than doing anything — see “Calculator model”
-below.
+has no serial console, and DM41_Explorer can't use the PX-41CX's yet, so in
+DM41X and PX-41CX mode those menu items are greyed out and the shortcuts say
+so rather than doing anything — see “Calculator model” below.
 
 ## Preferences
 
@@ -327,7 +349,7 @@ kept in `.dm41_explorer.json` in your home folder.
 
 ![Preferences, General tab](resources/screenshots/prefs_general.png)
 
-- **Calculator model:** DM41L or DM41X; see [Calculator
+- **Calculator model:** DM41L, DM41X or PX-41CX; see [Calculator
   model](#calculator-model). Changing it starts a new, empty memory state, so
   DM41_Explorer asks you to confirm first. If you decline, the other settings
   are still saved.
@@ -386,29 +408,36 @@ DM41_Explorer works as one model at a time, chosen in Preferences → General
 → Calculator model and shown in the status bar. New installations start in
 **DM41X mode**, the more common device.
 
-| | DM41L mode | DM41X mode |
-| --- | --- | --- |
-| Serial connection | Yes | No — a DM41X has no serial console |
-| Extended memory | 362 registers | 600 registers |
-| Functions | the HP-41CX set | that, plus the DM41X’s own |
-| Plug-in modules | none — it can’t load modules | any, named by the [XROM libraries](#xrom-libraries) you turn on |
-| Key Assignments tab | the DM41L keyboard | the classic HP-41 keyboard |
-| New files default to | `.dm41` | `.d41` |
+| | DM41L mode | DM41X mode | PX-41CX mode |
+| --- | --- | --- | --- |
+| Serial connection | Yes | No — a DM41X has no serial console | No — not yet supported |
+| Extended memory | 362 registers | 600 registers | 600 registers |
+| Functions | the HP-41CX set | that, plus the DM41X’s own | the HP-41CX set |
+| Plug-in modules | none — it can’t load modules | any, named by the [XROM libraries](#xrom-libraries) you turn on | any, as on the DM41X |
+| Key Assignments tab | the DM41L keyboard | the classic HP-41 keyboard | the classic HP-41 keyboard |
+| New files default to | `.dm41` | `.d41` | `.px41` |
 
-Two things follow from this:
+A few things follow from this:
 
 - **Changing the model starts a new, empty memory state.** To move programs
   or data from one model to the other, export them before switching and
   import them afterwards.
 - **Opening a state that is too large for a DM41L**, while in DM41L mode,
-  offers to switch to DM41X mode so it can be opened. Accepting applies for
-  that session only and does not change the saved setting; the status bar
-  then reads “DM41X mode (this session)”. Declining leaves everything as it
-  was.
+  offers to switch to DM41X mode so it can be opened (PX-41CX mode, if the
+  file is a PX-41CX dump). Accepting applies for that session only and does
+  not change the saved setting; the status bar then reads “DM41X mode (this
+  session)”. Declining leaves everything as it was.
+- **Opening a PX-41CX dump** in DM41L or DM41X mode offers to switch to
+  PX-41CX mode, for that session only. If you decline, it opens in the
+  current mode, as long as it fits.
 
-A state file itself says nothing about which model wrote it — a `.dm41` and a
-`.d41` are the same format — so the mode, not the file, decides how one is
-read.
+A `.dm41` or `.d41` file says nothing about which DM41 wrote it — the two are
+the same format — so the mode, not the file, decides how one is read. A
+`.px41` dump does say it came from a PX-41CX, which is why opening one offers
+that mode. When you save, the file's extension decides its layout: `.px41`
+writes a PX-41CX dump, and `.dm41` or `.d41` a DM41 state file. Save State
+As… suggests the extension of the file you opened, or, for a new state, the
+current mode's.
 
 ## Documentation
 
@@ -455,7 +484,8 @@ pip install -r requirements-dev.txt
 
 A PyInstaller spec (`src/dm41explorer.spec`) and build script (`src/build.sh`)
 are included, producing a self-contained app — a macOS `.app` bundle
-(with `.dm41` file association) on macOS, and a onedir bundle on Linux and
+(with `.dm41`, `.d41` and `.px41` file associations) on macOS, and a onedir
+bundle on Linux and
 Windows.
 
 ```sh

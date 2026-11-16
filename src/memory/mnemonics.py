@@ -689,12 +689,18 @@ def is_available_on(op: Op, profile) -> bool:
     Only XROMs can be missing: a single-byte function is part of every
     HP-41's own instruction set, while an XROM comes from a module, and
     `profile.builtin_xroms` is what that model has built in. A model that
-    loads modules (the DM41X) can have any XROM, by plugging in the module
-    that holds it. A `profile` of None means "any model", which is what
-    every caller that does not care about availability passes."""
+    loads modules (the DM41X, the PX-41CX) can have any other XROM, by
+    plugging in the module that holds it -- except in a module number its
+    built-in ROMs already use: the DM41X's TRNG (XROM 26,36) is not on a
+    PX-41CX, whose XROM 26 is the original Time ROM (#82). A `profile` of
+    None means "any model", which is what every caller that does not care
+    about availability passes."""
     if profile is None or op.kind is not OpKind.XROM:
         return True
-    return op.code in profile.builtin_xroms or profile.loads_modules
+    if op.code in profile.builtin_xroms:
+        return True
+    module, _ = xrom_numbers(*op.code)
+    return profile.loads_modules and module not in profile.builtin_modules
 
 
 def assignable_display_names(profile=None) -> List[str]:

@@ -24,6 +24,7 @@ extension, and not what is plugged in.
 
 import enum
 from dataclasses import dataclass
+from functools import cached_property
 from typing import FrozenSet, Optional, Tuple
 
 from .xrom_library import builtin_xrom_names
@@ -79,6 +80,17 @@ class DeviceProfile:
                     f"Bad XM region (0x{lo:x}, 0x{hi:x}) in profile {self.name}"
                 )
             previous_hi = hi
+
+    @cached_property
+    def builtin_modules(self) -> FrozenSet[int]:
+        """The XROM module numbers of the model's built-in ROMs, such as 25
+        (Extended Functions) and 26 (Time). A plugged-in module cannot use
+        one of these numbers, so a function numbered in one of them that
+        is not in `builtin_xroms` is not on the model at all (#82). The
+        module number is decoded as in mnemonics.xrom_numbers()."""
+        return frozenset(
+            ((byte1 & 0x07) << 2) | (byte2 >> 6) for byte1, byte2 in self.builtin_xroms
+        )
 
     @property
     def xm_address_range(self) -> Tuple[int, int]:

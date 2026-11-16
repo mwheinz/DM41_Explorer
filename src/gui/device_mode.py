@@ -82,7 +82,7 @@ class ModeSwitcher:
         app.xrom_libraries.apply()
         if persist:
             app.config_store.mode = mode
-            app.persist_config("the DM41L/DM41X mode")
+            app.persist_config("the calculator mode")
         logger.info(
             "Mode changed from %s to %s (%s)",
             previous.value,
@@ -160,5 +160,5 @@ class ModeSwitcher:
             # user has confirmed this session's override as the saved
             # setting. Nothing to erase; just stop calling it temporary.
             app.config_store.mode = requested_mode
-            app.persist_config("the DM41L/DM41X mode")
+            app.persist_config("the calculator mode")
             app.refresh_mode_indicator()

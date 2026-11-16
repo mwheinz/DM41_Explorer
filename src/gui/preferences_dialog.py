@@ -1,7 +1,7 @@
 """
 Preferences dialog, in three tabs (GitHub issue #43):
 
-  General     the DM41L/DM41X mode, and logging (level, directory)
+  General     the calculator mode, and logging (level, directory)
   Appearance  light/dark, color theme, contrast
   Fonts       the four font roles (GitHub issue #61)
   Connection  default serial port, baud rate, console timeout

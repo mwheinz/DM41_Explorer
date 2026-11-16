@@ -75,14 +75,23 @@ app = BUNDLE(
     icon=icon,
     bundle_identifier=None,
     info_plist={
-        "CFBundleDocumentTypes": [{
-            "CFBundleTypeName": "DM41 Memory State",
-            # "Editor", not "Viewer" (unlike AtomDataExtractor's adv.spec):
-            # File > Save State/Save State As... actually write .dm41 files,
-            # this isn't a read-only viewer.
-            "CFBundleTypeRole": "Editor",
-            "LSHandlerRank": "Owner",
-            "CFBundleTypeExtensions": ["dm41"],
-        }],
+        # "Editor", not "Viewer" (unlike AtomDataExtractor's adv.spec):
+        # File > Save State/Save State As... actually write these files,
+        # this isn't a read-only viewer.
+        "CFBundleDocumentTypes": [
+            {
+                "CFBundleTypeName": "DM41 Memory State",
+                "CFBundleTypeRole": "Editor",
+                "LSHandlerRank": "Owner",
+                "CFBundleTypeExtensions": ["dm41", "d41"],
+            },
+            {
+                # A PX-41CX memory dump (#82).
+                "CFBundleTypeName": "PX-41CX Memory Dump",
+                "CFBundleTypeRole": "Editor",
+                "LSHandlerRank": "Owner",
+                "CFBundleTypeExtensions": ["px41"],
+            },
+        ],
     },
 )
