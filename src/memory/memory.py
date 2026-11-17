@@ -27,7 +27,7 @@ from .constants import (
     STATE_END_MARKER,
     STATE_STYLES,
 )
-from .regions import RegionSpan, VoidRegion, FreeSpace
+from .regions import RegionSpan, VoidRegion, IRPrinterMemory, FreeSpace
 from .status_registers import StatusRegisters
 from .key_assignments import KeyAssignments
 from .alarms import Alarms
@@ -89,6 +89,7 @@ class Memory:
         for region in (
             StatusRegisters(self),
             VoidRegion(self),
+            IRPrinterMemory(self),
             KeyAssignments(self),
             Alarms(self),
             FreeSpace(self),
@@ -494,9 +495,14 @@ class Memory:
         xm = self.extended_memory
         xm0_lo, xm0_hi = self._profile.xm_regions[0]
 
+        # The void is two spans, with the IR printer module's memory
+        # between them (#66).
+        void_below, void_above = self.region("nonexistent").spans()
         spans = [
             self.status_registers.span(),
-            self.region("nonexistent").span(),
+            void_below,
+            self.region("ir_printer").span(),
+            void_above,
             RegionSpan(xm.key, xm.label, xm0_lo, xm0_hi),
             self.key_assignments.span(),
             self.alarms.span(),

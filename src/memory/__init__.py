@@ -25,7 +25,7 @@ Modules, by area (each module's docstring has the details):
 
   Regions
     regions.py           MemoryRegion base class, RegionSpan, VoidRegion,
-                         FreeSpace
+                         IRPrinterMemory, FreeSpace
     status_registers.py  the 16 status registers, flags, R00/.END. pointers
     key_assignments.py   the Key Assignment Registers and KEYFLAGS
     alarms.py            the alarms buffer
@@ -73,6 +73,7 @@ from .device_profile import (
 from .constants import (
     STATUS_REGISTERS_RANGE,
     VOID_RANGE,
+    IR_PRINTER_RANGE,
     KEY_ASSIGNMENTS_RANGE,
     PRIMARY_DATA_END,
     ZERO_REGISTER_HEX,
@@ -82,7 +83,13 @@ from .constants import (
     STATUS_REGISTER_LABELS,
     MIN_SANE_R00,
 )
-from .regions import MemoryRegion, RegionSpan, VoidRegion, FreeSpace
+from .regions import (
+    MemoryRegion,
+    RegionSpan,
+    VoidRegion,
+    IRPrinterMemory,
+    FreeSpace,
+)
 from .status_registers import StatusRegisters
 from .key_assignments import KeyAssignment, KeyAssignments
 from .alarms import Alarm, Alarms
@@ -143,6 +150,7 @@ __all__ = [
     "focal_to_unicode",
     "STATUS_REGISTERS_RANGE",
     "VOID_RANGE",
+    "IR_PRINTER_RANGE",
     "KEY_ASSIGNMENTS_RANGE",
     "PRIMARY_DATA_END",
     "ZERO_REGISTER_HEX",
@@ -161,6 +169,7 @@ __all__ = [
     "MemoryRegion",
     "RegionSpan",
     "VoidRegion",
+    "IRPrinterMemory",
     "FreeSpace",
     "StatusRegisters",
     "KeyAssignment",

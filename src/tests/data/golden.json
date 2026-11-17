@@ -26,6 +26,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -471,6 +481,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -663,6 +683,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -1102,6 +1132,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -1228,6 +1268,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -1346,6 +1396,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -1489,6 +1549,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -2868,6 +2938,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -3024,6 +3104,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -3418,6 +3508,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -3500,6 +3600,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -3584,6 +3694,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -4960,6 +5080,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -6336,6 +6466,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -7708,6 +7848,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -8330,6 +8480,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -8982,6 +9142,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -9094,6 +9264,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -9211,6 +9391,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -9288,6 +9478,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -9365,6 +9565,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -9827,6 +10037,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -9983,6 +10203,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -10172,6 +10402,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -10263,6 +10503,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -10642,6 +10892,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -11193,6 +11453,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -11729,6 +11999,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -11879,6 +12159,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -12024,6 +12314,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -12803,6 +13103,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -13582,6 +13892,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -14361,6 +14681,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -14462,6 +14792,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -14569,6 +14909,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -14722,6 +15072,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -14875,6 +15235,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -14988,6 +15358,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -15110,6 +15490,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -15253,6 +15643,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -15376,6 +15776,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -15493,6 +15903,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -15679,6 +16099,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -15798,6 +16228,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -16183,6 +16623,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -16554,6 +17004,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -16662,6 +17122,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -16787,6 +17257,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -16908,6 +17388,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -17030,6 +17520,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -17243,6 +17743,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -17704,6 +18214,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -18418,6 +18938,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -18768,6 +19298,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -19109,6 +19649,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -19460,6 +20010,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [
@@ -19612,6 +20172,16 @@
    [
     "nonexistent",
     "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
     "0x03F"
    ],
    [

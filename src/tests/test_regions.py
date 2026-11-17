@@ -15,6 +15,7 @@ from pathlib import Path
 import pytest
 
 from memory import (
+    DM41X,
     Memory,
     Register,
     RegionSpan,
@@ -304,6 +305,40 @@ def test_regions_list_covers_the_whole_display_range_without_gaps():
             continue
         assert len(matches) == 1, f"0x{addr:03x} matched {matches}"
         assert memory.region_for(addr).key == matches[0].key
+
+
+@pytest.mark.parametrize(
+    "addr, key",
+    [
+        (0x010, "nonexistent"),
+        (0x01F, "nonexistent"),
+        (0x020, "ir_printer"),
+        (0x02F, "ir_printer"),
+        (0x030, "nonexistent"),
+        (0x03F, "nonexistent"),
+    ],
+)
+def test_ir_printer_memory_splits_the_void(addr, key):
+    # The HP 82242A IR printer module uses 0x020-0x02F (#66).
+    assert Memory().region_for(addr).key == key
+
+
+def test_ir_printer_memory_round_trips_unchanged():
+    # Rows 20-2c as V41 exports them with the IR printer module (#66).
+    rows = (
+        "20  20302e30302020  00202020202020  00002d2d2d1b01  203336302e1b02\n"
+        "24  0e673c1f40e041  00000000000000  000000000f3600  4e67251f40e088\n"
+        "28  000000000000d0  00000000000090  00000000000000  00000000000004\n"
+        "2c  000000000000aa  000000000000aa  00000000000090  00000000000000\n"
+    )
+    memory = Memory.from_string("DM41\n" + rows, profile=DM41X)
+
+    region = memory.region("ir_printer")
+    assert (region.label, region.start, region.end) == ("IR printer Memory", 0x20, 0x2F)
+    assert region.get_register(0x27).get_hex() == "4e67251f40e088"
+
+    again = Memory.from_string(memory.to_string(), profile=DM41X)
+    assert again.region("ir_printer").registers() == region.registers()
 
 
 def test_regions_omits_program_and_data_without_a_partition():

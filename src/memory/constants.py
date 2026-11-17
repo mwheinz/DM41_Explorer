@@ -7,6 +7,9 @@ from .registers import Register, REGISTER_SIZE_BYTES  # re-exported
 
 STATUS_REGISTERS_RANGE = (0x00, 0x0F)
 VOID_RANGE = (0x10, 0x3F)
+# The HP 82242A IR printer module ("Blinky") keeps its working state in
+# 0x020-0x02F, inside the void (#66). The rest of the void stays empty.
+IR_PRINTER_RANGE = (0x20, 0x2F)
 KEY_ASSIGNMENTS_RANGE = (0xC0, 0xC0)  # Key assignments are variable length.
 PRIMARY_DATA_END = 0x1FF
 

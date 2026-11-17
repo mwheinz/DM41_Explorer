@@ -36,7 +36,12 @@ from dataclasses import dataclass
 from typing import Dict, Optional, Sequence, TYPE_CHECKING
 
 from .registers import Register
-from .constants import PRIMARY_DATA_END, VOID_RANGE, zero_register
+from .constants import (
+    IR_PRINTER_RANGE,
+    PRIMARY_DATA_END,
+    VOID_RANGE,
+    zero_register,
+)
 
 if TYPE_CHECKING:
     from .memory import Memory
@@ -200,13 +205,44 @@ class VoidRegion(MemoryRegion):
     """The addressable-but-nonexistent hole between the status registers
     and the first extended-memory region. Nothing lives here; it exists as
     a region only so that every address in the displayed range belongs to
-    exactly one of them."""
+    exactly one of them.
+
+    The IR printer module's memory (`IRPrinterMemory`, 0x020-0x02F) sits
+    inside this range, so `Memory.regions()` reports the void as two
+    spans, one on each side of it (#66)."""
 
     key = "nonexistent"
     label = "Inaccessible"
 
     def __init__(self, memory: "Memory"):
         super().__init__(memory, VOID_RANGE)
+
+    def spans(self) -> list:
+        """The void's RegionSpans with the IR printer memory cut out:
+        0x010-0x01F and 0x030-0x03F."""
+        lo, hi = VOID_RANGE
+        ir_lo, ir_hi = IR_PRINTER_RANGE
+        return [
+            RegionSpan(self.key, self.label, lo, ir_lo - 1),
+            RegionSpan(self.key, self.label, ir_hi + 1, hi),
+        ]
+
+
+class IRPrinterMemory(MemoryRegion):
+    """The 16 registers at 0x020-0x02F that the HP 82242A IR printer
+    module ("Blinky") uses for its own state: a staging buffer for the
+    bytes on their way to the printer and the printing modes (MAPON/MAPOFF
+    and the like), plus the module's timer and transmit registers (#66).
+
+    Only V41's exports are known to contain them. A DM41X with IR-PRINT.MOD
+    loaded leaves these rows out of its state files, so they normally read
+    as zero. Their contents are not decoded."""
+
+    key = "ir_printer"
+    label = "IR printer Memory"
+
+    def __init__(self, memory: "Memory"):
+        super().__init__(memory, IR_PRINTER_RANGE)
 
 
 class FreeSpace(MemoryRegion):
