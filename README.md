@@ -7,19 +7,18 @@ its memory dumps.
 
 ## Features
 
-- **Live or offline** — connect directly to a DM41L over USB serial, or work
-  offline from a saved `.dm41` or `.d41` state file or a PX-41CX `.px41`
-  memory dump (File > Open State / Save State, with the last ten files under
-  File > Open Recent).
-- **Overview** — a quick summary of the DM41L/X's memory, including the stack
-  and alpha registers, main memory, and extended memory. Also shows the
-  current values of R00, .END., ΣREG, and a memory-usage summary at a glance.
+- **Serial or Disk-based interface** — connect directly to a DM41L over USB
+  serial, or work offline from a saved `.dm41` or `.d41` state file or a
+  PX-41CX `.px41` memory dump.
+- **Overview** — a quick summary of the calculator's state, including the stack
+  and alpha registers, main memory, and extended memory. Also shows the current
+  values of R00, .END., ΣREG, and a memory-usage summary at a glance.
 - **Flags** — all 56 status flags, named and editable.
 - **Programs** — list, import, export, and remove programs from the
   calculator's memory.
 - **Key Assignments** — view, add, edit, and remove user key assignments,
-  including any XROM function, by name or by its module and function
-  numbers, and save a printable PDF diagram of the keyboard.
+  including any XROM function, by name or by its module and function numbers,
+  and save a printable PDF diagram of the keyboard.
 - **Alarms** — list, add, edit, and remove the calculator's alarms (message,
   control, and conditional), with past-due alarms marked.
 - **Data Registers** — browse and edit the user memory registers as numbers,
@@ -28,9 +27,9 @@ its memory dumps.
   (Data, ASCII, and Program types).
 - **Hex View** — a full, color-coded map of the entire memory space (status
   registers, extended memory, program memory, data memory, and unused space).
-- **XROM libraries** — names for the functions of the DM41X's application
-  pacs (Math, Stat, Advantage, PPC and the rest) and of any other ROM you add
-  as a `.mod` file or an hp41uc XROM list (Tools > XROM Libraries).
+- **XROM libraries** — names for the functions of the DM41X's application pacs
+  (Math, Stat, Advantage, PPC and the rest) and of any other ROM you add as a
+  `.mod` file or an hp41uc XROM list (Tools > XROM Libraries).
 - **Pack Memory** (Tools menu) — reclaims unused registers the way the
   calculator's PACK does.
 - **FOCAL Mnemonics Reference** (Help menu) — every instruction name that
@@ -86,10 +85,14 @@ save and preselect this port for future sessions.
 
 ### Working in Disk-Based Mode
 
-The DM41X uses a disk-based USB interface and supports the storage of multiple
-state files. To generate a state file on the DM41X, press SETUP, select “File,”
-and choose “Save DM41 state file.” This procedure must be completed before
-DM41_Explorer can load the calculator’s state.  
+The DM41X and PX-41CX use a disk-based USB interface and supports the storage
+of multiple state files.
+
+#### DM41X
+
+To generate a state file on the DM41X, press SETUP, select “File,” and choose
+“Save DM41 state file.” This procedure must be completed before DM41_Explorer
+can load the calculator’s state.
 
 Once a state file is stored on the device, connect the DM41X to your computer,
 press CST, and select “USB Disk” from the calculator menu; the unit will appear
@@ -107,7 +110,7 @@ and choose “Load DM41 State File.”
 Additionally, the “File” menu may be used to load and save state files from
 other directories on your computer.
 
-### Working with PX-41CX Memory Dumps
+#### Working with PX-41CX Memory Dumps
 
 The PX-41CX saves its memory as a dump (`.px41`) over its USB serial
 connection: MENU → COMDUMP on the calculator, received on the computer with a
@@ -118,23 +121,15 @@ has the calculator's manuals, which explain sending and receiving dumps with a
 terminal program such as CoolTerm. DM41_Explorer doesn't talk to the PX-41CX
 itself yet; it opens and saves the dump files.
 
-A dump holds the same registers as a DM41 state file, in a slightly different
-layout, so the two convert into each other. Open the file, choose Save State
-As…, and give the new file the extension you want: `.px41` writes a PX-41CX
-dump, `.dm41` or `.d41` a DM41 state file. Programs, data, key assignments and
-alarms all carry over; functions a PX-41CX doesn't have (the DM41X's own,
-for example) are kept, but won't run on it.
-
 ## The Tabs
 
 ### Overview Tab
 
 ![Overview](resources/screenshots/overview.png)
 
-The Overview tab shows a quick summary of the loaded memory state. It is
-almost entirely read-only, except for the address of
-the R00 register, which you can adjust if you want to experiment with synthetic
-programming.
+The Overview tab shows a quick summary of the loaded memory state. It is almost
+entirely read-only, except for the address of the R00 register, which you can
+adjust if you want to experiment with synthetic programming.
 
 ### Flags Tab
 
@@ -144,7 +139,7 @@ A complete list of all the user and system flags and their current values.
 Some of the flags are available for use by HP41 applications, some control
 system behavior, and others pertain to peripherals and will have no effect on
 the DM41L. Some flags are automatically reset each time the calculator is
-turned on.
+turned on. See the HP-41 documentation for details.
 
 ### Programs Tab
 
@@ -158,10 +153,7 @@ which is the same as DAT format but with line breaks. RAW files are read with
 or without hp41uc's checksum trailer; exported RAW files have one unless you
 turn it off in Preferences → General. A file to import can hold
 several programs, each ending with its own END; they are all imported, in the
-order they appear in the file. If an imported program has the same global
-label as one already in memory, DM41_Explorer lists what would be replaced and
-asks first; the old program is removed, and its key assignments move to the
-new program's labels of the same name. To export several programs into one file,
+order they appear in the file. To export several programs into one file,
 Shift- or Cmd/Ctrl-click to select their rows before choosing Export.
 
 ### Key Assignments Tab
@@ -170,33 +162,31 @@ Shift- or Cmd/Ctrl-click to select their rows before choosing Export.
 
 ![Key Assigns - DM41X layout](resources/screenshots/key_assigns_dm41x.png)
 
-The Key Assignments tab allows you to view and edit the user key assignments in
-the loaded state. It shows the keyboard of the model DM41_Explorer is working
-as (see [Calculator model](#calculator-model)): the DM41L's four rows of ten
-keys in DM41L mode, the classic HP-41 keyboard in DM41X and PX-41CX mode.
-Each key has a
-button for its unshifted assignment and one for its shifted assignment;
-clicking either lets you edit it. You can choose:
+The Key Assignments tab allows you to view and edit the user key assignments
+in the loaded state file. It shows the keys laid out according to the model DM41_Explorer is
+working as (see [Calculator model](#calculator-model)).
+
+Each key has a button for its unshifted assignment and one for its
+shifted assignment; clicking either lets you edit it. You can choose:
 
 - **Function:** a built-in function, or one from an active [XROM
-  library](#xrom-libraries), by picking it or typing its name. A typed name
-  is looked up the way `ASN` does it on the calculator, so with the Standard
-  Applications Pac active, `LOG` is the pac's LOG. When two functions share
-  a name, the list shows where each comes from. You can also type
-  `XROM 26,38` or `XROM "LOG"`.
-- **XROM:** any XROM function by its module (1–31) and function (0–63)
-  numbers, whether or not a library names it. A function a DM41L doesn't
-  have can still be assigned in DM41L mode, after a confirmation.
-- **Program:** one of the currently loaded programs.
-- **Raw Hex:** two hexadecimal bytes, if you want to experiment with
-  synthetic programming.
+  library](#xrom-libraries), by picking it or typing its name. A typed name is
+  looked up the way `ASN` does it on the calculator, so with the Standard
+  Applications Pac active, `LOG` is the pac's LOG. When two functions share a
+  name, the list shows where each comes from. You can also type `XROM 26,38` or
+  `XROM "LOG"`.
+- **XROM:** any XROM function by its module (1–31) and function (0–63) numbers,
+  whether or not a library names it.
+- **Program:** one of the currently defined global labels.
+- **Raw Hex:** one or two hexadecimal bytes, allowing you to directly assign
+  synthetic instructions.
 
 ![Key assignment dialog, XROM tab](resources/screenshots/key_assign_xrom.png)
 
 **Save PDF…** (or Cmd/Ctrl+E) saves a printable diagram of the keyboard,
 titled with the state's name, with every assignment on its key: shifted
 assignments on a gold strip across the top of the key, unshifted ones below.
-Global programs are marked with ▸, and an assignment whose key flag is clear
+Global labels are marked with ▸, and an assignment whose key flag is clear
 (as after `LKAOFF`) has a dashed outline. A list of all the assignments
 follows on a second page.
 
@@ -213,8 +203,8 @@ Manual).
 An alarm is one of three types:
 
 - **Message:** shows a message of up to 24 characters.
-- **Control:** runs the program at a global label of up to 22 characters. With
-  no label, it resumes the program from its current line.
+- **Control:** runs the specified global label of up to 22 characters. With
+  no label, it resumes the current program from its current line.
 - **Conditional:** like Control, but runs the program only if the calculator
   is off when the alarm goes off.
 
@@ -263,8 +253,8 @@ register. Select a register with the mouse, then click on the desired action.
 The XM Files view is organized similarly to the Data Registers view, and allows
 you to import, export, and alter files in Extended Memory. Unlike the Data
 Registers view, there is no raw hex entry: a Data file holds numbers and an
-ASCII file holds text. Program files can be viewed and removed, but not
-created or edited.
+ASCII file holds text. Program files can be viewed and removed, but not created
+or edited.
 
 ### Hex View Tab
 
@@ -278,12 +268,11 @@ region. It is useful for studying how HP41 memory is organized.
 - **Tools > Pack Memory…** packs program memory, key assignments, and alarms
   the way the calculator's PACK does, and reports how many registers it
   reclaimed. Packing before an import makes the most room available.
-- **Tools > XROM Libraries…** — see [XROM Libraries](#xrom-libraries)
-  below.
+- **Tools > XROM Libraries…** — see [XROM Libraries](#xrom-libraries) below.
 - **Help > FOCAL Mnemonics Reference** lists every instruction's name, the
   other spellings that importing a TXT program and the key assignment dialog
-  accept, and the character-substitution and trigraph tables. It can stay
-  open while you work.
+  accept, and the character-substitution and trigraph tables. It can stay open
+  while you work.
 - **Help > Keyboard Shortcuts** lists the [keyboard
   shortcuts](#keyboard-shortcuts).
 
@@ -298,8 +287,7 @@ the 20 application pacs on the DM41X's disk and the Thermal Printer come
 with DM41_Explorer, and **Add…** imports any other ROM from a `.mod` file,
 an hp41uc XROM list or a library file. Tick the libraries you use and put
 them in the order of the calculator's ROM pages. A conflict panel shows
-where they clash, for instance two pacs that share an XROM number. Each
-mode keeps its own list.
+where they clash, for instance two modules that share an XROM number.
 
 See [docs/xrom_libraries.md](docs/xrom_libraries.md) for how names are
 looked up, what the conflict messages mean and the library file format.
@@ -350,9 +338,7 @@ kept in `.dm41_explorer.json` in your home folder.
 ![Preferences, General tab](resources/screenshots/prefs_general.png)
 
 - **Calculator model:** DM41L, DM41X or PX-41CX; see [Calculator
-  model](#calculator-model). Changing it starts a new, empty memory state, so
-  DM41_Explorer asks you to confirm first. If you decline, the other settings
-  are still saved.
+  model](#calculator-model). Changing the model starts a new, empty memory state.
 - **Log level** and **Log file directory:** how much DM41_Explorer records in
   its log file, `dm41_explorer.log`, and where that file goes. Attach the log
   to a bug report. The default level, INFO, is enough for most problems;
@@ -419,17 +405,17 @@ DM41_Explorer works as one model at a time, chosen in Preferences → General
 
 A few things follow from this:
 
-- **Changing the model starts a new, empty memory state.** To move programs
-  or data from one model to the other, export them before switching and
-  import them afterwards.
+- **Changing the model starts a new, empty memory state.** To move programs or
+  data from one model to the other, export them before switching and import
+  them afterwards.
 - **Opening a state that is too large for a DM41L**, while in DM41L mode,
-  offers to switch to DM41X mode so it can be opened (PX-41CX mode, if the
-  file is a PX-41CX dump). Accepting applies for that session only and does
-  not change the saved setting; the status bar then reads “DM41X mode (this
-  session)”. Declining leaves everything as it was.
-- **Opening a PX-41CX dump** in DM41L or DM41X mode offers to switch to
-  PX-41CX mode, for that session only. If you decline, it opens in the
-  current mode, as long as it fits.
+  offers to switch to DM41X or PX-41CX mode so it can be opened. Accepting
+  applies for that session only and does not change the saved setting; the
+  status bar then reads “DM41X mode (this session)”. Declining leaves
+  everything as it was.
+- **Opening a PX-41CX dump** in DM41L or DM41X mode offers to switch to PX-41CX
+  mode, for that session only. If you decline, it opens in the current mode, as
+  long as it fits.
 
 A `.dm41` or `.d41` file says nothing about which DM41 wrote it — the two are
 the same format — so the mode, not the file, decides how one is read. A
@@ -441,13 +427,13 @@ current mode's.
 
 ## Documentation
 
-There are many markdown files in the
-[`docs`](https://github.com/mwheinz/DM41_Explorer/tree/main/docs) directory.
-These represent my research notes from developing this project. Hopefully
-they will be useful to you if you are curious about the internals of the HP41
-and the DM41L/X emulator.
 [`docs/xrom_libraries.md`](docs/xrom_libraries.md) is the user's guide to XROM
-libraries, including the file format for writing your own.
+libraries, including the file format for writing your own. There are many other
+markdown files in the
+[`docs`](https://github.com/mwheinz/DM41_Explorer/tree/main/docs) directory.
+These represent my research notes from developing this project. Hopefully they
+will be useful to you if you are curious about the internals of the HP41 and
+the DM41L/X emulator.
 
 Most of my notes are derived from 40 year old memories and classic HP41 texts
 like *Synthetic Programming* by Jonathan Wickes, supplemented by
@@ -471,33 +457,27 @@ python3 -m gui.app
 
 On Linux, `tkinter` isn't always bundled with Python — if the app fails to
 import `tkinter`, install it separately first (e.g. `sudo apt install
-python3-tk` on Debian/Ubuntu).
-
-To also run the test suite or build a standalone binary, install the
-development requirements instead of just the runtime ones:
-
-```sh
-pip install -r requirements-dev.txt
-```
+python3-tk` on Debian/Ubuntu)
 
 ## Building the standalone application
 
-A PyInstaller spec (`src/dm41explorer.spec`) and build script (`src/build.sh`)
-are included, producing a self-contained app — a macOS `.app` bundle
-(with `.dm41`, `.d41` and `.px41` file associations) on macOS, and a onedir
-bundle on Linux and
-Windows.
-
+To build the standalone application for MacOS, Windows, or Linux, use the following instructions: 
 ```sh
+git clone https://github.com/mwheinz/DM41_Explorer.git
+cd DM41_Explorer
+python3 -m venv venv
+source venv/bin/activate   # on Windows: venv\Scripts\activate
+pip install -r requirements-dev.txt
 cd src
 ./build.sh
 ```
+The final application will be in `src/dist/`.
 
-Output lands in `src/dist/`. `build.sh` is a shell script — on Windows,
-run it from Git Bash (installed alongside [Git for
-Windows](https://git-scm.com/download/win)) or WSL, or invoke PyInstaller
-directly with `pyinstaller dm41explorer.spec` after generating `dm41version.py`
-yourself (see the comment at the top of `build.sh`).
+`build.sh` is a shell script — on Windows, run it from Git Bash (installed
+alongside [Git for Windows](https://git-scm.com/download/win)) or WSL, or
+invoke PyInstaller directly with `pyinstaller dm41explorer.spec` after
+generating `dm41version.py` yourself (see the comment at the top of
+`build.sh`).
 
 On Linux and Windows, the executable needs the `_internal/` folder that's
 built alongside it — don't separate them, or move the exe without also
@@ -507,22 +487,20 @@ unzipping it without this context. The Linux build also includes `MyIcon.png`, r
 to use as a `.desktop` file's `Icon=` entry if you set one up yourself.
 
 The built binaries aren't code-signed (this is an independently-developed
-hobby project without an Apple or Microsoft developer account), so:
+hobby project without an Apple or Microsoft developer account), so they can't
+be redistributed to other machines without extra work:
 
-- **macOS** will refuse to open it as coming from an "unidentified
-  developer" — right-click (or Control-click) the app and choose Open,
-  then confirm once, instead of double-clicking it.
-- **Windows** will show a SmartScreen warning — click "More info", then
-  "Run anyway".
-
-Building and running from source, as above, doesn't trigger either of
-these.
+- **macOS** will refuse to open it as coming from an "unidentified developer" —
+  right-click (or Control-click) the app and choose Open, then confirm once,
+  instead of double-clicking it.
+- **Windows** will show a SmartScreen warning — click "More info", then "Run
+  anyway".
 
 ## Contributing
 
 Bug reports, feature requests, and pull requests are welcome — see
-[`CONTRIBUTING.md`](https://github.com/mwheinz/DM41_Explorer/blob/main/CONTRIBUTING.md) for how to get set up, run the tests, and
-what makes a good bug report or PR.
+[`CONTRIBUTING.md`](https://github.com/mwheinz/DM41_Explorer/blob/main/CONTRIBUTING.md)
+for how to get set up, run the tests, and what makes a good bug report or PR.
 
 ## Running the tests
 
