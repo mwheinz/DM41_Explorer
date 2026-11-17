@@ -31,7 +31,8 @@ from gui.tab_common import (
 
 # The full addressable range this tab displays: from DISPLAY_START through
 # the memory's profile.display_end (0x2EF for a DM41L, 0x3EF for a DM41X).
-# Memory.regions() names Status Registers, an unused/"void" gap, Extended
+# Memory.regions() names Status Registers, an unused/"void" gap with the IR
+# printer module's memory in the middle of it (#66), Extended
 # Memory #0, Main Memory (itself split further, when a state with a sane
 # R00/.END. is loaded) and each later Extended Memory region. The registers
 # 0x200 and 0x300 and (on a DM41X) 0x2F0-0x2FF belong to no region and show
@@ -55,6 +56,7 @@ REGIONS = [
     ("alarms", "Alarms", "#f5d9df", "#7a3f52"),
     ("program", "User Programs", "#f5e3c2", "#81622b"),
     ("data", "Data Memory", "#c9f0ee", "#2c7171"),
+    ("ir_printer", "IR printer Memory", "#f0e6c0", "#6b5a24"),
     ("nonexistent", "Inaccessible", "#d0d0d0", "#242424"),
 ]
 

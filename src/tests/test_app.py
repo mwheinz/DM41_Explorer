@@ -424,6 +424,13 @@ def test_hex_view_runs_to_the_end_of_the_profiles_map(app, profile, last):
     assert rows[last][3] == "XM"
     # The register below each later XM region's pointer is inaccessible (#65).
     assert (rows[0x200][3], rows[0x201][3]) == ("Inaccessible", "XM")
+    # The IR printer module's memory sits in the middle of the void (#66).
+    assert [rows[a][3] for a in (0x01F, 0x020, 0x02F, 0x030)] == [
+        "Inaccessible",
+        "IR printer Memory",
+        "IR printer Memory",
+        "Inaccessible",
+    ]
     if profile is DM41X:
         assert rows[0x2F0][3] == "Inaccessible"  # the gap between XM #1 and #2
         assert (rows[0x300][3], rows[0x301][3]) == ("Inaccessible", "XM")

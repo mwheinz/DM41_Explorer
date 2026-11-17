@@ -95,7 +95,9 @@ are interpreted differently:
 | Region | Description | Start | End |
 | ----------- | ----------- | ----------- | ----------- | 
 | Status Registers | Operational registers for the HP41/DM41L, including the math stack, Alpha Register and system pointers | 0x00 | 0x0F |
-| Void Region | Registers do not exist / not used. | 0x10 | 0x3F |
+| Void Region | Registers do not exist / not used. | 0x10 | 0x1F |
+| IR printer Memory | Used by the HP 82242A IR printer module (see below). | 0x20 | 0x2F |
+| Void Region | Registers do not exist / not used. | 0x30 | 0x3F |
 | Extended Memory #0 | File-oriented memory region | 0x40 | 0xBF |
 | Main Memory | Main memory consists of 319 registers that are subdivided into variable length sub-regions. | 0xC0 | 0x1FF |
 | Inaccessible | XM RAM that cannot be used (see `docs/extended_memory.md`). | 0x200 | 0x200 |
@@ -104,6 +106,27 @@ are interpreted differently:
 An additional memory region may exist in actual HP41CV and HP41CX calculators
 if an additional Extended Memory module is installed, but this is not
 reflected in the DM41L emulator.
+
+The HP-41 books describe all of 0x10-0x3F as void ("nonexistent registers").
+The HP 82242A Infrared Printer Module ("Blinky"), which the DM41X supports
+through `IR-PRINT.MOD`, is the one module known to put registers there, at
+0x20-0x2F (#66). This comes from the Blinky reverse engineering in
+[tiny41](https://github.com/ecsfang/tiny41) (`blinky.h`) and from the module's
+owner's manual:
+
+- 0x20-0x27 hold all 56 bits. The manual says accumulated characters are
+  grouped into 26- to 28-byte packages in the module before being sent, which
+  fits 0x20-0x23 (4 registers, 28 bytes). The printer modes that survive power
+  off (MAPON/MAPOFF, PRTON/PRTOFF, STRTU/STOPU) must also live in the module,
+  probably in 0x24-0x27. The 200-byte print buffer is in the printer, not here.
+- 0x28-0x2F keep only the low 8 bits: 0x28 status, 0x29 a copy of 0x2E taken
+  when the timer starts, 0x2A timer countdown, 0x2B transmit, 0x2E module
+  flags. 0x2C, 0x2D and 0x2F have no known special use.
+
+The DM41X does not save these registers: its state files with `IR-PRINT.MOD`
+loaded, after MAPOFF, MAPON and ACA, have no rows between 0x10 and 0x3F. A
+state exported by V41 does have them. DM41_Explorer labels the range "IR
+printer Memory", keeps its contents as they are and does not decode them.
 
 ### 3.1 Status Registers
 
