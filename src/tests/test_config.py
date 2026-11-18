@@ -203,7 +203,7 @@ def test_a_saved_mode_is_read_back(prefs_file):
     assert config.mode is DeviceMode.DM41L
 
 
-@pytest.mark.parametrize("bad", ["", "dm41l", "DM41XN", None, 41, [], {}])
+@pytest.mark.parametrize("bad", ["", "dm41l", "DM42", None, 41, [], {}])
 def test_an_unreadable_mode_falls_back_to_the_default(prefs_file, bad):
     """A hand-edited preferences file must not stop the app starting."""
     prefs_file.write_text(json.dumps({"mode": bad}))

@@ -268,7 +268,7 @@ indicates whether the code can be assigned to a keystroke.
 - Standard extended functions are in the `EXT FCN 2d` set. `CX EXT FCN` is the
   set of functions that were added for the HP41CX.
 - `X<I>Y` (25,63) is not in the HP-41CX. The DM41X added it (confirmed on a
-  DM41XN state file); hp41uc does not have it yet. 25,51 is `ED` on every model;
+  real state file); hp41uc does not have it yet. 25,51 is `ED` on every model;
   the DM41X calls it `ED$`.
 
 | Code | Cmd | 
@@ -343,8 +343,8 @@ indicates whether the code can be assigned to a keystroke.
 - Standard time functions are in the `TIME 2C` set. `CX TIME` is the
   set of functions that were added for the HP41CX.
 - `TRNG` (26,36) and the whole `DM41X` set (26,38 - 26,53) are not in the
-  HP-41CX. They are the DM41X's additions, and the same on the DM41XN
-  (confirmed against real state files). A DM41L does not have them.
+  HP-41CX. They are the DM41X's additions (confirmed against real
+  state files). A DM41L does not have them.
 
 | Code | Cmd | 
 |--|--|

@@ -40,7 +40,7 @@ DM41X_ADDED = {
 DATA_DIR = Path(__file__).parent / "data"
 
 # Files in tests/data that were not captured on a DM41L.
-NOT_DM41L = {"dm41xn.dm41", "dm41x_manyfiles.dm41", "xm2-full.dm41"}
+NOT_DM41L = {"dm41x_xiy_trng.dm41", "dm41x_manyfiles.dm41", "xm2-full.dm41"}
 
 
 def _load(name, profile=DM41X):
@@ -74,7 +74,7 @@ def test_dm41l_capture_has_no_findings(name, opened_as):
 
 @pytest.mark.parametrize(
     "name",
-    ["dm41x_manyfiles.dm41", "xrom.d41", "dm41x_xrom_keys.d41", "dm41xn.dm41"],
+    ["dm41x_manyfiles.dm41", "xrom.d41", "dm41x_xrom_keys.d41", "dm41x_xiy_trng.dm41"],
 )
 def test_dm41x_states_fit_a_dm41x(name):
     assert check_profile_fit(_load(name), DM41X) == []
@@ -205,8 +205,8 @@ def test_ed_dollar_is_not_reported_because_a_dm41l_has_ed():
     assert not any(f.message.split()[0] == "ED" for f in findings)
 
 
-def test_dm41xn_program_warnings():
-    findings = check_profile_fit(_load("dm41xn.dm41"), DM41L)
+def test_dm41x_xiy_trng_program_warnings():
+    findings = check_profile_fit(_load("dm41x_xiy_trng.dm41"), DM41L)
 
     assert [str(f) for f in findings] == [
         'Program "AAA", step 2: X<I>Y is not built into a DM41L',

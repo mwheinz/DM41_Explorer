@@ -152,5 +152,4 @@ A PX41 file is written in the PX-41CX layout of section 4.1, so a dump in that l
 - Does the calculator accept single spaces between special-register pairs, or any of the other variations in section 5? Only the trailing-space removal has been tested.
 - Why do `lander.dm41` and `targ.dm41` lack trailing spaces when the other calculator-style files have them?
 - What do `S`, `M`, `N` and `G` hold, and does the calculator use any of the special registers when a state is loaded back into it? Files the hp41cx_tools encoder writes with them all zero are described as loading fine, but only in an emulator.
-- Does a `.d41` file from a DM41XN (not yet released) use the same format?
 - Does the PX-41CX need the `EOF` line and its own spacing when a dump is loaded back into it, or would it accept the DM41 layout?

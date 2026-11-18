@@ -3,7 +3,7 @@
   "format_version": 1,
   "id": "dm41x-cx",
   "title": "HP-41CX Extended Functions and Time, DM41X version",
-  "source": "DM41X User Manual sec. 3.8.5; hp41uc (-DM 41X-); confirmed by DM41X/DM41XN states (xrom.d41, dm41xn.dm41); section headers from CAT 2 on a DM41X (issue #58)",
+  "source": "DM41X User Manual sec. 3.8.5; hp41uc (-DM 41X-); confirmed by real states (xrom.d41, dm41x_xiy_trng.dm41); section headers from CAT 2 on a DM41X (issue #58)",
   "builtin_on": ["DM41X"],
   "modules": [
     {

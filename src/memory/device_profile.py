@@ -48,8 +48,8 @@ class DeviceProfile:
     `supports_serial` is whether this model has a serial console at all, and
     so whether the application's Connect/Get/Send actions mean anything in
     its mode. It is a property of the model, deliberately not a test against
-    `name`: the DM41XN has both a FAT disk and a serial interface, so adding
-    its profile later must not require revisiting every gating decision.
+    `name`: a later model could have both a FAT disk and a serial interface,
+    and adding its profile must not require revisiting every gating decision.
     Defaults to False, so a new profile has to opt in.
 
     `loads_modules` is whether the model can plug in other ROM modules
@@ -136,10 +136,9 @@ DM41L = DeviceProfile(
 # against tests/data/dm41x_manyfiles.dm41, a real state whose files span all
 # three regions. Its XROMs are the CX set plus its own additions (X<I>Y, TRNG
 # and the DM41X module): its built-in library, dm41x-cx.json. The
-# DM41XN is treated identically (the DM41X plan, archived on #78), except that
-# its newer USB interface does offer a serial console; when its own profile
-# is added it will set supports_serial=True. The DM41X is strictly
-# file-based, so its mode offers no serial actions.
+# DM41X is strictly file-based, so its mode offers no serial actions; a later
+# model with the same memory and a serial console would get its own profile
+# with supports_serial=True (the DM41X plan, archived on #78).
 DM41X = DeviceProfile(
     "DM41X",
     ((0x40, 0xBF), (0x201, 0x2EF), (0x301, 0x3EF)),

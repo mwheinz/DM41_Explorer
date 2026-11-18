@@ -588,7 +588,7 @@ def test_a_d41_file_saves_back_identically(app, tmp_path):
         "dm41x_manyfiles.dm41",
         "xrom.d41",
         "dm41x_xrom_keys.d41",
-        "dm41xn.dm41",
+        "dm41x_xiy_trng.dm41",
         "dm41x_retpfl_before.d41",
         "dm41x_retpfl_after.d41",
         "lkaoff3.d41",

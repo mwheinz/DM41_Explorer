@@ -4,7 +4,7 @@
 
 This document describes how the DM41X exchanges files with a computer: how its USB disk mode is entered, what is on the disk, how the clock can be set and corrected, and how USB power behaves. The state file on the disk is described in `state_format.md`, and the Full Backup set in `backup_set.md` and `cst.md`.
 
-Everything here is about the DM41X. Nothing is known, and nothing is assumed, about the DM41XN.
+Everything here is about the DM41X.
 
 ## 1. Source Material
 

@@ -1,15 +1,15 @@
 """Tests for the DM41X's additions to the XROM table (phase 1 of
 the DM41X plan, archived on #78).
 
-The DM41X (and DM41XN) add 18 XROM functions to the HP-41CX set: X<I>Y
+The DM41X adds 18 XROM functions to the HP-41CX set: X<I>Y
 (XROM 25,63), TRNG (26,36), and the 16 functions of the DM41X's own module
 (26,38 - 26,53). Their names and codes below were transcribed from hp41uc's
 table (hp41ucg.h, the "-DM 41X-" section at 26,37) so the checks don't depend
 on that source tree being present. X<I>Y is not in hp41uc yet; its code comes
-from a real DM41XN state file.
+from a real state file.
 
-Every code is confirmed by a state file captured on a real DM41X or DM41XN:
-  - tests/data/dm41xn.dm41 / dm41xn.txt: one program calling X<I>Y and TRNG.
+Every code is confirmed by a state file captured on real hardware:
+  - tests/data/dm41x_xiy_trng.dm41 / dm41x_xiy_trng.txt: one program calling X<I>Y and TRNG.
   - tests/data/xrom.d41 / xrom.raw / xrom.txt: one program calling ED$, X<I>Y,
     TRNG and the 16 DM41X-module functions (plan, S5).
   - tests/data/dm41x_xrom_keys.d41: LKAON, LKAOFF and ED$ assigned to keys
@@ -249,17 +249,19 @@ def test_names_compile_with_extra_whitespace_and_any_case():
     assert decode_program_txt(text).startswith(b"".join(want))
 
 
-def test_dm41xn_text_compiles_to_the_bytes_in_the_state_file():
-    compiled = decode_program_txt((DATA_DIR / "dm41xn.txt").read_bytes())
-    in_memory = _program_bytes("dm41xn.dm41")
+def test_dm41x_xiy_trng_text_compiles_to_the_bytes_in_the_state_file():
+    compiled = decode_program_txt((DATA_DIR / "dm41x_xiy_trng.txt").read_bytes())
+    in_memory = _program_bytes("dm41x_xiy_trng.dm41")
     # Only the END differs: the compiler writes a placeholder END (C0 00 0D),
     # the calculator's carries the link to the previous program.
     assert compiled[:-3] == in_memory[:-3]
     assert compiled[-3:] == b"\xc0\x00\x0d"
 
 
-def test_dm41xn_program_decompiles_to_xrom_numbers_and_names():
-    lines = encode_program_txt(_program_bytes("dm41xn.dm41")).decode().splitlines()
+def test_dm41x_xiy_trng_program_decompiles_to_xrom_numbers_and_names():
+    lines = (
+        encode_program_txt(_program_bytes("dm41x_xiy_trng.dm41")).decode().splitlines()
+    )
     assert lines[1:3] == ["XROM 25,63 ;X<I>Y", "XROM 26,36 ;TRNG"]
 
 

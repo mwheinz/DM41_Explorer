@@ -157,7 +157,7 @@ def render_mnemonic_reference() -> str:
         "",
         "The Key Assignment dialog accepts the same spellings.",
         "",
-        "A note of *DM41X only* marks a function that the DM41X (and DM41XN)",
+        "A note of *DM41X only* marks a function that the DM41X",
         "added to the HP-41CX set. A DM41L or a PX-41CX doesn't have it, but",
         "programs and key assignments that use it still open, display and",
         "save.",

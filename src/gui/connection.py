@@ -339,9 +339,9 @@ class Connection:
         # needs DM41L mode, and opening a state too large for a DM41L in
         # DM41L mode forces a switch to DM41X mode, which disconnects. The
         # check is kept because it is shared with evaluate_mode_switch()
-        # and costs nothing, and because a later model (a DM41XN over
-        # serial) could make the combination reachable again. The XROM
-        # *warning* branch is still reached normally: a state full of
+        # and costs nothing, and because a later model with both a large
+        # XM and a serial console could make the combination reachable
+        # again. The XROM *warning* branch is still reached normally: a state full of
         # DM41X-only functions opens in DM41L mode quite happily.
         memory = self.app.memory
         target = self.serial.profile

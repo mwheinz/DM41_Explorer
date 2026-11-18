@@ -86,7 +86,7 @@ def test_from_value_accepts_names_and_modes(value, expected):
     assert DeviceMode.from_value(value) is expected
 
 
-@pytest.mark.parametrize("value", [None, "", "dm41l", "DM41XN", 0, 41, [], {}])
+@pytest.mark.parametrize("value", [None, "", "dm41l", "DM42", 0, 41, [], {}])
 def test_from_value_falls_back_instead_of_raising(value):
     """A hand-edited preferences file must not stop the app starting, so
     anything unrecognised (including the wrong case) becomes the default."""
@@ -108,8 +108,8 @@ def test_only_the_dm41l_supports_serial():
 
 
 def test_a_mode_asks_its_profile_about_serial():
-    """The gating must go through the profile, so that a DM41XN profile
-    (disk AND serial) can be added without revisiting it."""
+    """The gating must go through the profile, so that a profile with
+    disk AND serial can be added without revisiting it."""
     assert DeviceMode.DM41L.supports_serial is DM41L.supports_serial
     assert DeviceMode.DM41X.supports_serial is DM41X.supports_serial
 
@@ -130,10 +130,10 @@ def test_only_the_dm41x_loads_modules():
 
 
 def test_a_profile_can_declare_serial_and_three_regions():
-    """What a DM41XN profile will look like: the DM41X's memory with a
+    """What a later model's profile could look like: the DM41X's memory with a
     serial console. Nothing in the profile forbids the combination."""
     future = DeviceProfile(
-        "DM41XN",
+        "future",
         DM41X.xm_regions,
         DM41X.builtin_xroms,
         supports_serial=True,

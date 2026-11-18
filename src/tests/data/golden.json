@@ -9116,129 +9116,7 @@
   },
   "alarms": []
  },
- "dm41x_xrom_keys.d41": {
-  "profile": "DM41X",
-  "saves_back": true,
-  "status": {
-   "R00": "0x19C",
-   ".END.": "0x19B",
-   "SIGMA-REG": "0x1A7",
-   "cold_start": "169",
-   "flags_set": [
-    26,
-    27,
-    28,
-    29,
-    37,
-    40
-   ]
-  },
-  "regions": [
-   [
-    "status",
-    "0x000",
-    "0x00F"
-   ],
-   [
-    "nonexistent",
-    "0x010",
-    "0x01F"
-   ],
-   [
-    "ir_printer",
-    "0x020",
-    "0x02F"
-   ],
-   [
-    "nonexistent",
-    "0x030",
-    "0x03F"
-   ],
-   [
-    "xm",
-    "0x040",
-    "0x0BF"
-   ],
-   [
-    "key",
-    "0x0C0",
-    "0x0C1"
-   ],
-   [
-    "alarms",
-    "0x0C2",
-    "0x0C1"
-   ],
-   [
-    "unused",
-    "0x0C2",
-    "0x19A"
-   ],
-   [
-    "program",
-    "0x19B",
-    "0x19B"
-   ],
-   [
-    "data",
-    "0x19C",
-    "0x1FF"
-   ],
-   [
-    "xm",
-    "0x201",
-    "0x2EF"
-   ],
-   [
-    "xm",
-    "0x301",
-    "0x3EF"
-   ]
-  ],
-  "global_chain": [],
-  "programs": [],
-  "xm_files": [],
-  "xm_directory_end": null,
-  "key_assignments": {
-   "assignments": [
-    [
-     13,
-     false,
-     "ED",
-     33,
-     166,
-     115
-    ],
-    [
-     12,
-     false,
-     "LKAOFF",
-     17,
-     166,
-     176
-    ],
-    [
-     11,
-     false,
-     "LKAON",
-     1,
-     166,
-     177
-    ]
-   ],
-   "flags_set": [
-    [
-     11,
-     12,
-     13
-    ],
-    []
-   ],
-   "flag_clear": []
-  },
-  "alarms": []
- },
- "dm41xn.dm41": {
+ "dm41x_xiy_trng.dm41": {
   "profile": "DM41X",
   "saves_back": true,
   "status": {
@@ -9360,6 +9238,128 @@
    "assignments": [],
    "flags_set": [
     [],
+    []
+   ],
+   "flag_clear": []
+  },
+  "alarms": []
+ },
+ "dm41x_xrom_keys.d41": {
+  "profile": "DM41X",
+  "saves_back": true,
+  "status": {
+   "R00": "0x19C",
+   ".END.": "0x19B",
+   "SIGMA-REG": "0x1A7",
+   "cold_start": "169",
+   "flags_set": [
+    26,
+    27,
+    28,
+    29,
+    37,
+    40
+   ]
+  },
+  "regions": [
+   [
+    "status",
+    "0x000",
+    "0x00F"
+   ],
+   [
+    "nonexistent",
+    "0x010",
+    "0x01F"
+   ],
+   [
+    "ir_printer",
+    "0x020",
+    "0x02F"
+   ],
+   [
+    "nonexistent",
+    "0x030",
+    "0x03F"
+   ],
+   [
+    "xm",
+    "0x040",
+    "0x0BF"
+   ],
+   [
+    "key",
+    "0x0C0",
+    "0x0C1"
+   ],
+   [
+    "alarms",
+    "0x0C2",
+    "0x0C1"
+   ],
+   [
+    "unused",
+    "0x0C2",
+    "0x19A"
+   ],
+   [
+    "program",
+    "0x19B",
+    "0x19B"
+   ],
+   [
+    "data",
+    "0x19C",
+    "0x1FF"
+   ],
+   [
+    "xm",
+    "0x201",
+    "0x2EF"
+   ],
+   [
+    "xm",
+    "0x301",
+    "0x3EF"
+   ]
+  ],
+  "global_chain": [],
+  "programs": [],
+  "xm_files": [],
+  "xm_directory_end": null,
+  "key_assignments": {
+   "assignments": [
+    [
+     13,
+     false,
+     "ED",
+     33,
+     166,
+     115
+    ],
+    [
+     12,
+     false,
+     "LKAOFF",
+     17,
+     166,
+     176
+    ],
+    [
+     11,
+     false,
+     "LKAON",
+     1,
+     166,
+     177
+    ]
+   ],
+   "flags_set": [
+    [
+     11,
+     12,
+     13
+    ],
     []
    ],
    "flag_clear": []
