@@ -15,6 +15,7 @@ dm41-venv/bin/ruff format <changed .py files>   # CI gates on `ruff format --che
 dm41-venv/bin/ruff check .
 dm41-venv/bin/python -m pytest                   # ASK FIRST (see below); ~75 s
 dm41-venv/bin/python -m pytest src/tests/test_regions.py -k name
+dm41-venv/bin/python -m pytest -m dm41l --dm41l-port=PORT  # real DM41L; + --dm41l-allow-writes
 cd src && ../dm41-venv/bin/python -m gui.app      # run the app
 cd src && ../dm41-venv/bin/python -m tests.golden # regenerate golden.json
 ```

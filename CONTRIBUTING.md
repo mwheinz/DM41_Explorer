@@ -37,6 +37,28 @@ pull request against `main` also runs the full suite on Linux, macOS,
 and Windows via GitHub Actions (`.github/workflows/test.yml`) — a green
 check there is expected before a PR gets merged.
 
+### Tests against a real DM41L
+
+`src/tests/test_dm41l_hardware.py` talks to a real DM41L through the
+app's own serial code. Its tests are skipped unless you name the port,
+so a plain `pytest` and CI never touch a calculator. With the DM41L on
+and its console awake:
+
+```sh
+pytest -m dm41l --dm41l-port=/dev/cu.usbserial-0001
+```
+
+Write the option with `=`: given as `--dm41l-port /dev/...`, pytest takes
+the port for a test path, looks for its configuration under `/dev`, and
+then rejects the option as unknown.
+
+That runs only the read-only tests: battery, clock, and reading the
+memory state. Add `--dm41l-allow-writes` to also run the ones that change
+the calculator. They set its clock to the computer's time and its console
+timeout to your preference, as connecting in the app does, and send its
+own memory state back to it, keeping a backup of the state in pytest's
+temporary folder.
+
 ## Code style
 
 The project uses [`ruff`](https://docs.astral.sh/ruff/) for formatting
