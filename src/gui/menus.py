@@ -28,6 +28,31 @@ def _format_recent_label(path_str: str) -> str:
     return "…" + path_str[-(_MAX_RECENT_LABEL_LEN - 1) :]
 
 
+# How long a menu item waits after its command returns before running its
+# action (see _Menu).
+MENU_COMMAND_DELAY_MS = 20
+
+
+class _Menu(Menu):
+    """A Menu whose items run their action from the normal event loop, a
+    moment after the menu command itself has returned.
+
+    On macOS a menu command runs inside the menu-tracking event loop, and a
+    dialog that waits for itself to close (wait_window(), as ask_yes_no()
+    does) never gets its events there: it shows, but can't be clicked, and
+    the app hangs with the beachball. Send State to DM41L hung that way
+    after its confirmation, and so could Open and Open Recent when they
+    offer a mode switch. Deferring every item, rather than the ones that
+    happen to open such a dialog today, keeps a later one from bringing the
+    hang back."""
+
+    def add_command(self, cnf=None, **kw):
+        command = kw.get("command")
+        if command is not None:
+            kw["command"] = lambda: self.after(MENU_COMMAND_DELAY_MS, command)
+        super().add_command(cnf or {}, **kw)
+
+
 class MenuBar:
     """The menu bar of the main window `app`. `is_mac` puts About and
     Preferences in the macOS application menu and uses Command for the
@@ -46,7 +71,7 @@ class MenuBar:
     def _build(self):
         app = self.app
         acc = self._acc
-        menubar = Menu(app)
+        menubar = _Menu(app)
 
         if self.is_mac:
             # About and Preferences live in the application menu (under the
@@ -58,7 +83,7 @@ class MenuBar:
             app.createcommand("::tk::mac::ShowPreferences", app.show_preferences)
 
         # File Menu
-        file_menu = Menu(menubar, tearoff=0)
+        file_menu = _Menu(menubar, tearoff=0)
         file_menu.add_command(
             label="New Memory Buffer",
             command=app.state_files.new_buffer,
@@ -72,7 +97,7 @@ class MenuBar:
             accelerator=f"{acc}+O",
             underline=0,
         )
-        self.recent_menu = Menu(file_menu, tearoff=0)
+        self.recent_menu = _Menu(file_menu, tearoff=0)
         file_menu.add_cascade(label="Open Recent", menu=self.recent_menu, underline=5)
         file_menu.add_command(
             label="Save State",
@@ -106,7 +131,7 @@ class MenuBar:
 
         # Connect Menu
         connection = app.connection
-        connect_menu = Menu(menubar, tearoff=0)
+        connect_menu = _Menu(menubar, tearoff=0)
         connect_menu.add_command(
             label="Connect / Reconnect...",
             command=connection.show_connect_dialog,
@@ -152,7 +177,7 @@ class MenuBar:
         menubar.add_cascade(label="Connect", menu=connect_menu)
 
         # View Menu
-        view_menu = Menu(menubar, tearoff=0)
+        view_menu = _Menu(menubar, tearoff=0)
         view_menu.add_command(
             label="Refresh Tabs",
             command=app.render_tabs,
@@ -162,7 +187,7 @@ class MenuBar:
         menubar.add_cascade(label="View", menu=view_menu)
 
         # Tools Menu
-        tools_menu = Menu(menubar, tearoff=0)
+        tools_menu = _Menu(menubar, tearoff=0)
         tools_menu.add_command(
             label="Pack Memory...",
             command=lambda: pack_memory(app),
@@ -176,7 +201,7 @@ class MenuBar:
         menubar.add_cascade(label="Tools", menu=tools_menu)
 
         # Help Menu
-        help_menu = Menu(menubar, tearoff=0)
+        help_menu = _Menu(menubar, tearoff=0)
         if not self.is_mac:
             help_menu.add_command(label="About DM41_Explorer", command=app.show_about)
             help_menu.add_separator()

@@ -743,6 +743,30 @@ def test_connect_menu_command_returns_before_the_dialog_blocks(dm41l_app):
         prompt.assert_called_once_with(None)
 
 
+def _menu_index(menu, label):
+    for index in range(menu.index("end") + 1):
+        if menu.type(index) == "command" and menu.entrycget(index, "label") == label:
+            return index
+    raise AssertionError(f"no menu entry {label!r}")
+
+
+def test_send_menu_item_returns_before_the_confirmation_blocks(connected_app):
+    """Send asks for confirmation in a dialog that waits for itself to
+    close, which on macOS hung the app when started from inside the menu
+    command: Yes could not be clicked. So the menu item must return first
+    and ask from the normal event loop -- as every menu item now does."""
+    connected_app.memory = Memory.from_file(DATA_DIR / "6x-xm.dm41", profile=DM41L)
+    menu = connected_app.menus.connect_menu
+    with mock.patch("gui.connection.ask_yes_no", return_value=False) as confirm:
+        menu.invoke(_menu_index(menu, "Send State to DM41L"))
+        confirm.assert_not_called()
+        deadline = time.time() + 2
+        while not confirm.called and time.time() < deadline:
+            connected_app.update()
+            time.sleep(0.01)
+        confirm.assert_called_once()
+
+
 # -- Explicit DM41L/DM41X modes (plan, phase 6 -- GitHub issue #43) ----------
 #
 # The mode is the single source of truth for the active profile. Changing it
