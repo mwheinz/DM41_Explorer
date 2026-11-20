@@ -48,7 +48,10 @@ def pytest_collection_modifyitems(config, items):
     no_port = pytest.mark.skip(reason="needs a DM41L: pass --dm41l-port=PORT")
     no_writes = pytest.mark.skip(reason="changes the DM41L: pass --dm41l-allow-writes")
     for item in items:
-        if "dm41l" in item.keywords and not port:
+        # Markers only, never item.keywords: those also hold test names and
+        # parameter ids, so a test parametrized with the string "dm41l"
+        # (a wrongly cased mode name) was skipped as if it needed hardware.
+        if item.get_closest_marker("dm41l") and not port:
             item.add_marker(no_port)
-        elif "dm41l_writes" in item.keywords and not writes:
+        elif item.get_closest_marker("dm41l_writes") and not writes:
             item.add_marker(no_writes)
